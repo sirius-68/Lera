@@ -3,6 +3,7 @@ import { Subject } from '../engine/types';
 import { actions, getState, useStore } from '../store';
 import { GOALS } from '../store/game';
 import { back, resetNav } from '../store/nav';
+import { STUDY_TIMES, disableReminders, enableReminders } from '../store/remind';
 import { Button3D, confirmDialog, haptic, toast } from '../ui/kit';
 import { Icon } from '../ui/icons';
 
@@ -83,6 +84,38 @@ export function SettingsScreen() {
               </button>
             ))}
             <p className="faint" style={{ fontSize: 13 }}>You can also switch inside any problem.</p>
+          </section>
+
+          <section className="col" style={{ gap: 8 }}>
+            <span className="label">Reminders</span>
+            <div className="goal-grid">
+              <button
+                className={!profile.notifications ? 'on' : ''}
+                onClick={() => {
+                  haptic(5);
+                  actions.setProfile({ notifications: false });
+                  void disableReminders();
+                }}
+              >
+                <b>Off</b>
+                <span>No nudges</span>
+              </button>
+              {Object.entries(STUDY_TIMES).map(([id, t]) => (
+                <button
+                  key={id}
+                  className={profile.notifications && (profile.studyTime ?? 'evening') === id ? 'on' : ''}
+                  onClick={async () => {
+                    haptic(5);
+                    const ok = await enableReminders(id, profile.name);
+                    actions.setProfile({ notifications: ok, studyTime: id });
+                  }}
+                >
+                  <b>{t.label.split(' · ')[0]}</b>
+                  <span>{t.label.split(' · ')[1]}</span>
+                </button>
+              ))}
+            </div>
+            <p className="faint" style={{ fontSize: 13 }}>One reminder a day, sent by this phone itself. Nothing leaves the device.</p>
           </section>
 
           <section className="col" style={{ gap: 8 }}>

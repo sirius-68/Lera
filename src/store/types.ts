@@ -9,6 +9,10 @@ export interface Profile {
   language: string;
   /** Answers from the onboarding quiz, in order. */
   goal?: string;
+  /** School, university, self-taught, returning — from onboarding. */
+  stage?: string;
+  /** 'morning' | 'afternoon' | 'evening' | 'night': when reminders should land. */
+  studyTime?: string;
   struggle?: string;
   explainStyle?: string;
   frequency?: string;

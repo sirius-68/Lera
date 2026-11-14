@@ -75,7 +75,11 @@ Anything built into an app can be extracted from it, so for a public release poi
 
 ## Android
 
-`.github/workflows/android-apk.yml` typechecks, tests, builds the web app, wraps it with Capacitor and uploads a debug APK on every push to `main` or `android-apk`. `android-overrides/LeraWebView.java` keeps Android's own Copy/Share menu from appearing over Lera's text toolbar.
+`.github/workflows/android-apk.yml` typechecks, tests, builds the web app, wraps it with Capacitor and uploads a debug APK on every push to `main` or `android-apk`. `android-overrides/LeraWebView.java` keeps Android's own Copy/Share menu from appearing over Lera's text toolbar; `MainActivity.java` shrinks the page when the keyboard opens so the field being typed in stays visible. Reminders are local notifications (`@capacitor/local-notifications`, `src/store/remind.ts`), scheduled on the phone.
+
+## Books and long files
+
+`src/ingest/toc.ts` decides what is a chapter and what is a section the way a PDF reader does: the file's own outline first, then a printed contents page, then heading numbering, then type size. Cover, copyright, contents, preface and index pages are left out. Lessons are shown one sub-topic per page (`paginate` in `src/screens/Lesson.tsx`), and uploaded notes are stored in IndexedDB (`src/store/docdb.ts`) so a 400-page book does not hit the localStorage limit. Chats with Lera are kept per topic in the saved state.
 
 ## What is real and what is a placeholder
 
