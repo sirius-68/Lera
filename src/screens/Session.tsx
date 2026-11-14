@@ -1,17 +1,22 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { aiCheckOpen, aiDiagnose } from '../ai/tasks';
+import { aiCheckOpen, aiDiagnose, aiSimplify } from '../ai/tasks';
 import { aiReady } from '../ai/providers';
 import { analyze, cleanPath, hintLadder, HintLadder } from '../engine/analyze';
+import { isCalc } from '../engine/calc/check';
 import { CONCEPTS } from '../engine/concepts';
+import { PLAIN } from '../engine/concepts-calc';
 import { AttemptAnalysis, CheckedLine, Diagnosis, Problem } from '../engine/types';
 import { Lera, Mood } from '../mascot/Lera';
 import { actions, getState, useStore } from '../store';
-import { addDays, buildSession, dayOf, findTopic, Session } from '../store/learner';
-import { back, openOverlay, Route } from '../store/nav';
-import { Button3D, Confetti, CountUp, LeraSays, haptic, toast } from '../ui/kit';
+import { levelOf, totalXp, xpByDay } from '../store/game';
+import { addDays, buildSession, dayOf, findTopic, Session, streak } from '../store/learner';
+import { weaknesses } from '../store/weakness';
+import { back, openOverlay, Route, setBackGuard } from '../store/nav';
+import { Button3D, Confetti, CountUp, LeraSays, Ring, haptic, toast } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import { MathView, RichText, typeset } from '../ui/math';
+import { WeakCard } from './Main';
 
 interface Result {
   problem: Problem;
@@ -32,24 +37,50 @@ const chipTone = (s: Diagnosis['severity']): string => (s === 'gap' ? 'gap' : s 
 
 /* ───────────── the keyboard ───────────── */
 
-function Keyboard({ vars, onKey, onDelete, onEnter, onMove, ready }: { vars: string[]; onKey: (s: string) => void; onDelete: () => void; onEnter: () => void; onMove: (d: -1 | 1) => void; ready: boolean }) {
+function Keyboard({ vars, onKey, onDelete, onEnter, onMove, ready, calc }: { vars: string[]; onKey: (s: string) => void; onDelete: () => void; onEnter: () => void; onMove: (d: -1 | 1) => void; ready: boolean; calc?: boolean }) {
   const [a, b] = [vars[0] ?? 'x', vars[1] ?? (vars[0] === 'y' ? 'x' : 'y')];
-  const rows: { k: string; ins?: string; tone?: string; label?: string }[][] = [
+  type Key = { k: string; ins?: string; tone?: string; label?: string };
+  // calculus swaps the inequality column for the functions it needs
+  const calcRows: Key[][] = [
+    [{ k: a, tone: 'var' }, { k: 'e', tone: 'var' }, { k: '(' }, { k: ')' }, { k: 'x²', ins: '^2', label: 'squared' }, { k: '⌫', tone: 'fn', label: 'Delete' }],
+    [{ k: '7' }, { k: '8' }, { k: '9' }, { k: '+', tone: 'op' }, { k: 'sin', ins: 'sin(', tone: 'op' }, { k: 'xⁿ', ins: '^', label: 'to the power' }],
+    [{ k: '4' }, { k: '5' }, { k: '6' }, { k: '−', ins: '-', tone: 'op', label: 'minus' }, { k: 'cos', ins: 'cos(', tone: 'op' }, { k: '√', ins: 'sqrt(', label: 'square root' }],
+    [{ k: '1' }, { k: '2' }, { k: '3' }, { k: '×', ins: '*', tone: 'op', label: 'times' }, { k: 'ln', ins: 'ln(', tone: 'op' }, { k: '+C', ins: ' + C', tone: 'op', label: 'plus C' }],
+    [{ k: '0' }, { k: '.' }, { k: '=', tone: 'op' }, { k: '÷', ins: '/', tone: 'op', label: 'divided by' }, { k: 'π', ins: 'pi', tone: 'op', label: 'pi' }, { k: '↵', tone: 'go', label: 'Check this line' }],
+  ];
+  const algebraRows: Key[][] = [
     [{ k: a, tone: 'var' }, { k: b, tone: 'var' }, { k: '(' }, { k: ')' }, { k: 'x²', ins: '^2', label: 'squared' }, { k: '⌫', tone: 'fn', label: 'Delete' }],
     [{ k: '7' }, { k: '8' }, { k: '9' }, { k: '+', tone: 'op' }, { k: '<', tone: 'op' }, { k: 'xⁿ', ins: '^', label: 'to the power' }],
     [{ k: '4' }, { k: '5' }, { k: '6' }, { k: '−', ins: '-', tone: 'op', label: 'minus' }, { k: '>', tone: 'op' }, { k: '√', ins: 'sqrt(', label: 'square root' }],
     [{ k: '1' }, { k: '2' }, { k: '3' }, { k: '×', ins: '*', tone: 'op', label: 'times' }, { k: '≤', ins: '<=', tone: 'op' }, { k: '±', tone: 'op' }],
     [{ k: '0' }, { k: '.' }, { k: '=', tone: 'op' }, { k: '÷', ins: '/', tone: 'op', label: 'divided by' }, { k: '≥', ins: '>=', tone: 'op' }, { k: '↵', tone: 'go', label: 'Check this line' }],
   ];
+  const rows = calc ? calcRows : algebraRows;
+  void b;
   return (
     <div className="kbd" aria-label="Maths keyboard">
       <div className="kbd-extra">
         <button onClick={() => onMove(-1)} aria-label="Move left"><Icon name="left" size={18} /></button>
         <button onClick={() => onMove(1)} aria-label="Move right"><Icon name="right" size={18} /></button>
-        <button onClick={() => onKey(' or ')}>or</button>
-        <button onClick={() => onKey(', ')}>,</button>
-        <button onClick={() => onKey('no solution')}>no solution</button>
-        <button onClick={() => onKey('all real numbers')}>all reals</button>
+        {calc ? (
+          <>
+            <button onClick={() => onKey(`d/d${a}(`)}>d/d{a}</button>
+            <button onClick={() => onKey('∫ ')}>∫</button>
+            <button onClick={() => onKey(` d${a}`)}>d{a}</button>
+            <button onClick={() => onKey('tan(')}>tan</button>
+            <button onClick={() => onKey('e^(')}>eˣ</button>
+            <button onClick={() => onKey(`lim ${a}→`)}>lim</button>
+            <button onClick={() => onKey('inf')}>∞</button>
+            <button onClick={() => onKey('DNE')}>no limit</button>
+          </>
+        ) : (
+          <>
+            <button onClick={() => onKey(' or ')}>or</button>
+            <button onClick={() => onKey(', ')}>,</button>
+            <button onClick={() => onKey('no solution')}>no solution</button>
+            <button onClick={() => onKey('all real numbers')}>all reals</button>
+          </>
+        )}
       </div>
       <div className="kbd-grid">
         {rows.flat().map((key) => (
@@ -76,7 +107,8 @@ function Keyboard({ vars, onKey, onDelete, onEnter, onMove, ready }: { vars: str
 
 /* ───────────── one line of working ───────────── */
 
-function Mark({ line }: { line: CheckedLine }) {
+function Mark({ line, pending }: { line: CheckedLine; pending?: boolean }) {
+  if (pending) return <span className="mark wait" aria-label="Not checked yet" />;
   if (line.status === 'ok' || line.status === 'recovered') {
     return (
       <span className="mark ok" aria-label="Follows">
@@ -89,8 +121,17 @@ function Mark({ line }: { line: CheckedLine }) {
   return <span className="mark none" aria-label="Not checked" />;
 }
 
-function DiagnosisCard({ diag, onReview, onFix, fixShown, aiNote }: { diag: Diagnosis; onReview: () => void; onFix: () => void; fixShown: boolean; aiNote?: string }) {
+function DiagnosisCard({ diag, onReview, onFix, fixShown, aiNote, onSense }: { diag: Diagnosis; onReview: () => void; onFix: () => void; fixShown: boolean; aiNote?: string; onSense: (ok: boolean) => Promise<string | null> }) {
   const concept = CONCEPTS[diag.concept];
+  const [sense, setSense] = useState<'yes' | 'no' | null>(null);
+  const [simpler, setSimpler] = useState<string | null>(null);
+  const answer = (ok: boolean) => {
+    haptic(5);
+    setSense(ok ? 'yes' : 'no');
+    onSense(ok)
+      .then((text) => text && setSimpler(text))
+      .catch(() => undefined);
+  };
   return (
     <div className={`diag ${chipTone(diag.severity)}`} role="note">
       <div className="row" style={{ gap: 8 }}>
@@ -98,6 +139,29 @@ function DiagnosisCard({ diag, onReview, onFix, fixShown, aiNote }: { diag: Diag
         <b className="grow" style={{ fontSize: 14.5, lineHeight: 1.3 }}><RichText text={diag.title} /></b>
       </div>
       <p style={{ fontSize: 14.5, lineHeight: 1.5, marginTop: 8 }}><RichText text={aiNote ?? diag.message} /></p>
+      {diag.severity !== 'strategy' && (
+        <div className="sense" data-state={sense ?? 'ask'}>
+          {sense === null && (
+            <>
+              <span>Did that make sense?</span>
+              <button onClick={() => answer(true)}>Yes</button>
+              <button onClick={() => answer(false)}>Not really</button>
+            </>
+          )}
+          {sense === 'yes' && <span className="sense-ok"><Icon name="check" size={14} stroke={3} /> Good. Fix the line and carry on.</span>}
+          {sense === 'no' && (
+            <div className="plainer">
+              <span className="label">In plain words</span>
+              <p><RichText text={simpler ?? PLAIN[diag.concept]} /></p>
+              <button className="review-link" onClick={onReview}>
+                <Icon name="play" size={14} fill />
+                <span>Walk me through an example</span>
+                <Icon name="chevron" size={15} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       {fixShown && diag.fix && (
         <p className="fixline">
           <span className="faint" style={{ fontSize: 12.5 }}>This line should read</span>
@@ -139,6 +203,10 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
   const [compare, setCompare] = useState(false);
   const [shake, setShake] = useState(0);
   const [aiNotes, setAiNotes] = useState<Record<string, string>>({});
+  // 'line' marks each line as it lands; 'end' holds every mark back until the learner asks
+  const [mode, setMode] = useState<'line' | 'end'>(() => getState().profile.checkMode ?? 'line');
+  const [checkedCount, setCheckedCount] = useState(0);
+  const calc = isCalc(problem.kind);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const caret = useRef<number | null>(null);
   const scroller = useRef<HTMLDivElement | null>(null);
@@ -147,15 +215,20 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
   const recorded = useRef(false);
 
   const analysis = useMemo(() => analyze(problem, lines), [problem, lines]);
-  const solved = analysis.verdict === 'solved';
+  const isChecked = (i: number): boolean => mode === 'line' || i < checkedCount;
+  const allChecked = mode === 'line' || checkedCount >= lines.length;
+  const solved = analysis.verdict === 'solved' && allChecked;
   const finished = solved || revealed;
   const clean = useMemo(() => cleanPath(problem), [problem]);
   const vars = useMemo(() => {
+    if (isCalc(problem.kind)) return [problem.variable ?? 'x'];
     const found = [...new Set((problem.given.match(/[a-z]/gi) ?? []).filter((c) => !/[e]/i.test(c) || problem.given.includes('e')))];
     return (problem.variable ? [problem.variable, ...found.filter((v) => v !== problem.variable)] : found).slice(0, 2);
   }, [problem]);
 
-  for (const l of analysis.lines) if (l.status === 'wrong' && l.diag) seen.current.set(`${l.diag.code}:${l.diag.concept}`, l.diag);
+  analysis.lines.forEach((l, i) => {
+    if (isChecked(i) && l.status === 'wrong' && l.diag) seen.current.set(`${l.diag.code}:${l.diag.concept}`, l.diag);
+  });
 
   useLayoutEffect(() => {
     if (caret.current !== null && inputRef.current) {
@@ -209,6 +282,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       // deleting on an empty line pulls the previous line back for editing
       const prev = lines[lines.length - 1];
       setLines(lines.slice(0, -1));
+      setCheckedCount((c) => Math.min(c, lines.length - 1));
       setInput(prev);
       caret.current = prev.length;
       setOpenDiag(null);
@@ -239,6 +313,13 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     setLines(next);
     setInput('');
     setHintOpen(false);
+    if (mode === 'end') {
+      // nothing is marked yet: the learner finishes first, then asks
+      setNote(null);
+      setOpenDiag(null);
+      setMood('idle');
+      return;
+    }
     setNote(line.status === 'unchecked' ? line.note ?? 'I can’t compare this line with the one above, so I’ve left it unmarked.' : null);
     const idx = next.length - 1;
     if (line.status === 'wrong') {
@@ -266,6 +347,43 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       if (line.status === 'recovered') setNote('Back on track: this line is true to the original problem again.');
       setTimeout(() => setMood('idle'), 1100);
     }
+  };
+
+  /** "When I finish" mode: mark every line written so far, all at once. */
+  const checkAll = () => {
+    if (!lines.length || finished) return;
+    const a = analysis;
+    setCheckedCount(lines.length);
+    setHintOpen(false);
+    const wrong = a.lines.filter((l) => l.status === 'wrong');
+    if (a.verdict === 'solved') {
+      for (const l of wrong) if (l.diag) seen.current.set(`${l.diag.code}:${l.diag.concept}`, l.diag);
+      setOpenDiag(wrong.length ? a.lines.findIndex((l) => l.status === 'wrong') : null);
+      setNote(null);
+      setMood('celebrate');
+      haptic([10, 50, 20]);
+      record(a, rung);
+    } else if (wrong.length) {
+      setOpenDiag(a.lines.findIndex((l) => l.status === 'wrong'));
+      setMood('oops');
+      haptic([14, 40, 14]);
+      setTimeout(() => setMood('thinking'), 1400);
+      setNote(`${wrong.length === 1 ? 'One line doesn’t' : `${wrong.length} lines don’t`} follow. Tap a flagged line to see why — then write the corrected line underneath, or delete back to it.`);
+    } else {
+      setOpenDiag(null);
+      setMood('happy');
+      setNote(a.remaining ?? 'Every line follows — but it isn’t finished yet. Keep going.');
+    }
+  };
+
+  const switchMode = () => {
+    const nextMode = mode === 'line' ? 'end' : 'line';
+    haptic(5);
+    if (nextMode === 'line') checkAll();
+    else setCheckedCount(lines.length);
+    setMode(nextMode);
+    actions.setProfile({ checkMode: nextMode });
+    toast(nextMode === 'end' ? 'I’ll wait until you ask before marking anything' : 'Marking each line as you write it');
   };
 
   const askHint = () => {
@@ -333,22 +451,30 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
 
         <ol className="lines">
           {analysis.lines.map((line, i) => (
-            <li key={`${i}:${line.text}`} className={`line ${line.status}`} data-final={line.isFinal && solved && i === analysis.lines.length - 1 ? '' : undefined}>
+            <li key={`${i}:${line.text}`} className={`line ${isChecked(i) ? line.status : 'pending'}`} data-final={line.isFinal && solved && i === analysis.lines.length - 1 ? '' : undefined}>
               <button
                 className="line-row"
-                onClick={() => line.status === 'wrong' && setOpenDiag(openDiag === i ? null : i)}
-                aria-expanded={line.status === 'wrong' ? openDiag === i : undefined}
-                disabled={line.status !== 'wrong'}
+                onClick={() => isChecked(i) && line.status === 'wrong' && setOpenDiag(openDiag === i ? null : i)}
+                aria-expanded={isChecked(i) && line.status === 'wrong' ? openDiag === i : undefined}
+                disabled={!isChecked(i) || line.status !== 'wrong'}
               >
                 <span className="n">{i + 1}</span>
                 <span className="grow" style={{ textAlign: 'left' }}>
                   {line.latex ? <MathView latex={line.latex} block /> : <MathView text={line.text} block />}
                 </span>
-                <Mark line={line} />
+                <Mark line={line} pending={!isChecked(i)} />
               </button>
-              {line.status === 'wrong' && line.diag && openDiag === i && (
+              {isChecked(i) && line.status === 'wrong' && line.diag && openDiag === i && (
                 <DiagnosisCard
                   diag={line.diag}
+                  onSense={async (ok) => {
+                    const d = line.diag as Diagnosis;
+                    actions.setUnderstood(d.concept, ok);
+                    const st = getState();
+                    if (ok || !aiReady(st.ai)) return null;
+                    // a connected model rewords the same point more simply; the engine's verdict stays the authority
+                    return aiSimplify(st.ai, { concept: d.concept, title: d.title, message: d.message, plain: PLAIN[d.concept], problem, line: line.text, fix: d.fix });
+                  }}
                   aiNote={aiNotes[line.text]}
                   fixShown={!!fixShown[i]}
                   onFix={() => {
@@ -376,7 +502,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
                 autoCorrect="off"
                 autoComplete="off"
                 spellCheck={false}
-                placeholder={lines.length ? 'Next line…' : 'Write your first line…'}
+                placeholder={lines.length ? (mode === 'end' ? 'Next line… then “Check my work”' : 'Next line…') : 'Write your first line…'}
                 aria-label={`Line ${lines.length + 1} of your working`}
                 onChange={(e: { target: { value: string } }) => {
                   setInput(e.target.value);
@@ -482,12 +608,20 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
             <button className="tool" onClick={askHint}>
               <Icon name="bulb" size={18} /> Hint{rung ? ` ${rung}/3` : ''}
             </button>
+            <button className="tool" onClick={switchMode} aria-label="Change when your working is checked">
+              <Icon name={mode === 'end' ? 'clock' : 'check'} size={16} stroke={2.6} /> {mode === 'end' ? 'At the end' : 'As I go'}
+            </button>
             <span className="grow" />
+            {mode === 'end' && lines.length > checkedCount && (
+              <button className="tool go" onClick={checkAll}>
+                <Icon name="check" size={16} stroke={3} /> Check my work
+              </button>
+            )}
             <button className="tool" onClick={() => (lines.length || rung ? reveal() : finish(true))}>
               {lines.length || rung ? 'Show solution' : 'Skip'}
             </button>
           </div>
-          <Keyboard vars={vars} onKey={insert} onDelete={del} onEnter={commit} onMove={move} ready={!!input.trim()} />
+          <Keyboard vars={vars} onKey={insert} onDelete={del} onEnter={commit} onMove={move} ready={!!input.trim()} calc={calc} />
         </div>
       )}
       {solved && <Confetti fire={1} />}
@@ -562,6 +696,18 @@ export function SessionScreen({ route }: { route: Extract<Route, { name: 'sessio
   const [leaving, setLeaving] = useState(false);
   const total = session.problems.length;
   const problem = session.problems[index];
+
+  // the phone's back button asks before throwing away a session that is under way
+  useEffect(() => {
+    setBackGuard(() => {
+      if (phase === 'solve' && results.length + 1 < total && !leaving) {
+        setLeaving(true);
+        return true;
+      }
+      return false;
+    });
+    return () => setBackGuard(null);
+  }, [phase, results.length, total, leaving]);
 
   if (total === 0) {
     return (
@@ -668,6 +814,18 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
   const gap = list.find((m) => m.severity === 'gap');
   const today = dayOf();
   const allClean = done.length > 0 && clean === done.length;
+  const attempts = useStore((s) => s.attempts);
+  const read = useStore((s) => s.read);
+  const docs = useStore((s) => s.docs);
+  const understood = useStore((s) => s.understood);
+  const goal = useStore((s) => s.profile.dailyXp) || 30;
+  const xpToday = xpByDay({ attempts, read }).get(today) ?? 0;
+  // what this session was worth, by the same rules as the log
+  const earned = done.reduce((sum, r) => sum + (r.verdict === 'solved' ? 10 + (r.marks.filter((m) => m.severity !== 'strategy').length === 0 && r.hintRung < 3 ? 5 : 0) + (r.problem.source === 'review' ? 5 : 0) + (r.hintRung === 0 ? 2 : 0) : 2), 0);
+  const lv = levelOf(totalXp({ attempts, read }));
+  const days = streak(attempts);
+  const touched = new Set(list.map((m) => m.concept));
+  const weak = weaknesses({ attempts, concepts, docs, understood }).filter((w) => (w.concept && touched.has(w.concept)) || w.kind === 'lesson').slice(0, 2);
   const text = allClean
     ? 'Every line followed from the one before. That’s what solid looks like.'
     : gap
@@ -681,7 +839,20 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
         <div className="center" style={{ padding: '6px 0 4px' }}>
           <LeraSays stack size={112} mood={allClean || solved === done.length ? 'celebrate' : 'proud'} text={text} />
         </div>
-        <div className="row" style={{ gap: 10, marginTop: 14 }}>
+        <div className="reward">
+          <div className="reward-xp">
+            <span className="reward-plus">+<CountUp to={earned} /></span>
+            <span>XP</span>
+          </div>
+          <div className="reward-side">
+            <span className={`streakpill ${days > 0 ? 'lit' : ''}`}><Icon name="flame" size={16} fill /> Day {Math.max(1, days)}</span>
+            <span className="faint" style={{ fontSize: 12.5 }}>Level {lv.level} · {lv.title}</span>
+          </div>
+          <Ring value={Math.min(1, xpToday / goal)} size={58} stroke={7} color="var(--flame)">
+            <span style={{ fontSize: 11, fontWeight: 700 }}>{xpToday >= goal ? 'Goal!' : `${xpToday}/${goal}`}</span>
+          </Ring>
+        </div>
+        <div className="row" style={{ gap: 10, marginTop: 12 }}>
           <div className="stat grow"><b><CountUp to={solved} />/{results.length}</b><span>solved</span></div>
           <div className="stat grow"><b><CountUp to={clean} /></b><span>clean</span></div>
           <div className="stat grow"><b><CountUp to={Math.max(1, Math.round(seconds / 60))} /></b><span>min</span></div>
@@ -705,6 +876,12 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
                 </button>
               );
             })}
+          </div>
+        )}
+        {weak.length > 0 && (
+          <div className="col" style={{ gap: 10, marginTop: 14 }}>
+            <span className="label">Worth going back to</span>
+            {weak.map((w) => <WeakCard key={w.id} w={w} />)}
           </div>
         )}
         <p className="faint" style={{ fontSize: 13, textAlign: 'center', marginTop: 14 }}>{session.title}</p>

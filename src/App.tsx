@@ -4,7 +4,9 @@ import { LessonScreen } from './screens/Lesson';
 import { Onboarding } from './screens/Onboarding';
 import { AskSheet, ReviewSheet } from './screens/Overlays';
 import { SessionScreen } from './screens/Session';
+import { SavedScreen } from './screens/Saved';
 import { SettingsScreen } from './screens/Settings';
+import { StreakScreen } from './screens/Streak';
 import { UploadScreen } from './screens/Upload';
 import { useStore } from './store';
 import { back, Route, useNav } from './store/nav';
@@ -28,6 +30,10 @@ function Screen({ route, dir }: { route: Route; dir: number }) {
       return <SettingsScreen />;
     case 'upload':
       return <UploadScreen />;
+    case 'streak':
+      return <StreakScreen />;
+    case 'saved':
+      return <SavedScreen />;
   }
 }
 

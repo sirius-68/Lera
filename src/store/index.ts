@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from 'react';
-import { AiConfig, NO_AI } from '../ai/providers';
+import { BUILD_AI } from '../ai/config';
 import { AttemptAnalysis, ConceptId, Problem } from '../engine/types';
 import { LeraDoc } from '../ingest/types';
 import { AttemptMeta, dayOf, recordAttempt } from './learner';
@@ -17,6 +17,9 @@ export const emptyProfile = (): Profile => ({
   email: '',
   language: 'en',
   focusMinutes: 10,
+  subjects: ['algebra'],
+  dailyXp: 30,
+  checkMode: 'line',
   notifications: false,
   plan: 'none',
   onboarded: false,
@@ -25,7 +28,7 @@ export const emptyProfile = (): Profile => ({
 export const emptyState = (): AppState => ({
   version: 1,
   profile: emptyProfile(),
-  ai: { ...NO_AI },
+  ai: { ...BUILD_AI },
   docs: [],
   highlights: [],
   notes: [],
@@ -34,6 +37,7 @@ export const emptyState = (): AppState => ({
   attempts: [],
   solved: {},
   read: {},
+  understood: {},
 });
 
 function load(): AppState {
@@ -43,7 +47,8 @@ function load(): AppState {
     const data = JSON.parse(raw) as Partial<AppState>;
     if (data.version !== 1) return emptyState();
     const base = emptyState();
-    return { ...base, ...data, profile: { ...base.profile, ...data.profile }, ai: { ...base.ai, ...data.ai } };
+    // the AI backend comes from the build, never from what an older version stored
+    return { ...base, ...data, profile: { ...base.profile, ...data.profile }, ai: { ...BUILD_AI } };
   } catch {
     // private windows and sandboxed previews can refuse storage; the app still runs, it just won't remember
     return emptyState();
@@ -109,10 +114,6 @@ export const actions = {
     setState((s) => ({ profile: { ...s.profile, onboarded: true, createdAt: s.profile.createdAt ?? new Date().toISOString() } }));
   },
 
-  setAi(ai: AiConfig): void {
-    setState({ ai });
-  },
-
   addDoc(doc: LeraDoc): void {
     setState((s) => ({
       docs: [doc, ...s.docs.filter((d) => d.id !== doc.id)],
@@ -169,6 +170,15 @@ export const actions = {
 
   save(item: Omit<SavedItem, 'id' | 'createdAt'>): void {
     setState((s) => ({ saved: [{ ...item, id: uid('s'), createdAt: new Date().toISOString() }, ...s.saved] }));
+  },
+
+  togglePin(id: string): void {
+    setState((s) => ({ saved: s.saved.map((x) => (x.id === id ? { ...x, pinned: !x.pinned } : x)) }));
+  },
+
+  /** The learner's answer to "did that make sense?" for one idea. */
+  setUnderstood(concept: ConceptId, ok: boolean): void {
+    setState((s) => ({ understood: { ...s.understood, [concept]: ok ? dayOf() : 'no' } }));
   },
 
   removeSaved(id: string): void {

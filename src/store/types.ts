@@ -1,5 +1,5 @@
 import { AiConfig } from '../ai/providers';
-import { ConceptId, LineStatus, ProblemKind, Severity, Verdict } from '../engine/types';
+import { ConceptId, LineStatus, ProblemKind, Severity, Subject, Verdict } from '../engine/types';
 import { LeraDoc } from '../ingest/types';
 
 export interface Profile {
@@ -13,6 +13,14 @@ export interface Profile {
   explainStyle?: string;
   frequency?: string;
   focusMinutes: number;
+  /** What the learner is studying; decides which ideas are offered for practice. */
+  subjects: Subject[];
+  /** How maths feels right now, from onboarding: 0 (lost) … 3 (confident). */
+  feel?: number;
+  /** XP to earn each day. */
+  dailyXp: number;
+  /** 'line' marks each line as it is written; 'end' waits until the learner asks. */
+  checkMode: 'line' | 'end';
   notifications: boolean;
   plan: 'none' | 'trial';
   trialStarted?: string;
@@ -51,6 +59,8 @@ export interface SavedItem {
   topicTitle: string;
   text: string;
   createdAt: string;
+  /** Pinned items sit at the top of the notebook. */
+  pinned?: boolean;
 }
 
 /** What Lera knows about one concept for one learner. */
@@ -125,4 +135,6 @@ export interface AppState {
   solved: Record<string, string>;
   /** topicIds whose lesson has been opened */
   read: Record<string, string>;
+  /** conceptId → the learner said the explanation made sense (day) or didn't ('no') */
+  understood: Record<string, string>;
 }

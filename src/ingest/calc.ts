@@ -1,6 +1,7 @@
 import { conceptsOfCalc, prepCalc } from '../engine/calc/check';
 import { E, ev, has, parseCalc, pending, pre, toText, tryParse } from '../engine/calc/expr';
 import { PROMPTS } from '../engine/generate';
+import { mathLatex } from '../engine/latex';
 import { Problem, ProblemKind } from '../engine/types';
 
 /** Calculus exercises and graphs found in a student's notes. */
@@ -189,4 +190,46 @@ export function graphFunctions(text: string, force = false): string[] {
 export function functionOfLine(text: string): string | null {
   const m = /^\s*(?:[yY]|[a-zA-Z]\s*\(\s*x\s*\))\s*=\s*(.+)$/.exec(text.replace(/\$/g, '').replace(/[−–]/g, '-'));
   return m ? plottable(m[1]) : null;
+}
+
+/* ───────────── maths inside a sentence ───────────── */
+
+const OP = /^[+\-−–·*/=<>≤≥]$/;
+const ENGLISH = new Set(['a', 'i', 'is', 'of', 'to', 'in', 'on', 'as', 'at', 'by', 'we', 'an', 'or', 'if', 'so', 'be', 'it', 'the', 'and', 'for', 'are', 'has', 'not', 'but', 'can', 'its']);
+const TERM = /^[0-9a-zA-Z()^.]{1,14}$/;
+
+/**
+ * Files without equation objects (PDFs, plain text) carry their maths as bare text: "the form ax^2 + bx + c = 0".
+ * Wrap each run that contains a power in $…$ so the lesson typesets it. Only runs the engine can read are wrapped.
+ */
+export function markInlineMath(text: string): string {
+  if (text.includes('$') || !text.includes('^')) return text;
+  const words = text.split(' ');
+  const strip = (w: string): string => w.replace(/[.,;:!?]+$/, '');
+  const isTerm = (w: string): boolean => TERM.test(w) && !ENGLISH.has(w.toLowerCase()) && (w.includes('^') || /^[0-9.]+$/.test(w) || /^[0-9]*[a-zA-Z]{1,3}$/.test(w) || /^\(?[0-9a-zA-Z^+\-−]+\)?$/.test(w));
+  const used = new Array<boolean>(words.length).fill(false);
+  const out: { from: number; to: number }[] = [];
+  for (let i = 0; i < words.length; i++) {
+    if (used[i] || !strip(words[i]).includes('^') || !/^[0-9a-zA-Z()^+\-−–·*/=.]+$/.test(strip(words[i]))) continue;
+    let from = i;
+    let to = i;
+    // grow leftwards over "term op", rightwards over "op term" — stop at sentence punctuation
+    while (from >= 2 && OP.test(words[from - 1]) && isTerm(words[from - 2]) && !used[from - 2]) from -= 2;
+    while (to + 2 < words.length && words[to] === strip(words[to]) && OP.test(words[to + 1]) && (isTerm(strip(words[to + 2])) || strip(words[to + 2]).includes('^'))) to += 2;
+    for (let k = from; k <= to; k++) used[k] = true;
+    out.push({ from, to });
+  }
+  if (!out.length) return text;
+  const parts: string[] = [];
+  let at = 0;
+  for (const g of out) {
+    parts.push(...words.slice(at, g.from));
+    const last = words[g.to];
+    const tail = last.slice(strip(last).length);
+    const body = [...words.slice(g.from, g.to), strip(last)].join(' ');
+    parts.push(mathLatex(body.replace(/[−–]/g, '-').replace(/·/g, '*')) !== null ? `$${body}$${tail}` : `${body}${tail}`);
+    at = g.to + 1;
+  }
+  parts.push(...words.slice(at));
+  return parts.join(' ');
 }

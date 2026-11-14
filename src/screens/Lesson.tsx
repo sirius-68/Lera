@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { CONCEPTS } from '../engine/concepts';
+import { functionOfLine } from '../ingest/calc';
 import { isMathLine, plain } from '../ingest/structure';
 import { prettyInline } from '../ingest/text';
 import { Block, LeraDoc, Topic } from '../ingest/types';
@@ -11,6 +12,7 @@ import { back, go, openOverlay, replace, Route } from '../store/nav';
 import { Highlight, Note } from '../store/types';
 import { Button3D, LeraSays, Seg, Sheet, haptic, toast } from '../ui/kit';
 import { Icon } from '../ui/icons';
+import { Graph } from '../ui/Graph';
 import { MathView, tokenize } from '../ui/math';
 
 export const HIGHLIGHT_COLORS = ['#22c55e', '#3b82f6', '#06b6d4', '#f59e0b', '#ec4899', '#a855f7', '#ef4444', '#6366f1'];
@@ -153,7 +155,9 @@ function BlockView({ block, index, ctx }: { block: Block; index: number; ctx: Re
     case 'p':
       return <p className="rd-p"><SegText text={block.text} block={index} item={0} ctx={ctx} /></p>;
     case 'math':
-      return <div className="rd-math"><MathView text={plain(block.text)} block /></div>;
+      return <MathBlock text={plain(block.text)} />;
+    case 'graph':
+      return <Graph fns={block.fns} caption={block.text ? plain(block.text) : undefined} />;
     case 'list': {
       const items = block.items.map((it, i) => <li key={i}><SegText text={it} block={index} item={i} ctx={ctx} /></li>);
       return block.ordered ? <ol className="rd-list">{items}</ol> : <ul className="rd-list">{items}</ul>;
@@ -168,6 +172,25 @@ function BlockView({ block, index, ctx }: { block: Block; index: number; ctx: Re
         </aside>
       );
   }
+}
+
+/** A display equation. When it defines a function of x, it can be drawn on the spot. */
+function MathBlock({ text }: { text: string }) {
+  const [open, setOpen] = useState(false);
+  const fnText = useMemo(() => functionOfLine(text), [text]);
+  return (
+    <>
+      <div className="rd-math">
+        <MathView text={text} block />
+        {fnText && (
+          <button className="graph-it" onClick={() => { haptic(5); setOpen(!open); }} aria-expanded={open}>
+            <Icon name="chart" size={15} /> {open ? 'Hide graph' : 'Graph it'}
+          </button>
+        )}
+      </div>
+      {open && fnText && <Graph fns={[fnText]} />}
+    </>
+  );
 }
 
 /** Worked examples from the notes are revealed a line at a time: predict, then look. */
@@ -387,7 +410,7 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
     <div className="screen lesson" data-dir={dir} ref={screen}>
       <div className="lesson-nav">
         <button className="navpill" onClick={() => go({ name: 'home' })}><Icon name="home" size={18} /> Home</button>
-        <span className="streakpill" title={`${days}-day streak`}><Icon name="flame" size={17} fill /> Day {Math.max(1, days)}</span>
+        <button className="streakpill tap" onClick={() => go({ name: 'streak' })} aria-label={`${days}-day streak`}><Icon name="flame" size={17} fill /> Day {Math.max(1, days)}</button>
         <button className="navpill" onClick={() => go({ name: 'lessons' })}>Lessons <Icon name="book" size={18} /></button>
       </div>
       <div style={{ padding: '2px 20px 10px' }}>
@@ -408,7 +431,7 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
             }
           }}
         >
-          <article className="reader stagger" ref={reader} onClick={onReaderClick}>
+          <article className="reader stagger" ref={reader} onClick={onReaderClick} onContextMenu={(e: { preventDefault(): void }) => e.preventDefault()}>
             <span className="label">{unitTitle}</span>
             <h1 className="rd-title">{topic.title}</h1>
             {topic.blocks.map((b, i) => (
@@ -455,7 +478,7 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
                 ['bulb', 'Explain', () => { openOverlay({ name: 'ask', topicId: topic.id, seed: `Explain this: “${picked.text.slice(0, 300)}”` }); clearSel(); }],
                 ['note', 'Note', () => { setNoteDraft(picked); clearSel(); }],
                 ['chat', 'Ask Lera', () => { openOverlay({ name: 'ask', topicId: topic.id, seed: `Tell me more about “${picked.text.slice(0, 300)}”` }); clearSel(); }],
-                ['bookmark', 'Save', () => { actions.save({ topicId: topic.id, topicTitle: topic.title, text: picked.text }); toast('Saved to your notebook'); clearSel(); }],
+                ['bookmark', 'Save', () => { actions.save({ topicId: topic.id, topicTitle: topic.title, text: picked.text }); haptic([8, 30, 8]); toast('Saved to your notebook'); clearSel(); }],
                 ['share', 'Share', () => { void share(picked.text); clearSel(); }],
               ] as [string, string, () => void][]
             ).map(([icon, label, fn]) => (

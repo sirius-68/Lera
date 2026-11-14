@@ -2,7 +2,7 @@ import { Statement, statementToText, statementVars, walk, Node } from '../engine
 import { finalForm, isCollected, prepare } from '../engine/check';
 import { cleanPath } from '../engine/analyze';
 import { CONCEPTS, conceptsForText } from '../engine/concepts';
-import { buildCalcProblem, graphFunctions } from './calc';
+import { buildCalcProblem, graphFunctions, markInlineMath } from './calc';
 import { PROMPTS } from '../engine/generate';
 import { parseLine } from '../engine/parse';
 import { ConceptId, Problem, ProblemKind } from '../engine/types';
@@ -430,8 +430,11 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
     instruction = undefined;
     instructionLive = false;
   };
-  const pushBlock = (b: Block) => {
+  const pushBlock = (raw: Block) => {
     const t = ensureTopic();
+    // prose from files without equation objects: typeset the powers it mentions
+    const b: Block =
+      raw.t === 'p' || raw.t === 'note' ? { ...raw, text: markInlineMath(raw.text) } : raw.t === 'list' ? { ...raw, items: raw.items.map(markInlineMath) } : raw;
     const last = t.blocks[t.blocks.length - 1];
     if (b.t === 'list' && last && last.t === 'list' && last.ordered === b.ordered) last.items.push(...b.items);
     else t.blocks.push(b);
@@ -502,7 +505,7 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
     const exm = EXAMPLE_LEAD.exec(text);
     if (exm) {
       const rest = text.slice(exm[0].length).trim();
-      inExample = { t: 'example', title: exm[2] ? `Example ${exm[2]}` : 'Example', lines: rest ? [rest] : [] };
+      inExample = { t: 'example', title: exm[2] ? `Example ${exm[2]}` : 'Example', lines: rest ? [markInlineMath(rest)] : [] };
       pushBlock(inExample);
       instructionLive = false;
       continue;
@@ -516,7 +519,7 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
       const worked = /^(solution|answer|step|so|therefore|then|check|hence|решение|ответ)\b/i.test(text);
       const keep = !note && !VERB.test(bare) && (mathy || worked || text.length <= 110);
       if (keep && inExample.lines.length < 14) {
-        inExample.lines.push(text);
+        inExample.lines.push(markInlineMath(text));
         continue;
       }
       inExample = null;

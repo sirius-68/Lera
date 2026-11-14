@@ -4,12 +4,13 @@ import { localAnswer } from '../ai/offline';
 import { aiReady } from '../ai/providers';
 import { aiChat } from '../ai/tasks';
 import { CONCEPTS } from '../engine/concepts';
+import { PLAIN } from '../engine/concepts-calc';
 import { practiceFor, seedFrom } from '../engine/generate';
 import { ConceptId, Problem } from '../engine/types';
 import { Lera } from '../mascot/Lera';
 import { actions, useStore } from '../store';
 import { dayOf, findTopic, statusOf } from '../store/learner';
-import { closeOverlay, go } from '../store/nav';
+import { closeOverlay, go, openOverlay } from '../store/nav';
 import { Button3D, Sheet, haptic } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import { MathView, RichText } from '../ui/math';
@@ -34,6 +35,8 @@ export function ReviewSheet({ concept }: { concept: ConceptId }) {
   const c = CONCEPTS[concept];
   const state = useStore((s) => s.concepts[concept]);
   const [shown, setShown] = useState(0);
+  const said = useStore((s) => s.understood[concept]);
+  const [sense, setSense] = useState<'yes' | 'no' | null>(null);
   const status = statusOf(state);
   const total = c.example.steps.length;
 
@@ -63,6 +66,10 @@ export function ReviewSheet({ concept }: { concept: ConceptId }) {
             <span>You’re here because: <RichText text={state.lastTitle} /></span>
           </p>
         )}
+        <div className="plain-card">
+          <span className="label">In plain words</span>
+          <p><RichText text={PLAIN[concept]} /></p>
+        </div>
         {c.explain.map((p, i) => (
           <p key={i} className="review-p"><RichText text={p} /></p>
         ))}
@@ -106,6 +113,27 @@ export function ReviewSheet({ concept }: { concept: ConceptId }) {
             </button>
           ) : (
             <p className="chip ok" style={{ marginTop: 10 }}><Icon name="check" size={13} stroke={3} /> That’s the whole route</p>
+          )}
+        </div>
+
+        <div className="sense block" data-state={sense ?? 'ask'}>
+          {sense === null && (
+            <>
+              <span>{said === 'no' ? 'Does it make sense now?' : 'Did that make sense?'}</span>
+              <button onClick={() => { haptic(5); setSense('yes'); actions.setUnderstood(concept, true); }}>Yes</button>
+              <button onClick={() => { haptic(5); setSense('no'); actions.setUnderstood(concept, false); setShown(0); }}>Not really</button>
+            </>
+          )}
+          {sense === 'yes' && <span className="sense-ok"><Icon name="check" size={14} stroke={3} /> Good. Now prove it to yourself with three quick ones.</span>}
+          {sense === 'no' && (
+            <div className="plainer">
+              <p>That’s fine — it means we go slower, not that you can’t do it. Read the <b>plain words</b> box at the top once more, then tap through the worked example one step at a time, guessing each step before you reveal it.</p>
+              <button className="review-link" onClick={() => openOverlay({ name: 'ask', seed: `I don’t understand ${c.title.toLowerCase()}. Can you explain it more simply?` })}>
+                <Icon name="chat" size={15} />
+                <span>Ask Lera about this</span>
+                <Icon name="chevron" size={15} />
+              </button>
+            </div>
           )}
         </div>
 

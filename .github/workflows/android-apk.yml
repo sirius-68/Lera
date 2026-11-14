@@ -8,6 +8,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Optional AI backend, baked in at build time (see src/ai/config.ts).
+      # Add these under Settings → Secrets and variables → Actions. Leave them unset to build without AI.
+      LERA_AI_BASE_URL: ${{ secrets.LERA_AI_BASE_URL }}
+      LERA_AI_MODEL: ${{ secrets.LERA_AI_MODEL }}
+      LERA_AI_KEY: ${{ secrets.LERA_AI_KEY }}
     steps:
       - uses: actions/checkout@v5
 
@@ -23,6 +29,12 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
       - name: Build web app
         run: npm run build
 
@@ -30,6 +42,22 @@ jobs:
         run: |
           npx cap add android
           npx cap sync android
+
+      - name: Keep the system text menu out of the way
+        run: |
+          # Lera's own web view class: selection works, Android's Copy/Share menu stays empty
+          pkg=android/app/src/main/java/com/sirius68/lera
+          cp android-overrides/LeraWebView.java "$pkg/"
+          layout=$(find node_modules/@capacitor/android -name '*bridge_layout_main.xml' | head -n 1)
+          test -n "$layout"
+          mkdir -p android/app/src/main/res/layout
+          sed 's/com\.getcapacitor\.CapacitorWebView/com.sirius68.lera.LeraWebView/' "$layout" > "android/app/src/main/res/layout/$(basename "$layout")"
+          grep -q 'com.sirius68.lera.LeraWebView' "android/app/src/main/res/layout/$(basename "$layout")"
+
+      - name: Allow vibration
+        run: |
+          manifest=android/app/src/main/AndroidManifest.xml
+          grep -q 'android.permission.VIBRATE' "$manifest" || sed -i 's#</manifest>#    <uses-permission android:name="android.permission.VIBRATE" />\n</manifest>#' "$manifest"
 
       - name: Use Lera's icon
         run: |

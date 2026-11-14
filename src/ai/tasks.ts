@@ -5,8 +5,9 @@ import { Block, LeraDoc, RawDoc, RawPara, Topic, Unit } from '../ingest/types';
 import { ChatMessage, chat, extractJson } from './client';
 import { AiConfig } from './providers';
 
-const VOICE = `You are Lera, a calm, precise maths tutor for school students.
-Write the way a good teacher talks: short sentences, plain words, no praise padding, no exclamation marks.
+const VOICE = `You are Lera, a calm, precise maths tutor for school and first-year university students (algebra, calculus 1 and calculus 2).
+Write the way a good teacher talks: short sentences, plain everyday words, no praise padding, no exclamation marks. Assume the student is meeting the idea for the first time.
+You work alongside a rule-based checker. The checker decides what is right and wrong; you only put things into words. Stay inside the topic you are given — if asked about something else, say it is outside this lesson.
 Never just hand over a final answer to a problem the student is working on — point at the idea instead.
 Write maths in plain linear text between dollar signs, like $3x + 4 = 19$ or $x^2 - 9$. Do not use LaTeX commands.`;
 
@@ -271,4 +272,33 @@ Return ONLY JSON: {"correct": boolean, "feedback": string (max 60 words; if wron
   const data = extractJson<{ correct?: boolean; feedback?: string }>(reply);
   if (!data || typeof data.correct !== 'boolean') return null;
   return { correct: data.correct, feedback: data.feedback ?? '' };
+}
+
+/**
+ * The student said an explanation didn't make sense: say the same point again, more simply.
+ * The engine has already decided what went wrong and which idea it belongs to — the model only rewords it.
+ */
+export async function aiSimplify(
+  config: AiConfig,
+  input: { concept: ConceptId; title: string; message: string; plain: string; problem?: Problem; line?: string; fix?: string },
+  signal?: AbortSignal,
+): Promise<string> {
+  const c = CONCEPTS[input.concept];
+  return chat(
+    config,
+    [
+      {
+        role: 'system',
+        content: `${VOICE}
+The student read the explanation below and said it did not make sense. Explain the SAME point again for a complete beginner:
+one everyday picture or one tiny number example, at most 70 words, no new rules, no other topics, and do not give the final answer to their problem.
+Idea: ${c.title} — ${c.short}`,
+      },
+      {
+        role: 'user',
+        content: `${input.problem ? `Problem: ${input.problem.prompt} ${input.problem.given}\n` : ''}${input.line ? `My line: ${input.line}\n` : ''}What the checker said: ${plain(input.title)} ${plain(input.message)}\nA plain version I was also shown: ${input.plain}`,
+      },
+    ],
+    { temperature: 0.4, maxTokens: 260, signal },
+  );
 }

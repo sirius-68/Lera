@@ -1,20 +1,24 @@
 import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import { CONCEPTS } from '../engine/concepts';
+import { SUBJECT_LABEL, subjectOf } from '../engine/concepts-calc';
 import { ALL_CONCEPTS, practiceFor, seedFrom } from '../engine/generate';
-import { ConceptId } from '../engine/types';
+import { ConceptId, Subject } from '../engine/types';
 import { LeraDoc } from '../ingest/types';
 import { Lera, Mood } from '../mascot/Lera';
 import { actions, persisted, useStore } from '../store';
+import { levelOf, totalXp, weekStrip, xpByDay } from '../store/game';
 import { byDay, confidence, dayOf, docMastery, dueNow, findTopic, insights, reviewQueue, statusOf, streak, topicMastery, topicStatus } from '../store/learner';
 import { go, openOverlay, Route } from '../store/nav';
 import { AttemptRecord } from '../store/types';
-import { Bar, Button3D, confirmDialog, CountUp, LeraSays, Ring, Seg, toast } from '../ui/kit';
+import { Weakness, weaknesses } from '../store/weakness';
+import { Bar, Button3D, confirmDialog, CountUp, LeraSays, Ring, Seg, haptic, toast } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import { MathView, RichText } from '../ui/math';
 
 const TABS: { name: Route['name']; label: string; icon: string }[] = [
   { name: 'home', label: 'Home', icon: 'home' },
-  { name: 'lessons', label: 'Lessons', icon: 'book' },
+  { name: 'lessons', label: 'Learn', icon: 'book' },
   { name: 'practice', label: 'Practice', icon: 'pencil' },
   { name: 'progress', label: 'Progress', icon: 'chart' },
 ];
@@ -22,12 +26,21 @@ const TABS: { name: Route['name']; label: string; icon: string }[] = [
 export function TabBar({ current }: { current: string }) {
   const concepts = useStore((s) => s.concepts);
   const due = dueNow(concepts).length;
+  const at = Math.max(0, TABS.findIndex((t) => t.name === current));
   return (
-    <nav className="tabbar" aria-label="Main">
+    <nav className="tabbar v2" aria-label="Main" style={{ '--at': at } as CSSProperties}>
+      <i className="tab-pill" aria-hidden="true" />
       {TABS.map((t) => (
-        <button key={t.name} aria-current={current === t.name ? 'page' : undefined} onClick={() => go({ name: t.name } as Route)}>
-          <Icon name={t.icon} size={23} />
-          {t.label}
+        <button
+          key={t.name}
+          aria-current={current === t.name ? 'page' : undefined}
+          onClick={() => {
+            if (current !== t.name) haptic(4);
+            go({ name: t.name } as Route);
+          }}
+        >
+          <Icon name={t.icon} size={23} fill={current === t.name && t.icon === 'home'} />
+          <span>{t.label}</span>
           {t.name === 'practice' && due > 0 && <span className="badge">{due}</span>}
         </button>
       ))}
@@ -40,6 +53,35 @@ const hello = (): string => {
   return h < 5 ? 'Still up' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
 };
 
+/** What tapping a weak spot does. */
+export function actOn(w: Weakness): void {
+  const a = w.action;
+  if (a.type === 'lesson' && a.topicId) go({ name: 'lesson', topicId: a.topicId });
+  else if (a.type === 'review' && a.concept) openOverlay({ name: 'review', concept: a.concept });
+  else if (a.concept) go({ name: 'session', problems: practiceFor(a.concept, 4, seedFrom(`${dayOf()}:${a.concept}:${Date.now() % 991}`)), title: CONCEPTS[a.concept].title });
+  else go({ name: 'practice' });
+}
+
+export function WeakCard({ w, compact }: { w: Weakness; compact?: boolean }) {
+  return (
+    <div className={`weak ${w.tone}`}>
+      <div className="row" style={{ gap: 8, alignItems: 'flex-start' }}>
+        <span className="weak-ic"><Icon name={w.tone === 'gap' ? 'target' : w.tone === 'slip' ? 'eye' : 'bulb'} size={18} /></span>
+        <div className="grow">
+          <b>{w.title}</b>
+          {!compact && <p><RichText text={w.detail} /></p>}
+          {w.topic && w.action.type !== 'lesson' && <span className="weak-topic"><Icon name="book" size={13} /> Taught in: {w.topic.title}</span>}
+        </div>
+      </div>
+      <button className="weak-act" onClick={() => actOn(w)}>
+        <Icon name={w.action.type === 'lesson' ? 'book' : w.action.type === 'review' ? 'bulb' : 'pencil'} size={16} />
+        <span className="grow" style={{ textAlign: 'left' }}>{w.action.label}</span>
+        <Icon name="chevron" size={15} />
+      </button>
+    </div>
+  );
+}
+
 /* ───────────── home ───────────── */
 
 export function HomeScreen() {
@@ -48,63 +90,106 @@ export function HomeScreen() {
   const concepts = useStore((s) => s.concepts);
   const solved = useStore((s) => s.solved);
   const attempts = useStore((s) => s.attempts);
+  const read = useStore((s) => s.read);
+  const understood = useStore((s) => s.understood);
+  const kept = useStore((s) => s.saved.length + s.notes.length + s.highlights.length);
   const lastTopicId = useStore((s) => s.lastTopicId);
   const state = { concepts, solved };
+  const game = { attempts, read };
   const due = dueNow(concepts);
   const days = streak(attempts);
   const today = dayOf();
-  const doneToday = attempts.filter((a) => a.day === today).length;
+  const doneToday = attempts.some((a) => a.day === today);
+  const xpToday = xpByDay(game).get(today) ?? 0;
+  const goal = profile.dailyXp || 30;
+  const lv = levelOf(totalXp(game));
+  const week = weekStrip(game);
   const last = findTopic(docs, lastTopicId) ?? (docs[0]?.units[0]?.topics[0] ? findTopic(docs, docs[0].units[0].topics[0].id) : null);
+  const weak = weaknesses({ attempts, concepts, docs, understood })[0];
 
   let mood: Mood = 'idle';
   let line: string;
   if (docs.length === 0) {
-    line = 'Give me your algebra notes and I’ll turn them into lessons and practice.';
+    line = 'Give me your notes and I’ll turn them into lessons and practice.';
     mood = 'curious';
-  } else if (due.length > 0) {
-    line = `**${CONCEPTS[due[0].concept].title}** is due to come back${due.length > 1 ? `, and ${due.length - 1} more` : ''}. Two minutes now saves you later.`;
-  } else if (doneToday > 0) {
-    line = `${doneToday} ${doneToday === 1 ? 'problem' : 'problems'} today. I’m keeping track of every line.`;
+  } else if (xpToday >= goal) {
+    line = 'Goal reached. Anything more today is a bonus.';
     mood = 'proud';
+  } else if (due.length > 0) {
+    line = `**${CONCEPTS[due[0].concept].title}** is ready to come back${due.length > 1 ? `, and ${due.length - 1} more` : ''}.`;
+  } else if (doneToday) {
+    line = `${goal - xpToday} XP to today’s goal. One or two more problems.`;
+    mood = 'happy';
   } else if (attempts.length === 0) {
     line = 'Your notes are ready. Read a lesson, then show me your working.';
   } else {
     line = days > 1 ? `Day ${days}. Shall we keep it going?` : 'Ready when you are.';
   }
 
+  const start = () => {
+    if (due.length > 0) go({ name: 'session', title: 'Review' });
+    else if (last) go({ name: 'session', topicId: last.topic.id });
+    else go({ name: 'upload' });
+  };
+
   return (
-    <div className="screen" data-dir="0">
-      <div className="topbar" style={{ paddingBottom: 4 }}>
+    <div className="screen home2" data-dir="0">
+      <div className="topbar" style={{ paddingBottom: 6 }}>
         <div className="grow">
           <p className="faint" style={{ fontSize: 13.5, fontWeight: 600 }}>{hello()}</p>
           <h1 style={{ fontSize: 22 }}>{profile.name || 'Welcome'}</h1>
         </div>
-        <span className="streakpill" title="Days in a row"><Icon name="flame" size={17} fill /> {days}</span>
+        <button className={`streakpill tap ${doneToday ? 'lit' : ''}`} onClick={() => go({ name: 'streak' })} aria-label={`${days}-day streak`}>
+          <Icon name="flame" size={17} fill /> {days}
+        </button>
         <button className="iconbtn" onClick={() => go({ name: 'settings' })} aria-label="Settings"><Icon name="gear" /></button>
       </div>
       <div className="scroll">
-        <div className="stagger" style={{ padding: '4px 20px 26px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div className="hero">
-            <LeraSays size={92} mood={mood} text={line} sleepAfter={45000} solid />
-          </div>
-
-          {!persisted && <p className="warn"><Icon name="alert" size={17} /> <span>This browser isn’t letting Lera save. Your progress will last until you close the tab.</span></p>}
-
-          {due.length > 0 && (
-            <button className="card tap due" onClick={() => go({ name: 'session', title: 'Review' })}>
-              <div className="row">
-                <span className="due-ic"><Icon name="refresh" size={20} /></span>
-                <div className="grow">
-                  <b style={{ fontSize: 16 }}>{due.length} {due.length === 1 ? 'topic is' : 'topics are'} due</b>
-                  <p className="muted" style={{ fontSize: 13.5 }}>{due.slice(0, 2).map((d) => CONCEPTS[d.concept].title).join(' · ')}</p>
-                </div>
-                <Icon name="chevron" size={18} />
+        <div className="stagger" style={{ padding: '4px 18px 26px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <section className="today-card">
+            <div className="today-top">
+              <span className="halo"><Lera size={66} mood={mood} sleepAfter={45000} /></span>
+              <div className="grow">
+                <p className="today-say"><RichText text={line} /></p>
               </div>
+            </div>
+            <div className="today-goal">
+              <Ring value={Math.min(1, xpToday / goal)} size={62} stroke={7} color="#fff">
+                <b style={{ fontSize: 15, color: '#fff' }}>{xpToday}</b>
+              </Ring>
+              <div className="grow">
+                <b>{xpToday >= goal ? 'Daily goal done' : 'Today’s goal'}</b>
+                <span>{xpToday} / {goal} XP · Level {lv.level} {lv.title}</span>
+                <div className="week mini">
+                  {week.map((d) => (
+                    <div key={d.day} className={`week-day ${d.active ? 'on' : ''} ${d.today ? 'today' : ''}`}>
+                      <i>{d.active ? <Icon name="check" size={10} stroke={4} /> : null}</i>
+                      <span>{d.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button className="today-cta" onClick={start}>
+              <Icon name={docs.length === 0 ? 'upload' : 'play'} size={17} fill={docs.length > 0} />
+              {docs.length === 0 ? 'Upload your notes' : due.length > 0 ? `Review ${due.length} due ${due.length === 1 ? 'idea' : 'ideas'}` : attempts.length ? 'Continue practising' : 'Start practising'}
             </button>
+          </section>
+
+          {!persisted && <p className="warn"><Icon name="alert" size={17} /> <span>This browser isn’t letting Lera save. Your progress will last until you close the app.</span></p>}
+
+          {weak && (
+            <section className="col" style={{ gap: 8 }}>
+              <div className="row" style={{ justifyContent: 'space-between' }}>
+                <span className="label">Fix this first</span>
+                <button className="linkbtn" style={{ padding: '2px 4px', fontSize: 13.5 }} onClick={() => go({ name: 'progress' })}>All weak spots</button>
+              </div>
+              <WeakCard w={weak} />
+            </section>
           )}
 
-          {last ? (
-            <div className="card continue">
+          {last && (
+            <section className="card continue">
               <span className="label">{attempts.length || Object.keys(solved).length ? 'Continue' : 'Start here'}</span>
               <div className="row" style={{ marginTop: 8, gap: 14 }}>
                 <Ring value={topicMastery(last.topic, state)} size={58}>{Math.round(topicMastery(last.topic, state) * 100)}%</Ring>
@@ -117,20 +202,31 @@ export function HomeScreen() {
                 <Button3D small variant="secondary" style={{ flex: 1 }} onClick={() => go({ name: 'lesson', topicId: last.topic.id })}><Icon name="book" size={17} /> Read</Button3D>
                 <Button3D small style={{ flex: 1 }} onClick={() => go({ name: 'session', topicId: last.topic.id })}><Icon name="pencil" size={17} /> Practise</Button3D>
               </div>
-            </div>
-          ) : (
-            <div className="center" style={{ padding: '6px 0' }}>
-              <Button3D sheen onClick={() => go({ name: 'upload' })}><Icon name="upload" size={18} /> Upload your notes</Button3D>
-            </div>
+            </section>
           )}
+
+          <div className="tiles">
+            <button className="tile flame" onClick={() => go({ name: 'streak' })}>
+              <span className="tile-ic"><Icon name="flame" size={22} fill /></span>
+              <b>{days} day{days === 1 ? '' : 's'}</b>
+              <span>Streak &amp; badges</span>
+            </button>
+            <button className="tile gold" onClick={() => go({ name: 'saved' })}>
+              <span className="tile-ic"><Icon name="bookmark" size={22} fill /></span>
+              <b>{kept}</b>
+              <span>Notebook</span>
+            </button>
+            <button className="tile brand" onClick={() => go({ name: 'upload' })}>
+              <span className="tile-ic"><Icon name="plus" size={22} /></span>
+              <b>Add</b>
+              <span>New notes</span>
+            </button>
+          </div>
 
           {docs.length > 0 && (
             <section>
-              <div className="row" style={{ justifyContent: 'space-between' }}>
-                <span className="label">Your notes</span>
-                <button className="linkbtn" style={{ padding: '4px 6px', fontSize: 14 }} onClick={() => go({ name: 'upload' })}><Icon name="plus" size={15} /> Add</button>
-              </div>
-              <div className="col" style={{ gap: 10, marginTop: 6 }}>
+              <span className="label">Your notes</span>
+              <div className="col" style={{ gap: 10, marginTop: 8 }}>
                 {docs.map((d) => (
                   <button key={d.id} className="card tap" onClick={() => { actions.setActiveDoc(d.id); go({ name: 'lessons' }); }}>
                     <div className="row">
@@ -154,9 +250,11 @@ export function HomeScreen() {
   );
 }
 
-/* ───────────── lessons: the interactive table of contents ───────────── */
+/* ───────────── learn: the notes as a path ───────────── */
 
 const STATUS_LABEL = { new: 'Not started', gap: 'Has a gap', shaky: 'In progress', solid: 'Mastered' } as const;
+/** How far each stop sits from the centre line, so the path winds. */
+const SWAY = [0, 46, 74, 46, 0, -46, -74, -46];
 
 export function LessonsScreen() {
   const docs = useStore((s) => s.docs);
@@ -164,14 +262,10 @@ export function LessonsScreen() {
   const concepts = useStore((s) => s.concepts);
   const solved = useStore((s) => s.solved);
   const read = useStore((s) => s.read);
-  const notes = useStore((s) => s.notes);
-  const saved = useStore((s) => s.saved);
+  const kept = useStore((s) => s.saved.length + s.notes.length + s.highlights.length);
   const lastTopicId = useStore((s) => s.lastTopicId);
-  const [view, setView] = useState<'contents' | 'notebook'>('contents');
   const doc: LeraDoc | undefined = docs.find((d) => d.id === activeDocId) ?? docs[0];
   const state = { concepts, solved };
-  const currentUnit = doc?.units.find((u) => u.topics.some((t) => t.id === lastTopicId))?.id ?? doc?.units[0]?.id;
-  const [open, setOpen] = useState<Record<string, boolean>>(() => (currentUnit ? { [currentUnit]: true } : {}));
 
   if (!doc) {
     return (
@@ -179,7 +273,7 @@ export function LessonsScreen() {
         <div className="scroll center" style={{ justifyContent: 'center', gap: 14, padding: '0 30px' }}>
           <Lera size={104} mood="curious" />
           <h2 style={{ fontSize: 22 }}>No notes yet</h2>
-          <p className="muted" style={{ lineHeight: 1.5 }}>Upload a PDF or Word file and its headings become this table of contents.</p>
+          <p className="muted" style={{ lineHeight: 1.5 }}>Upload a PDF or Word file and its headings become your learning path.</p>
           <Button3D onClick={() => go({ name: 'upload' })}><Icon name="upload" size={18} /> Upload notes</Button3D>
         </div>
         <TabBar current="lessons" />
@@ -188,21 +282,24 @@ export function LessonsScreen() {
   }
 
   const mastery = docMastery(doc, state);
-  const docTopicIds = new Set(doc.units.flatMap((u) => u.topics.map((t) => t.id)));
-  const myNotes = notes.filter((n) => docTopicIds.has(n.topicId));
-  const mySaved = saved.filter((s) => docTopicIds.has(s.topicId));
+  const allTopics = doc.units.flatMap((u) => u.topics);
+  const hereId = allTopics.some((t) => t.id === lastTopicId) ? lastTopicId : allTopics.find((t) => topicStatus(t, state) !== 'solid')?.id ?? allTopics[0]?.id;
+  let n = 0;
 
   return (
     <div className="screen" data-dir="0">
       <header className="contents-head">
         <div className="row" style={{ justifyContent: 'space-between' }}>
-          <span className="label" style={{ color: 'rgba(255,255,255,.75)' }}>Notes contents</span>
-          <button className="head-add" onClick={() => go({ name: 'upload' })} aria-label="Add notes"><Icon name="plus" size={18} /></button>
+          <span className="label" style={{ color: 'rgba(255,255,255,.75)' }}>Your path</span>
+          <span className="row" style={{ gap: 8 }}>
+            <button className="head-add" onClick={() => go({ name: 'saved' })} aria-label={`Notebook, ${kept} kept`}><Icon name="bookmark" size={17} /></button>
+            <button className="head-add" onClick={() => go({ name: 'upload' })} aria-label="Add notes"><Icon name="plus" size={18} /></button>
+          </span>
         </div>
         <h1>{doc.title}</h1>
         <div className="row" style={{ gap: 12, marginTop: 10 }}>
           <div className="grow"><Bar value={mastery} tone="onbrand" label="Mastered" /></div>
-          <b style={{ fontSize: 14 }}>Mastered: <CountUp to={Math.round(mastery * 100)} suffix="%" /></b>
+          <b style={{ fontSize: 14 }}><CountUp to={Math.round(mastery * 100)} suffix="%" /> mastered</b>
         </div>
         {docs.length > 1 && (
           <div className="docswitch">
@@ -212,95 +309,57 @@ export function LessonsScreen() {
           </div>
         )}
       </header>
-      <div style={{ padding: '12px 20px 6px' }}>
-        <Seg options={[{ id: 'contents', label: 'Contents' }, { id: 'notebook', label: `Notebook${myNotes.length + mySaved.length ? ` · ${myNotes.length + mySaved.length}` : ''}` }]} value={view} onChange={setView} />
-      </div>
       <div className="scroll">
-        {view === 'contents' ? (
-          <div className="stagger" style={{ padding: '6px 20px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {doc.warnings.map((w) => (
-              <p key={w} className="warn"><Icon name="alert" size={17} /> <span>{w}</span></p>
-            ))}
-            {doc.units.map((u, ui) => {
-              const isOpen = !!open[u.id];
-              const um = u.topics.reduce((s, t) => s + topicMastery(t, state), 0) / Math.max(1, u.topics.length);
-              return (
-                <section key={u.id} className={`unit ${isOpen ? 'open' : ''}`}>
-                  <button className="unit-head" onClick={() => setOpen({ ...open, [u.id]: !isOpen })} aria-expanded={isOpen}>
-                    <span className="unit-n">{ui + 1}</span>
-                    <span className="grow">
-                      <b>{u.title}</b>
-                      <span className="muted">{u.topics.length} {u.topics.length === 1 ? 'lesson' : 'lessons'} · {Math.round(um * 100)}%</span>
-                    </span>
-                    <span className="chev"><Icon name="down" size={18} /></span>
-                  </button>
-                  <div className="unit-body">
-                    <div>
-                      {u.topics.map((t) => {
-                        const st = topicStatus(t, state);
-                        const seen = !!read[t.id];
-                        return (
-                          <button key={t.id} className="topic-row" onClick={() => go({ name: 'lesson', topicId: t.id })}>
-                            <span className={`dot ${st}`} title={STATUS_LABEL[st]}>{st === 'solid' ? <Icon name="check" size={11} stroke={3.5} /> : null}</span>
-                            <span className="grow">
-                              <b>{t.title}</b>
-                              <span className="muted">
-                                {t.exercises.length ? `${t.exercises.length} ${t.exercises.length === 1 ? 'exercise' : 'exercises'}` : 'Reading'}
-                                {st !== 'new' ? ` · ${STATUS_LABEL[st]}` : seen ? ' · Read' : ''}
-                              </span>
-                            </span>
-                            {t.id === lastTopicId && <span className="chip">Here</span>}
-                            <Icon name="chevron" size={16} />
-                          </button>
-                        );
-                      })}
-                    </div>
+        <div className="path">
+          {doc.warnings.map((w) => (
+            <p key={w} className="warn"><Icon name="alert" size={17} /> <span>{w}</span></p>
+          ))}
+          {doc.units.map((u, ui) => {
+            const um = u.topics.reduce((s, t) => s + topicMastery(t, state), 0) / Math.max(1, u.topics.length);
+            return (
+              <section key={u.id} className="path-unit">
+                <div className={`unit-banner tone-${ui % 4}`}>
+                  <div className="grow">
+                    <span>Unit {ui + 1}</span>
+                    <b>{u.title}</b>
                   </div>
-                </section>
-              );
-            })}
-            <p className="faint" style={{ fontSize: 12.5, textAlign: 'center', marginTop: 6 }}>
-              {doc.fileName} · organised by {doc.via === 'ai' ? 'your AI model' : 'the built-in reader'}
-            </p>
-            <button className="linkbtn" style={{ color: 'var(--ink-3)', fontSize: 13.5, alignSelf: 'center' }} onClick={async () => { if (await confirmDialog(`Remove “${doc.title}”?`, { body: 'Its highlights and notes go too. Your practice history stays.', yes: 'Remove', danger: true })) { actions.removeDoc(doc.id); toast('Notes removed'); } }}>
-              <Icon name="trash" size={15} /> Remove these notes
-            </button>
-          </div>
-        ) : (
-          <div className="stagger" style={{ padding: '6px 20px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {myNotes.length + mySaved.length === 0 && (
-              <div className="center" style={{ gap: 10, padding: '30px 10px' }}>
-                <Lera size={80} mood="curious" />
-                <p className="muted" style={{ lineHeight: 1.5, maxWidth: 280 }}>Select any text in a lesson to highlight it, add a note or save it. It all collects here.</p>
-              </div>
-            )}
-            {myNotes.length > 0 && <span className="label">Your notes</span>}
-            {myNotes.map((n) => (
-              <div key={n.id} className="card">
-                <div className="row" style={{ alignItems: 'flex-start' }}>
-                  <button className="grow" style={{ textAlign: 'left' }} onClick={() => go({ name: 'lesson', topicId: n.topicId })}>
-                    <b>{n.title || 'Untitled'}</b>
-                    <p style={{ fontSize: 14.5, lineHeight: 1.5, margin: '4px 0' }}>{n.content}</p>
-                    <span className="faint" style={{ fontSize: 13 }}>“{n.quote.slice(0, 70)}”</span>
-                  </button>
-                  <button className="iconbtn" onClick={() => actions.removeNote(n.id)} aria-label="Delete note"><Icon name="trash" size={17} /></button>
+                  <Ring value={um} size={44} stroke={5} color="#fff"><span style={{ fontSize: 11.5, fontWeight: 700, color: '#fff' }}>{Math.round(um * 100)}%</span></Ring>
                 </div>
-              </div>
-            ))}
-            {mySaved.length > 0 && <span className="label" style={{ marginTop: 6 }}>Saved passages</span>}
-            {mySaved.map((s) => (
-              <div key={s.id} className="card">
-                <div className="row" style={{ alignItems: 'flex-start' }}>
-                  <button className="grow" style={{ textAlign: 'left' }} onClick={() => go({ name: 'lesson', topicId: s.topicId })}>
-                    <p style={{ fontSize: 15, lineHeight: 1.5 }}>“{s.text}”</p>
-                    <span className="faint" style={{ fontSize: 13 }}>{s.topicTitle}</span>
-                  </button>
-                  <button className="iconbtn" onClick={() => actions.removeSaved(s.id)} aria-label="Remove"><Icon name="trash" size={17} /></button>
+                <div className="path-stops">
+                  {u.topics.map((t) => {
+                    const st = topicStatus(t, state);
+                    const seen = !!read[t.id];
+                    const here = t.id === hereId;
+                    const m = topicMastery(t, state);
+                    const sway = SWAY[n++ % SWAY.length];
+                    return (
+                      <button key={t.id} className={`stop ${st} ${here ? 'here' : ''} ${seen ? 'seen' : ''}`} style={{ '--sway': `${sway}px` } as CSSProperties} onClick={() => go({ name: 'lesson', topicId: t.id })} aria-label={`${t.title}: ${STATUS_LABEL[st]}`}>
+                        {here && <span className="stop-flag">{st === 'new' && !seen ? 'Start' : 'Continue'}</span>}
+                        <span className="stop-node">
+                          <svg viewBox="0 0 80 80" className="stop-ring" aria-hidden="true">
+                            <circle cx="40" cy="40" r="36" />
+                            <circle cx="40" cy="40" r="36" className="fill" style={{ strokeDasharray: `${226 * m} 226` }} />
+                          </svg>
+                          <span className="stop-face">
+                            <Icon name={st === 'solid' ? 'check' : st === 'gap' ? 'target' : t.exercises.length ? 'pencil' : 'book'} size={st === 'solid' ? 28 : 25} stroke={st === 'solid' ? 3.2 : 2} />
+                          </span>
+                        </span>
+                        <span className="stop-label">
+                          <b>{t.title}</b>
+                          <span>{t.exercises.length ? `${t.exercises.filter((e) => solved[e.id]).length}/${t.exercises.length} solved` : 'Reading'}{st === 'gap' ? ' · gap' : ''}</span>
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              </section>
+            );
+          })}
+          <p className="faint" style={{ fontSize: 12.5, textAlign: 'center', marginTop: 6 }}>{doc.fileName}</p>
+          <button className="linkbtn" style={{ color: 'var(--ink-3)', fontSize: 13.5, alignSelf: 'center' }} onClick={async () => { if (await confirmDialog(`Remove “${doc.title}”?`, { body: 'Its highlights and notes go too. Your practice history stays.', yes: 'Remove', danger: true })) { actions.removeDoc(doc.id); toast('Notes removed'); } }}>
+            <Icon name="trash" size={15} /> Remove these notes
+          </button>
+        </div>
       </div>
       <TabBar current="lessons" />
     </div>
@@ -315,16 +374,26 @@ export function PracticeScreen() {
   const docs = useStore((s) => s.docs);
   const concepts = useStore((s) => s.concepts);
   const solved = useStore((s) => s.solved);
+  const profile = useStore((s) => s.profile);
+  const mine: Subject[] = profile.subjects?.length ? profile.subjects : ['algebra'];
+  const [subject, setSubject] = useState<Subject>(mine[0]);
   const queue = reviewQueue(concepts);
   const due = queue.filter((q) => q.inDays <= 0);
   const later = queue.filter((q) => q.inDays > 0);
   const state = { concepts, solved };
   const topics = docs.flatMap((d) => d.units.flatMap((u) => u.topics));
   const quick = (id: ConceptId) => go({ name: 'session', problems: practiceFor(id, 4, seedFrom(`${dayOf()}:${id}:${Date.now() % 991}`)), title: CONCEPTS[id].title });
+  const shownSubject = mine.includes(subject) ? subject : mine[0];
+  const ideas = ALL_CONCEPTS.filter((id) => subjectOf(id) === shownSubject);
 
   return (
     <div className="screen" data-dir="0">
-      <div className="topbar"><h1 style={{ fontSize: 24 }}>Practice</h1></div>
+      <div className="topbar">
+        <h1 style={{ fontSize: 24 }} className="grow">Practice</h1>
+        <button className="modepill" onClick={() => { haptic(5); actions.setProfile({ checkMode: profile.checkMode === 'end' ? 'line' : 'end' }); toast(profile.checkMode === 'end' ? 'Checking each line as you go' : 'Checking when you finish'); }} aria-label="Change when your working is checked">
+          <Icon name={profile.checkMode === 'end' ? 'clock' : 'check'} size={15} stroke={2.6} /> {profile.checkMode === 'end' ? 'Check at the end' : 'Check as I go'}
+        </button>
+      </div>
       <div className="scroll">
         <div className="stagger" style={{ padding: '2px 20px 26px', display: 'flex', flexDirection: 'column', gap: 16 }}>
           <LeraSays
@@ -383,10 +452,11 @@ export function PracticeScreen() {
             </section>
           )}
 
-          <section className="col" style={{ gap: 8 }}>
+          <section className="col" style={{ gap: 10 }}>
             <span className="label">Any idea, any time</span>
+            {mine.length > 1 && <Seg options={mine.map((s) => ({ id: s, label: SUBJECT_LABEL[s] }))} value={shownSubject} onChange={setSubject} />}
             <div className="idea-grid">
-              {ALL_CONCEPTS.map((id) => (
+              {ideas.map((id) => (
                 <button key={id} className={`idea ${statusOf(concepts[id])}`} onClick={() => quick(id)}>
                   {CONCEPTS[id].title}
                 </button>
@@ -424,11 +494,16 @@ function Signature({ attempts }: { attempts: AttemptRecord[] }) {
 export function ProgressScreen() {
   const attempts = useStore((s) => s.attempts);
   const concepts = useStore((s) => s.concepts);
+  const docs = useStore((s) => s.docs);
+  const read = useStore((s) => s.read);
+  const understood = useStore((s) => s.understood);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [allWeak, setAllWeak] = useState(false);
   const days = streak(attempts);
   const solved = attempts.filter((a) => a.verdict === 'solved').length;
   const clean = attempts.filter((a) => a.verdict === 'solved' && a.marks.length === 0 && a.hintRung < 3).length;
   const notes = insights({ attempts, concepts });
+  const weak = weaknesses({ attempts, concepts, docs, understood });
   const known = Object.values(concepts).filter((c) => !!c);
   const order = { gap: 0, shaky: 1, solid: 2, new: 3 } as const;
   const sorted = [...known].sort((a, b) => order[statusOf(a)] - order[statusOf(b)]);
@@ -438,11 +513,13 @@ export function ProgressScreen() {
   const totalApproach = topApproaches.reduce((s, [, n]) => s + n, 0);
   const gaps = attempts.reduce((s, a) => s + a.marks.filter((m) => m.severity === 'gap').length, 0);
   const slips = attempts.reduce((s, a) => s + a.marks.filter((m) => m.severity === 'slip').length, 0);
+  const xp = totalXp({ attempts, read });
+  const lv = levelOf(xp);
 
   return (
     <div className="screen" data-dir="0">
       <div className="topbar">
-        <h1 style={{ fontSize: 24 }}>Progress</h1>
+        <h1 style={{ fontSize: 24 }} className="grow">Progress</h1>
         <button className="iconbtn" onClick={() => go({ name: 'settings' })} aria-label="Settings"><Icon name="gear" /></button>
       </div>
       <div className="scroll">
@@ -450,16 +527,41 @@ export function ProgressScreen() {
           <div className="center" style={{ gap: 14, padding: '60px 30px' }}>
             <Lera size={104} mood="curious" />
             <h2 style={{ fontSize: 21 }}>Nothing to analyse yet</h2>
-            <p className="muted" style={{ lineHeight: 1.5 }}>Solve a few problems and this page fills in: where your working breaks, which ideas are shaky, and how you tend to approach things.</p>
+            <p className="muted" style={{ lineHeight: 1.5 }}>Solve a few problems and this page fills in: where your working breaks, which ideas are shaky, and what to review.</p>
             <Button3D onClick={() => go({ name: 'practice' })}>Go to Practice</Button3D>
           </div>
         ) : (
           <div className="stagger" style={{ padding: '2px 20px 26px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <button className="level-card" onClick={() => go({ name: 'streak' })}>
+              <span className="level-n">{lv.level}</span>
+              <div className="grow" style={{ textAlign: 'left' }}>
+                <b>{lv.title}</b>
+                <div className="xpbar light"><i style={{ width: `${(lv.into / lv.need) * 100}%` }} /></div>
+                <span><CountUp to={xp} /> XP · {lv.need - lv.into} to level {lv.level + 1}</span>
+              </div>
+              <Icon name="chevron" size={18} />
+            </button>
+
             <div className="row" style={{ gap: 10 }}>
               <div className="stat grow"><b><CountUp to={days} /></b><span>day streak</span></div>
               <div className="stat grow"><b><CountUp to={solved} /></b><span>solved</span></div>
               <div className="stat grow"><b><CountUp to={solved ? Math.round((clean / solved) * 100) : 0} suffix="%" /></b><span>clean</span></div>
             </div>
+
+            {weak.length > 0 && (
+              <section className="col" style={{ gap: 10 }}>
+                <div className="row" style={{ justifyContent: 'space-between' }}>
+                  <span className="label">Weak spots · {weak.length}</span>
+                  <span className="faint" style={{ fontSize: 12.5 }}>most useful first</span>
+                </div>
+                {(allWeak ? weak : weak.slice(0, 3)).map((w) => <WeakCard key={w.id} w={w} />)}
+                {weak.length > 3 && (
+                  <button className="linkbtn" style={{ alignSelf: 'center' }} onClick={() => setAllWeak(!allWeak)}>
+                    {allWeak ? 'Show fewer' : `Show all ${weak.length}`}
+                  </button>
+                )}
+              </section>
+            )}
 
             <section className="card">
               <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -475,7 +577,7 @@ export function ProgressScreen() {
 
             {notes.length > 0 && (
               <section className="col" style={{ gap: 8 }}>
-                <span className="label">What I’ve noticed about how you work</span>
+                <span className="label">How you work</span>
                 {notes.map((n, i) => (
                   <div key={i} className={`insight ${n.tone}`}>
                     <Icon name={n.tone === 'gap' ? 'target' : n.tone === 'slip' ? 'eye' : n.tone === 'strategy' ? 'swap' : 'sparkle'} size={18} />
