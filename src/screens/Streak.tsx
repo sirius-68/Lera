@@ -196,7 +196,7 @@ function WidgetCard({ days }: { days: number }) {
         <span className="chip plain">{WIDGETS[at].when}</span>
       </div>
       <div className="wg-hero"><WidgetTile key={at} w={WIDGETS[at]} days={days} live /></div>
-      <p className="muted" style={{ fontSize: 13.5, textAlign: 'center' }}>The longer I’m ignored, the more I change. Tap me on the widget and I react.</p>
+      <p className="muted" style={{ fontSize: 13.5, textAlign: 'center' }}>My mood follows the day, then the days you’re away. Tap me on the widget and I react.</p>
       <div className="wg-row" data-noswipe>
         {WIDGETS.map((w) => (
           <figure key={w.when} className="wg-cell">
@@ -222,7 +222,7 @@ function WidgetCard({ days }: { days: number }) {
           >
             <span className="grow" style={{ textAlign: 'left' }}>
               <b>Test mode</b>
-              <span className="sub">A new mood every minute after you leave the app, instead of hours and days.</span>
+              <span className="sub">For trying it out: a new mood every minute after you leave the app, instead of real hours and days.</span>
             </span>
             <span className="radio" />
           </button>

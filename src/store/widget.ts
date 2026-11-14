@@ -64,8 +64,8 @@ const call = <T,>(fn: (n: Native) => T | undefined, fallback: T): T => {
 export const canPinWidget = (): boolean => call((n) => n.canPin?.(), false);
 export const pinWidget = (wide = false): boolean => call((n) => n.pinWidget?.(wide), false);
 
-/** Test mode: the widget climbs its whole ladder of moods, one a minute, from when the app was last open. */
-export const widgetTestMode = (): boolean => call((n) => n.isTest?.(), true);
+/** Test mode (off by default): the widget climbs its whole ladder of moods, one a minute, from when the app was last open. */
+export const widgetTestMode = (): boolean => call((n) => n.isTest?.(), false);
 export function setWidgetTestMode(on: boolean): void {
   call((n) => (n.setTest?.(on), true), false);
 }

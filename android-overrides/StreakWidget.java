@@ -28,9 +28,9 @@ import java.util.Locale;
  * days that count: sad, then bored, then covered in cobwebs after a week, a
  * ghost after a month, a fossil after a year.
  *
- * In test mode (the default for now, switchable in the app's settings) the
- * same ladder is climbed one step a minute from the moment the app was last
- * open, so every state can be seen in ten minutes.
+ * Test mode (off unless switched on from the app's Streak page) climbs the
+ * same ladder one step a minute from the moment the app was last open, so
+ * every state can be seen in ten minutes.
  *
  * Tapping her makes her react; tapping anywhere else opens practice.
  */
@@ -203,7 +203,7 @@ public class StreakWidget extends AppWidgetProvider {
     static void schedule(Context context) {
         AlarmManager alarms = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         if (alarms == null || !anyPlaced(context)) return;
-        boolean test = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("test", true);
+        boolean test = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("test", false);
         long every = test ? MINUTE : 15 * MINUTE;
         alarms.setRepeating(AlarmManager.RTC, System.currentTimeMillis() + every, every, tick(context));
     }
@@ -229,7 +229,7 @@ public class StreakWidget extends AppWidgetProvider {
         SharedPreferences p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         long now = System.currentTimeMillis();
         boolean known = p.getBoolean("known", false);
-        boolean test = p.getBoolean("test", true);
+        boolean test = p.getBoolean("test", false);
         int stored = p.getInt("streak", 0);
         String last = p.getString("lastDay", "");
         int goal = p.getInt("goal", 30);
@@ -251,15 +251,35 @@ public class StreakWidget extends AppWidgetProvider {
             ignoredDays = TEST_DAYS[step];
             seed = now / MINUTE;
         } else {
+            // the look is re-drawn from the same choices within an hour, so the card does not flicker between lines
             seed = cal.get(Calendar.DAY_OF_YEAR) * 24L + hour;
-            if (last.equals(day(0))) stage = xpToday >= goal ? GOAL : SAFE;
-            else if (last.isEmpty()) stage = NEW;
-            else if (ignoredDays <= 1) stage = hour < 6 ? NIGHT : hour < 12 ? MORNING : hour < 18 ? AFTERNOON : hour < 22 ? EVENING : LATE;
-            else if (ignoredDays >= 365) stage = YEAR;
-            else if (ignoredDays >= 30) stage = MONTH;
-            else if (ignoredDays >= 7) stage = WEEK;
-            else if (ignoredDays >= 3) stage = DAYS;
-            else stage = LOST;
+            if (last.isEmpty()) {
+                // never practised: count from when the app was last opened
+                ignoredDays = Math.max(0, (now - p.getLong("seenAt", now)) / 86400000L) + 1;
+            }
+            if (last.equals(day(0))) {
+                // practised today: nothing more is asked
+                stage = xpToday >= goal ? GOAL : SAFE;
+            } else if (ignoredDays <= 1) {
+                // the streak is alive (or the app is new) and today is still open: the hour sets the tone
+                if (last.isEmpty()) stage = NEW;
+                else if (hour < 6) stage = NIGHT;
+                else if (hour < 12) stage = MORNING;
+                else if (hour < 17) stage = AFTERNOON;
+                else if (hour < 21) stage = EVENING;
+                else stage = LATE;
+            } else if (ignoredDays >= 365) {
+                stage = YEAR;
+            } else if (ignoredDays >= 30) {
+                stage = MONTH;
+            } else if (ignoredDays >= 7) {
+                stage = WEEK;
+            } else if (ignoredDays >= 3) {
+                stage = DAYS;
+            } else {
+                // yesterday was missed: the streak is gone, as of this morning (someone who never had one is simply being waited for)
+                stage = hour < 6 ? NIGHT : last.isEmpty() ? DAYS : LOST;
+            }
         }
         boolean lost = stage >= LOST && stage <= YEAR;
         boolean atRisk = stage == EVENING || stage == LATE;

@@ -59,7 +59,7 @@ public class WidgetBridge {
 
     @JavascriptInterface
     public boolean isTest() {
-        return prefs().getBoolean("test", true);
+        return prefs().getBoolean("test", false);
     }
 
     /** "practice" when the app was opened from a widget, once; otherwise an empty string. */

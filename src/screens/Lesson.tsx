@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { CONCEPTS } from '../engine/concepts';
 import { functionOfLine } from '../ingest/calc';
@@ -15,6 +15,7 @@ import { Celebration } from '../ui/Celebrate';
 import { Icon } from '../ui/icons';
 import { Graph } from '../ui/Graph';
 import { MathView, tokenize } from '../ui/math';
+import { AS_WRITTEN } from '../engine/latex';
 
 export const HIGHLIGHT_COLORS = ['#22c55e', '#3b82f6', '#06b6d4', '#f59e0b', '#ec4899', '#a855f7', '#ef4444', '#6366f1'];
 
@@ -156,7 +157,7 @@ function BlockView({ block, index, ctx }: { block: Block; index: number; ctx: Re
     case 'p':
       return <p className="rd-p"><SegText text={block.text} block={index} item={0} ctx={ctx} /></p>;
     case 'math':
-      return <MathBlock text={plain(block.text)} index={index} ctx={ctx} />;
+      return <MathBlock text={plain(block.text)} steps={block.steps} caption={block.caption} index={index} ctx={ctx} />;
     case 'graph':
       return <Graph fns={block.fns} caption={block.text ? plain(block.text) : undefined} />;
     case 'list': {
@@ -176,13 +177,31 @@ function BlockView({ block, index, ctx }: { block: Block; index: number; ctx: Re
 }
 
 /** A display equation. When it defines a function of x, it can be drawn on the spot. */
-function MathBlock({ text, index, ctx }: { text: string; index: number; ctx: ReaderCtx }) {
+function MathBlock({ text, steps, caption, index, ctx }: { text: string; steps?: string[]; caption?: string; index: number; ctx: ReaderCtx }) {
   const [open, setOpen] = useState(false);
-  const fnText = useMemo(() => functionOfLine(text), [text]);
+  const fnText = useMemo(() => (steps ? null : functionOfLine(text)), [text, steps]);
   return (
     <>
-      <div className="rd-math">
-        <SegText text={`$${text}$`} block={index} item={0} ctx={ctx} />
+      <div className={`rd-math ${steps ? 'worked' : ''}`}>
+        {steps ? (
+          // working over several rows: the expression, then each row that carries on from it, signs lined up
+          <div className="rd-steps">
+            <span />
+            <SegText text={`$${AS_WRITTEN}${text}$`} block={index} item={0} ctx={ctx} />
+            {steps.map((row, k) => {
+              const rel = /^([=≈<>≤≥])\s*/.exec(row);
+              return (
+                <Fragment key={k}>
+                  <span className="rd-rel">{rel ? rel[1] : ''}</span>
+                  <SegText text={`$${AS_WRITTEN}${rel ? row.slice(rel[0].length) : row}$`} block={index} item={k + 1} ctx={ctx} />
+                </Fragment>
+              );
+            })}
+          </div>
+        ) : (
+          <SegText text={`$${caption ? AS_WRITTEN : ''}${text}$`} block={index} item={0} ctx={ctx} />
+        )}
+        {caption && <span className="rd-cap">{caption}</span>}
         {fnText && (
           <button className="graph-it" onClick={() => { haptic(5); setOpen(!open); }} aria-expanded={open}>
             <Icon name="chart" size={15} /> {open ? 'Hide graph' : 'Graph it'}

@@ -29,7 +29,7 @@ const NUMBERING = /^(?:\(?\d{1,2}[.)]|\(?[a-hA-H][.)]|\([ivx]{1,4}\)|[•▪◦�
 const MATH_WORDS = new Set(['sqrt', 'and', 'or', 'abs']);
 
 /** Text with the $…$ maths markers removed. */
-export const plain = (text: string): string => text.replace(/\$/g, '');
+export const plain = (text: string): string => text.replace(/[$\u2063]/g, '');
 
 export function isMathLine(text: string): boolean {
   const t = toMathText(plain(text)).replace(/[.;,]+$/, '');
@@ -519,7 +519,7 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
       const worked = /^(solution|answer|step|so|therefore|then|check|hence|решение|ответ)\b/i.test(text);
       const keep = !note && !VERB.test(bare) && (mathy || worked || text.length <= 110);
       if (keep && inExample.lines.length < 14) {
-        inExample.lines.push(markInlineMath(text));
+        inExample.lines.push(...(tg.para.rows ?? [text]).map(markInlineMath));
         continue;
       }
       inExample = null;
@@ -579,7 +579,13 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
       continue;
     }
     if (mathy) {
-      pushBlock({ t: 'math', text: toMathText(plain(text)).replace(/[.;,]+$/, '') });
+      const tidy = (row: string) => toMathText(plain(row)).replace(/[.;,]+$/, '');
+      const rows = tg.para.rows?.map(tidy);
+      const block: Block = { t: 'math', text: rows ? rows[0] : tidy(text) };
+      // working shown over several rows keeps its rows; a formula with its name beside it keeps the name
+      if (rows && rows.length > 1) block.steps = rows.slice(1);
+      if (tg.para.caption) block.caption = tg.para.caption;
+      pushBlock(block);
       continue;
     }
     pushBlock({ t: 'p', text });

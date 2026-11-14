@@ -11,6 +11,10 @@ export interface RawPara {
   scale?: number;
   /** The paragraph is an equation on its own line. */
   math?: boolean;
+  /** A formula that runs over several rows, one per entry: an expression, then "= …", "= …". */
+  rows?: string[];
+  /** Words set beside the formula on the same row. */
+  caption?: string;
   /** A picture or drawing sits here in the file. */
   figure?: boolean;
   page?: number;
@@ -32,7 +36,7 @@ export interface RawDoc {
 export type Block =
   | { t: 'h'; text: string }
   | { t: 'p'; text: string }
-  | { t: 'math'; text: string }
+  | { t: 'math'; text: string; steps?: string[]; caption?: string }
   | { t: 'list'; ordered: boolean; items: string[] }
   | { t: 'example'; title: string; lines: string[] }
   | { t: 'note'; label: string; text: string }

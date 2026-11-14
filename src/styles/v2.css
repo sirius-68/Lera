@@ -506,3 +506,11 @@ button.unit-banner:active { transform: translateY(3px); }
 .wg-mist { background: linear-gradient(180deg, #3d3a66, #1b1930); }
 .wg-stone { background: linear-gradient(180deg, #c9bfa6, #8c8169); }
 @keyframes wg-in { from { opacity: 0; transform: scale(0.8) rotate(-4deg); } }
+
+
+/* ───────── working shown over several rows, and a formula with its name ───────── */
+.rd-math.worked { text-align: left; overflow-x: auto; }
+.rd-steps { display: grid; grid-template-columns: auto auto; justify-content: center; align-items: center; column-gap: 10px; row-gap: 14px; }
+.rd-steps > [data-seg] { display: block; justify-self: start; }
+.rd-rel { font-family: KaTeX_Main, 'Times New Roman', serif; font-size: 1.05em; color: var(--ink-2); justify-self: end; }
+.rd-cap { display: block; margin-top: 8px; font-size: 13.5px; font-weight: 600; color: var(--ink-3); font-family: var(--sans, inherit); text-align: center; }

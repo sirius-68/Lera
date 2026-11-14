@@ -375,3 +375,12 @@
 .auth-links .linkbtn { padding: 2px 4px; }
 .auth-links .quiet { color: var(--ink-3); font-weight: 600; }
 @keyframes cb-pop { from { opacity: 0; transform: scale(0.3); } }
+
+/* ═════════ splash and welcome: no purple panel — white, with the rings and formulas in purple ═════════ */
+.ob-hero, .ob-welcome .ob-hero { background: none; color: var(--ink); border-radius: 0; margin-left: 0; margin-right: 0; }
+.ob-orbit i { border-color: rgba(108, 99, 255, 0.3); }
+.ob-orbit i::after { color: var(--brand); }
+.ob-hero .halo { background: radial-gradient(circle, #f1efff 0 62%, rgba(108, 99, 255, 0.16) 63% 70%, transparent 71%); }
+.ob-hero .wordmark { color: var(--brand); }
+.ob-hero .splash-tag { color: var(--ink-2); opacity: 1; }
+.ob-hero .splash-mark { filter: drop-shadow(0 14px 22px rgba(76, 66, 214, 0.22)); }

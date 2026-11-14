@@ -1,3 +1,4 @@
+import { Glyph, markInlineFractions, stackFractions, stripCancelMarks, tidyMathRow } from './layout2d';
 import { cleanText } from './text';
 import { TocEntry, applyBookStructure } from './toc';
 import { RawDoc, RawPara } from './types';
@@ -41,15 +42,6 @@ export interface PdfModule {
   getDocument(src: unknown): { promise: Promise<PdfDocument> };
 }
 
-interface Glyph {
-  str: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  font: string;
-}
-
 interface Line {
   text: string;
   x0: number;
@@ -60,6 +52,10 @@ interface Line {
   page: number;
   pageHeight: number;
   pageWidth: number;
+  /** Words set beside a formula on the same row, across a wide gap: "a(b + c) = ab + ac     Distributing over addition". */
+  caption?: string;
+  /** The row contains a rebuilt fraction. */
+  frac?: boolean;
 }
 
 function mode<T>(entries: [T, number][]): T | undefined {
@@ -96,14 +92,21 @@ function buildLines(glyphs: Glyph[], page: number, pageWidth: number, pageHeight
   }
 
   const lines: Line[] = [];
-  for (const row of rows) {
+  for (const rawRow of rows) {
+    const rawInked = rawRow.filter((g) => g.str.trim());
+    if (rawInked.length === 0) continue;
+    const dom = mode(rawInked.map((g): [number, number] => [round(g.h), g.str.trim().length])) ?? rawInked[0].h;
+    const baseline = mode(rawInked.filter((g) => round(g.h) === dom).map((g): [number, number] => [round(g.y, 0.25), g.str.length])) ?? rawInked[0].y;
+    rawRow.sort((a, b) => a.x - b.x);
+    // brackets and dots a symbol font reports as letters
+    const row = tidyMathRow(rawRow, dom, baseline, mode(rawInked.map((g): [string, number] => [g.font, g.str.length])) ?? '');
     const inked = row.filter((g) => g.str.trim());
     if (inked.length === 0) continue;
-    const dom = mode(inked.map((g): [number, number] => [round(g.h), g.str.trim().length])) ?? inked[0].h;
-    const baseline = mode(inked.filter((g) => round(g.h) === dom).map((g): [number, number] => [round(g.y, 0.25), g.str.length])) ?? inked[0].y;
-    row.sort((a, b) => a.x - b.x);
     let text = '';
     let prevEnd: number | null = null;
+    let breakAt = -1;
+    let hasFrac = false;
+    let inkEnd: number | null = null;
     // a raised (or lowered) run can be split over several glyphs: "n", "−1" → ^(n−1)
     type Script = { kind: '^' | '_'; s: string };
     let script = null as Script | null;
@@ -124,6 +127,24 @@ function buildLines(glyphs: Glyph[], page: number, pageWidth: number, pageHeight
         prevEnd = g.x + g.w;
         continue;
       }
+      // a wide gap in a row: a formula on the left and its name on the right
+      if (inkEnd !== null && breakAt < 0 && text.trim() && g.x - inkEnd > 2.4 * dom) {
+        flush();
+        breakAt = text.length;
+      }
+      if (g.frac) {
+        flush();
+        hasFrac = true;
+        const before = text.trimEnd();
+        // "12 · 1/2" where the dot's glyph was not reported: the gap it left is still there
+        if (prevEnd !== null && /\d$/.test(before) && g.x - prevEnd > 0.45 * dom && g.x - prevEnd < 2.4 * dom) text = `${before} · `;
+        else if (text && !/[\s(]$/.test(text)) text += ' ';
+        text += g.str;
+        prevEnd = g.x + g.w;
+        inkEnd = prevEnd;
+        continue;
+      }
+      inkEnd = g.x + g.w;
       const rise = g.y - baseline;
       // exporters disagree about superscript size (Word ≈ 65%, LaTeX ≈ 70%, browsers ≈ 83%), and some
       // keep the full size and only lift the glyph — so go by the lift, with size as supporting evidence
@@ -146,9 +167,22 @@ function buildLines(glyphs: Glyph[], page: number, pageWidth: number, pageHeight
       prevEnd = g.x + g.w;
     }
     flush();
-    const clean = cleanText(text);
+    let caption: string | undefined;
+    if (breakAt > 0) {
+      const left = text.slice(0, breakAt).trim();
+      const right = text.slice(breakAt).trim();
+      if (/=/.test(left) && !/[A-Za-z]{4,}/.test(left) && (right.match(/[A-Za-z]{3,}/g) ?? []).length >= 2 && !/=/.test(right)) {
+        text = left;
+        caption = cleanText(right);
+      }
+    }
+    // a fraction keeps a space from what follows it, so "1/2x" is never read as 1/(2x)
+    if (hasFrac || row !== rawRow) text = text.replace(/\s*·\s*/g, ' · ').replace(/\s+\)/g, ')').replace(/\(\s+/g, '(');
+    const clean = cleanText(text.replace(/(\d\/\d+)(?=[A-Za-z(])/g, '$1 '));
     if (!clean) continue;
     lines.push({
+      caption,
+      frac: hasFrac || undefined,
       text: clean,
       x0: Math.min(...inked.map((g) => g.x)),
       x1: Math.max(...inked.map((g) => g.x + g.w)),
@@ -194,11 +228,15 @@ function assemble(lines: Line[]): RawPara[] {
 
   interface Draft {
     parts: Line[];
+    /** Maths set on rows of its own, away from the margin. */
+    display?: boolean;
   }
   const drafts: Draft[] = [];
   let cur: Draft | null = null;
 
   const looksMath = (t: string) => /[=+−\-*/^<>≤≥]/.test(t) && (t.match(/[A-Za-z]{3,}/g) ?? []).length === 0;
+  // a formula on a row of its own: set in from the margin, stopping well short of the right edge
+  const isDisplay = (l: Line) => round(l.size) <= body * 1.12 && l.x0 > left + 1.2 * body && (!!l.caption || l.x1 < right - 0.12 * width) && looksMath(l.text) && !BULLET.test(l.text);
   let lastNumber: number | null = null;
 
   for (const line of lines) {
@@ -238,8 +276,15 @@ function assemble(lines: Line[]): RawPara[] {
       const numbered = /^\(?(\d{1,2})[.)]\s/.exec(line.text);
       if (numbered) lastNumber = Number(numbered[1]);
     }
+    // rows of working stay together when each begins with the sign that carries on from the row above;
+    // anything else next to a displayed formula starts afresh
+    const shown = isDisplay(line);
+    if (prev && (shown || cur!.display)) {
+      const carries = shown && !!cur!.display && !line.caption && !prev.caption && prev.page === line.page && prev.y - line.y < 6 * Math.max(prev.size, line.size) && /^[=≈<>≤≥]/.test(line.text);
+      split = !carries;
+    }
     if (split || !cur) {
-      cur = { parts: [line] };
+      cur = { parts: [line], display: shown || undefined };
       drafts.push(cur);
     } else {
       cur.parts.push(line);
@@ -262,7 +307,15 @@ function assemble(lines: Line[]): RawPara[] {
       else text += ' ' + part.text;
     }
     const size = round(dft.parts[0].size);
+    // a fraction inside a sentence is typeset where it stands
+    if (!dft.display && dft.parts.some((l) => l.frac)) text = markInlineFractions(text);
     const para: RawPara = { text, scale: size / body, page: dft.parts[0].page, x: dft.parts[0].x0 };
+    if (dft.display) {
+      para.math = true;
+      if (dft.parts.length > 1) para.rows = dft.parts.map((l) => l.text);
+      if (dft.parts[0].caption) para.caption = dft.parts[0].caption;
+      return para;
+    }
     if (titleSize !== null && size === titleSize) para.level = 0;
     else {
       const rank = headingSizes.indexOf(size);
@@ -289,6 +342,9 @@ function assemble(lines: Line[]): RawPara[] {
   });
 }
 
+/** The two steps between glyphs and paragraphs, for tests. */
+export const pdfInternals = { buildLines, assemble };
+
 /** Paragraphs straight off the pages, before any decision about structure — for tests and tools. */
 export async function readPdfRaw(pdfjs: PdfModule, data: Uint8Array): Promise<RawPara[]> {
   const doc = await pdfjs.getDocument({ data, useSystemFonts: true, isEvalSupported: false, verbosity: 0 }).promise;
@@ -312,7 +368,7 @@ async function pageLines(doc: PdfDocument, n: number): Promise<Line[]> {
     const h = it.height || Math.hypot(it.transform[2], it.transform[3]);
     glyphs.push({ str: it.str, x: it.transform[4], y: it.transform[5], w: it.width ?? 0, h, font: it.fontName ?? '' });
   }
-  return buildLines(glyphs, n, vp.width, vp.height);
+  return buildLines(stripCancelMarks(stackFractions(glyphs)), n, vp.width, vp.height);
 }
 
 /** The file's own bookmarks, flattened: what a PDF app shows as its table of contents. */
