@@ -4,6 +4,8 @@ import './styles/base.css';
 import './styles/screens.css';
 import './styles/v2.css';
 import { App } from './App';
+import { getState, onChange } from './store';
+import { syncWidget } from './store/widget';
 
 /*
  * The on-screen keyboard must never cover what is being typed.
@@ -35,3 +37,13 @@ window.addEventListener('resize', () => {
 
 const el = document.getElementById('root');
 if (el) createRoot(el).render(<App />);
+
+// keep the Android home-screen widget in step with the app (does nothing in a browser)
+let widgetTimer: ReturnType<typeof setTimeout> | undefined;
+const pushWidget = () => {
+  clearTimeout(widgetTimer);
+  widgetTimer = setTimeout(() => syncWidget(getState()), 400);
+};
+onChange(pushWidget);
+pushWidget();
+document.addEventListener('visibilitychange', pushWidget);

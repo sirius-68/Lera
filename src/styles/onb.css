@@ -237,3 +237,32 @@
 @keyframes grow-bar { from { transform: scaleY(0); } }
 .ob-projection-cap { font-size: 13.5px; color: var(--ink-2); margin-top: 8px; line-height: 1.45; }
 .ob-done { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 0 26px; }
+
+
+/* ───────── second pass: questions asked in a bubble, tiles, a three-part bar ───────── */
+.ob-segs { flex: 1; display: flex; gap: 6px; }
+.ob-segs i { flex: 1; height: 8px; border-radius: 999px; background: #ebe9f5; overflow: hidden; }
+.ob-segs b { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7b73ff, var(--brand)); transition: width 0.5s cubic-bezier(0.3, 0.8, 0.2, 1); }
+.ob-ask { display: flex; align-items: flex-start; gap: 12px; margin: 4px 0 18px; }
+.ob-ask .lera { margin-top: 2px; }
+.ob-bubble { position: relative; flex: 1; background: #f6f5ff; border: 2px solid #e4e1ff; border-radius: 6px 22px 22px 22px; padding: 13px 16px 14px; animation: ob-bubble 0.45s var(--spring) both; transform-origin: 0 0; }
+.ob-bubble::before { content: ''; position: absolute; left: -9px; top: 12px; width: 14px; height: 14px; background: #f6f5ff; border-left: 2px solid #e4e1ff; border-bottom: 2px solid #e4e1ff; transform: rotate(45deg); border-radius: 0 0 0 4px; }
+.ob-bubble h2 { font-size: 20px; line-height: 1.22; font-weight: 800; letter-spacing: -0.01em; text-wrap: balance; }
+.ob-bubble p { margin-top: 5px; font-size: 14px; line-height: 1.4; color: var(--ink-2); }
+@keyframes ob-bubble { from { opacity: 0; transform: scale(0.6); } }
+.ob-kicker.mid, .ob-h.mid, .ob-p.mid { text-align: center; align-self: center; }
+.ob-h.mid { text-wrap: balance; }
+.ob-p.mid { max-width: 33ch; margin-left: auto; margin-right: auto; text-wrap: pretty; }
+.ob-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.ob-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 148px; padding: 16px 10px; border-radius: 22px; background: #f7f7fb; border: 2px solid #ecebf3; box-shadow: 0 3px 0 #e6e4f0; text-align: center; transition: transform 0.18s var(--spring), background 0.2s, border-color 0.2s, box-shadow 0.2s; animation: ob-tile 0.45s calc(var(--i) * 0.06s) var(--spring) both; }
+.ob-tile:active { transform: translateY(2px) scale(0.98); box-shadow: 0 1px 0 #e6e4f0; }
+.ob-tile b { font-size: 15.5px; line-height: 1.2; font-weight: 700; }
+.ob-tile .sub { font-size: 12.5px; color: var(--ink-3); line-height: 1.3; }
+.ob-tile .ob-art { font-size: 42px; line-height: 1; filter: drop-shadow(0 4px 6px rgba(60, 50, 160, 0.14)); transition: transform 0.4s var(--spring); }
+.ob-tile.on { background: linear-gradient(150deg, #fff 0%, #efeaff 55%, #dcd5ff 100%); border-color: var(--brand); box-shadow: 0 3px 0 var(--brand-d, #4b42d6); }
+.ob-tile.on .ob-art { transform: scale(1.18) rotate(-6deg); }
+@keyframes ob-tile { from { opacity: 0; transform: translateY(14px) scale(0.92); } }
+.ob-peek { height: 50px; margin: 18px 0 -4px; display: flex; justify-content: center; overflow: hidden; }
+.ob-peek .lera { animation: ob-peek 0.7s 0.2s var(--spring) both; }
+@keyframes ob-peek { from { transform: translateY(60px); } }
+.plan.peeked { position: relative; z-index: 1; background: #fff; border: 2px solid var(--line); border-radius: 22px; padding: 6px 12px; box-shadow: 0 4px 0 var(--line); }

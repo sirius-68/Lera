@@ -58,6 +58,29 @@ jobs:
           sed 's/com\.getcapacitor\.CapacitorWebView/com.sirius68.lera.LeraWebView/' "$layout" > "android/app/src/main/res/layout/$(basename "$layout")"
           grep -q 'com.sirius68.lera.LeraWebView' "android/app/src/main/res/layout/$(basename "$layout")"
 
+      - name: Home-screen widget
+        run: |
+          pkg=android/app/src/main/java/com/sirius68/lera
+          manifest=android/app/src/main/AndroidManifest.xml
+          cp android-overrides/StreakWidget.java android-overrides/WidgetBridge.java "$pkg/"
+          cp -r android-overrides/res/. android/app/src/main/res/
+          grep -q 'StreakWidget' "$manifest" || python3 - "$manifest" <<'PY'
+          import sys
+          path = sys.argv[1]
+          text = open(path).read()
+          receiver = """
+                  <receiver android:name=".StreakWidget" android:exported="false" android:label="@string/widget_name">
+                      <intent-filter>
+                          <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                      </intent-filter>
+                      <meta-data android:name="android.appwidget.provider" android:resource="@xml/streak_widget_info" />
+                  </receiver>
+              </application>"""
+          assert "</application>" in text
+          open(path, "w").write(text.replace("</application>", receiver.lstrip("\n"), 1))
+          PY
+          grep -q 'StreakWidget' "$manifest"
+
       - name: Allow vibration
         run: |
           manifest=android/app/src/main/AndroidManifest.xml

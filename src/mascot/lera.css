@@ -52,7 +52,18 @@
 .lera[data-mood='oops'] .m-wobble,
 .lera[data-mood='curious'] .m-o,
 .lera[data-mood='sleepy'] .m-o,
+.lera[data-mood='eureka'] .m-big,
+.lera[data-mood='party'] .m-big,
+.lera[data-mood='fired'] .m-big,
+.lera[data-mood='graduate'] .m-big,
+.lera[data-mood='love'] .m-smile,
+.lera[data-mood='calculating'] .m-flat,
+.lera[data-mood='sad'] .m-frown,
+.lera[data-mood='determined'] .m-smirk,
+.lera[data-mood='cool'] .m-smirk,
+.lera[data-mood='shocked'] .m-o,
 .lera[data-mood='talking'] .m-talk { opacity: 1; transform: none; }
+.lera[data-mood='shocked'] .m-o { transform: scale(1.35); }
 .lera[data-mood='talking'] .m-talk { animation: lera-talk 0.34s ease-in-out infinite alternate; }
 .lera[data-mood='sleepy'] .m-o { transform: scale(0.6); animation: lera-snore 3.6s ease-in-out infinite; }
 .lera[data-mood='thinking'] .m-flat { transform: translateX(2.5px); }
@@ -188,4 +199,126 @@
 
 @media (prefers-reduced-motion: reduce) {
   .lera *, .lera { animation: none !important; }
+}
+
+
+/* ───────── the maths set: accessories that pop on, and what floats around her ───────── */
+.l-acc { opacity: 0; pointer-events: none; transform-origin: 50% 100%; transform: translateY(-9px) scale(0.5); transition: opacity 0.16s, transform 0.5s var(--spring, cubic-bezier(0.34, 1.56, 0.64, 1)); }
+.a-glasses rect { fill: rgba(255, 255, 255, 0.14); stroke: #17143f; stroke-width: 2.3; }
+.a-glasses path { stroke: #17143f; stroke-width: 2.3; stroke-linecap: round; }
+.a-shades path { fill: #14122e; }
+.a-shades .bridge { fill: none; stroke: #14122e; stroke-width: 3.2; stroke-linecap: round; }
+.a-shades .glint { fill: none; stroke: rgba(255, 255, 255, 0.55); stroke-width: 1.6; stroke-linecap: round; }
+.a-cap .tassel { fill: none; stroke: #ffc940; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.a-tear { fill: #9fd8ff; transform-origin: 50% 0%; transform: none; }
+.a-hat { transform-origin: 50% 100%; }
+.a-flame { transform-origin: 50% 100%; }
+
+.lera[data-mood='calculating'] .a-glasses,
+.lera[data-mood='cool'] .a-shades,
+.lera[data-mood='graduate'] .a-cap,
+.lera[data-mood='party'] .a-hat,
+.lera[data-mood='fired'] .a-flame { opacity: 1; transform: none; }
+.lera[data-mood='party'] .a-hat { transform: rotate(13deg); }
+.lera[data-mood='graduate'] .a-cap { animation: lera-cap 0.9s var(--spring, ease-out) 1 both; }
+.lera[data-mood='graduate'] .a-cap .tassel, .lera[data-mood='graduate'] .a-cap circle { transform-origin: 50% 0%; animation: lera-tassel 2.2s ease-in-out infinite; }
+.lera[data-mood='fired'] .a-flame { animation: lera-flame 0.5s ease-in-out infinite alternate; }
+.lera[data-mood='fired'] .a-flame .core { transform-origin: 50% 100%; animation: lera-flame 0.36s ease-in-out infinite alternate-reverse; }
+.lera[data-mood='cool'] .a-shades .glint { animation: lera-glint 2.6s ease-in-out infinite; }
+.lera[data-mood='sad'] .a-tear { opacity: 1; animation: lera-tear 2.2s ease-in infinite; }
+
+/* faces */
+.lera[data-mood='love'] .l-eyes-open,
+.lera[data-mood='graduate'] .l-eyes-open { opacity: 0; transform: scaleY(0.2); }
+.lera[data-mood='love'] .l-eyes-arc,
+.lera[data-mood='graduate'] .l-eyes-arc { opacity: 1; transform: none; }
+.lera[data-mood='love'] .l-cheek,
+.lera[data-mood='party'] .l-cheek,
+.lera[data-mood='fired'] .l-cheek,
+.lera[data-mood='eureka'] .l-cheek { opacity: 0.8; transform: none; }
+.lera[data-mood='eureka'] .l-eyes-open,
+.lera[data-mood='party'] .l-eyes-open { transform: scale(1.1); }
+.lera[data-mood='shocked'] .l-eyes-open { transform: scale(1.2); }
+.lera[data-mood='shocked'] .l-pupil rect { transform: scale(0.72); transform-origin: center; }
+.lera[data-mood='sad'] .l-brow,
+.lera[data-mood='determined'] .l-brow,
+.lera[data-mood='fired'] .l-brow,
+.lera[data-mood='shocked'] .l-brow,
+.lera[data-mood='calculating'] .l-brow { opacity: 1; }
+.lera[data-mood='sad'] .l-brow-l { transform: rotate(-18deg) translateY(1px); }
+.lera[data-mood='sad'] .l-brow-r { transform: rotate(18deg) translateY(1px); }
+.lera[data-mood='determined'] .l-brow-l, .lera[data-mood='fired'] .l-brow-l { transform: rotate(16deg) translateY(2.2px); }
+.lera[data-mood='determined'] .l-brow-r, .lera[data-mood='fired'] .l-brow-r { transform: rotate(-16deg) translateY(2.2px); }
+.lera[data-mood='shocked'] .l-brow { transform: translateY(-3.4px); }
+.lera[data-mood='calculating'] .l-brow { transform: translateY(-3px); }
+.lera[data-mood='calculating'] .l-brow-l { transform: translateY(-3px) rotate(6deg); }
+
+/* bodies */
+.lera[data-mood='eureka'] .l-jump { animation: lera-eureka 0.7s cubic-bezier(0.3, 0, 0.3, 1) 1; }
+.lera[data-mood='party'] .l-jump { animation: lera-jump 0.62s cubic-bezier(0.3, 0, 0.3, 1) 3; }
+.lera[data-mood='party'] .l-shadow { animation: lera-shadow-jump 0.62s cubic-bezier(0.3, 0, 0.3, 1) 3; }
+.lera[data-mood='shocked'] .l-jump { animation: lera-recoil 0.5s var(--ease, ease-out) 1; }
+.lera[data-mood='love'] .l-jump { animation: lera-sway 1.6s ease-in-out infinite; }
+.lera[data-mood='fired'] .l-jump { animation: lera-pump 0.9s ease-in-out infinite; }
+.lera[data-mood='cool'] .l-tilt { transform: rotate(-6deg); }
+.lera[data-mood='determined'] .l-tilt { transform: rotate(3deg) translateY(1px) scale(1.02, 0.98); }
+.lera[data-mood='sad'] .l-tilt { transform: rotate(-4deg) translateY(2px) scale(1.02, 0.96); }
+.lera[data-mood='sad'] .l-breathe { animation-duration: 5s; }
+.lera[data-mood='calculating'] .l-tilt { transform: rotate(-3deg); }
+.lera[data-mood='graduate'] .l-jump { animation: lera-nod 0.6s var(--ease, ease-out) 2; }
+.lera[data-mood='sleepy'] .l-jump { animation: lera-doze 5.2s ease-in-out infinite; }
+
+/* around her */
+.lera[data-mood='party'] .l-sparkles { opacity: 1; }
+.lera[data-mood='party'] .l-sparkles path { animation: lera-sparkle 0.9s var(--spring, ease-out) infinite alternate; }
+.lera[data-mood='party'] .l-sparkles path:nth-child(2) { animation-delay: 0.2s; fill: #ff7aa8; }
+.lera[data-mood='party'] .l-sparkles path:nth-child(3) { animation-delay: 0.4s; fill: #3ecf8e; }
+.lera[data-mood='party'] .l-sparkles path:nth-child(4) { animation-delay: 0.1s; }
+.l-bulb { transform-origin: 50% 100%; }
+.l-bulb .rays { stroke: #ffc940; stroke-width: 1.9; stroke-linecap: round; fill: none; }
+.lera[data-mood='eureka'] .l-bulb { opacity: 1; animation: lera-bulb 0.5s var(--spring, ease-out) both; }
+.lera[data-mood='eureka'] .l-bulb .rays { transform-origin: center; animation: lera-rays 0.7s ease-in-out infinite alternate; }
+.l-hearts path { fill: #ff6f9f; transform-origin: center; }
+.lera[data-mood='love'] .l-hearts { opacity: 1; }
+.lera[data-mood='love'] .l-hearts path { animation: lera-heart 1.7s ease-out infinite; }
+.lera[data-mood='love'] .l-hearts g:nth-child(2) path { animation-delay: 0.45s; }
+.lera[data-mood='love'] .l-hearts g:nth-child(3) path { animation-delay: 0.9s; }
+.l-ops text, .l-bang text, .l-formulas text { font: 800 11px 'DM Sans', system-ui, sans-serif; fill: #8f88ff; }
+.l-ops text { transform-origin: center; }
+.lera[data-mood='calculating'] .l-ops { opacity: 1; }
+.lera[data-mood='calculating'] .l-ops text { animation: lera-op 2.4s ease-in-out infinite; }
+.lera[data-mood='calculating'] .l-ops text:nth-child(2) { animation-delay: 0.5s; fill: #ff8a3d; }
+.lera[data-mood='calculating'] .l-ops text:nth-child(3) { animation-delay: 1s; fill: #3ecf8e; }
+.lera[data-mood='calculating'] .l-ops text:nth-child(4) { animation-delay: 1.5s; }
+.lera[data-mood='calculating'] .l-ops text:nth-child(5) { animation-delay: 1.9s; fill: #ffb020; }
+.l-bang text { font-size: 17px; fill: #ff6b5e; }
+.lera[data-mood='shocked'] .l-bang { opacity: 1; animation: lera-pop 0.35s var(--spring, ease-out) both; transform-origin: center; }
+/* asleep: she dreams in formulas — they drift up where the z's would be */
+.lera[data-mood='sleepy'] .l-zzz { opacity: 0; }
+.lera[data-mood='sleepy'] .l-formulas { opacity: 1; }
+.l-formulas text { opacity: 0; transform-origin: center; }
+.lera[data-mood='sleepy'] .l-formulas text { animation: lera-dream 6.5s ease-in-out infinite; }
+.lera[data-mood='sleepy'] .l-formulas text:nth-child(1) { fill: #8f88ff; }
+.lera[data-mood='sleepy'] .l-formulas text:nth-child(2) { animation-delay: 1.3s; fill: #ffb020; }
+.lera[data-mood='sleepy'] .l-formulas text:nth-child(3) { animation-delay: 2.6s; fill: #3ecf8e; font-size: 13px; }
+.lera[data-mood='sleepy'] .l-formulas text:nth-child(4) { animation-delay: 3.9s; fill: #ff7aa8; }
+.lera[data-mood='sleepy'] .l-formulas text:nth-child(5) { animation-delay: 5.2s; fill: #8f88ff; }
+
+@keyframes lera-cap { 0% { opacity: 0; transform: translateY(-26px) rotate(-22deg); } 60% { opacity: 1; transform: translateY(2px) rotate(4deg); } 100% { opacity: 1; transform: none; } }
+@keyframes lera-tassel { 0%, 100% { transform: rotate(-7deg); } 50% { transform: rotate(9deg); } }
+@keyframes lera-flame { from { transform: scale(0.94, 1.04) rotate(-3deg); } to { transform: scale(1.06, 0.95) rotate(3deg); } }
+@keyframes lera-glint { 0%, 70%, 100% { opacity: 0.2; } 80% { opacity: 1; } }
+@keyframes lera-tear { 0% { opacity: 0; transform: translateY(-2px) scale(0.5); } 25% { opacity: 1; transform: none; } 80% { opacity: 1; transform: translateY(9px); } 100% { opacity: 0; transform: translateY(13px) scale(0.8); } }
+@keyframes lera-eureka { 0% { transform: none; } 25% { transform: translateY(3px) scale(1.06, 0.92); } 55% { transform: translateY(-9px) scale(0.96, 1.06); } 100% { transform: none; } }
+@keyframes lera-recoil { 0% { transform: none; } 30% { transform: translateY(-5px) scale(0.94, 1.08); } 60% { transform: translateY(1px) scale(1.04, 0.96); } 100% { transform: none; } }
+@keyframes lera-pump { 0%, 100% { transform: none; } 50% { transform: translateY(-2.5px) scale(1.02, 1.02); } }
+@keyframes lera-doze { 0%, 100% { transform: rotate(0); } 45% { transform: rotate(5deg) translateY(1px); } 55% { transform: rotate(5deg) translateY(1px); } 62% { transform: rotate(1deg); } }
+@keyframes lera-bulb { from { opacity: 0; transform: translateY(8px) scale(0.2); } }
+@keyframes lera-rays { from { opacity: 0.35; transform: scale(0.9); } to { opacity: 1; transform: scale(1.08); } }
+@keyframes lera-heart { 0% { opacity: 0; transform: translateY(6px) scale(0.3); } 30% { opacity: 1; transform: translateY(0) scale(1.1); } 100% { opacity: 0; transform: translateY(-12px) scale(0.9); } }
+@keyframes lera-op { 0%, 100% { opacity: 0.25; transform: translateY(2px) scale(0.8) rotate(-10deg); } 50% { opacity: 1; transform: translateY(-3px) scale(1.15) rotate(8deg); } }
+@keyframes lera-dream { 0% { opacity: 0; transform: translate(-6px, 10px) scale(0.5) rotate(-12deg); } 12% { opacity: 1; } 30% { opacity: 1; transform: translate(2px, -2px) scale(1) rotate(6deg); } 46% { opacity: 0; transform: translate(9px, -14px) scale(1.15) rotate(-4deg); } 100% { opacity: 0; transform: translate(9px, -14px) scale(1.15); } }
+@media (prefers-reduced-motion: reduce) {
+  .lera[data-mood] .l-jump, .lera[data-mood] .l-acc, .lera[data-mood] .l-fx * { animation: none !important; }
+  .lera[data-mood='sleepy'] .l-formulas text:first-child { opacity: 1; }
 }

@@ -11,7 +11,19 @@ import './lera.css';
  * that runs every frame writes CSS variables straight to the element, so the
  * rest of the app never re-renders because of her.
  */
-export type Mood = 'idle' | 'happy' | 'proud' | 'celebrate' | 'thinking' | 'oops' | 'curious' | 'sleepy' | 'talking' | 'wave';
+export type Mood =
+  | 'idle' | 'happy' | 'proud' | 'celebrate' | 'thinking' | 'oops' | 'curious' | 'sleepy' | 'talking' | 'wave'
+  /* the maths set */
+  | 'eureka' // a lightbulb: the idea just landed
+  | 'calculating' // glasses on, eyes scanning, + − × ÷ circling
+  | 'fired' // a flame on her head: the streak is alive
+  | 'love' // hearts: something worth keeping
+  | 'sad' // a tear: the streak is about to break
+  | 'determined' // brows down: a gap to close
+  | 'cool' // shades: goal done
+  | 'shocked' // that line really did not follow
+  | 'graduate' // a cap: chapter finished
+  | 'party'; // a hat: level up
 
 interface Props {
   size?: number;
@@ -30,7 +42,10 @@ const reduced = (): boolean =>
 const rand = (a: number, b: number): number => a + Math.random() * (b - a);
 
 /** Moods shown for a moment before she settles back to looking around. */
-const BRIEF = new Set<string>(['happy', 'proud', 'celebrate', 'wave', 'oops']);
+const BRIEF = new Set<string>(['happy', 'proud', 'celebrate', 'wave', 'oops', 'eureka', 'shocked', 'love']);
+
+/** What a tap brings out, in turn. */
+const TAPS: Mood[] = ['happy', 'love', 'proud', 'eureka', 'cool', 'party'];
 
 /** Let Lera, wherever she is on screen, react to something that just happened. */
 export function leraReact(mood: Mood): void {
@@ -43,6 +58,7 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
   const [asleep, setAsleep] = useState(false);
   const [hop, setHop] = useState(0);
   const taps = useRef<number[]>([]);
+  const tapNo = useRef(0);
   const lastActive = useRef(Date.now());
   const moodRef = useRef<string>(mood);
   // a smile with closed eyes is a moment, not a state: after a beat she opens her eyes and looks around again
@@ -135,7 +151,21 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
       if (m === 'thinking') {
         tx = 1.9 + Math.sin(now / 900) * 0.5;
         ty = -2.7;
-      } else if (m === 'sleepy' || m === 'proud' || m === 'happy') {
+      } else if (m === 'calculating') {
+        // reading along a line of working, then back to the start of the next
+        const k = (now / 1500) % 1;
+        tx = -2.6 + 5.2 * Math.min(1, k * 1.25);
+        ty = 1.4;
+      } else if (m === 'eureka') {
+        tx = 1.8;
+        ty = -2.6;
+      } else if (m === 'sad') {
+        tx = Math.sin(now / 1400) * 0.4;
+        ty = 2.4;
+      } else if (m === 'shocked') {
+        tx = 0;
+        ty = -0.8;
+      } else if (m === 'sleepy' || m === 'proud' || m === 'happy' || m === 'love' || m === 'cool' || m === 'graduate' || m === 'determined') {
         tx = 0;
         ty = 0.6;
       } else if (m === 'oops') {
@@ -202,14 +232,14 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
   useEffect(() => {
     if (!sleepAfter) return;
     const id = setInterval(() => {
-      if (!asleep && Date.now() - lastActive.current > sleepAfter && moodRef.current === 'idle') setAsleep(true);
+      if (!asleep && Date.now() - lastActive.current > sleepAfter && !/^(talking|thinking|calculating|sleepy)$/.test(moodRef.current)) setAsleep(true);
     }, 2000);
     return () => clearInterval(id);
   }, [sleepAfter, asleep]);
 
   useEffect(() => {
     if (!reaction) return;
-    const id = setTimeout(() => setReaction(null), reaction === 'dizzy' ? 1900 : reaction === 'curious' ? 1600 : 1300);
+    const id = setTimeout(() => setReaction(null), reaction === 'dizzy' ? 1900 : reaction === 'curious' ? 1600 : reaction === 'happy' || reaction === 'proud' ? 1300 : 2100);
     return () => clearTimeout(id);
   }, [reaction, hop]);
 
@@ -230,7 +260,8 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
     const now = Date.now();
     taps.current = [...taps.current.filter((t) => now - t < 1400), now];
     // poke her enough times in a row and she gets dizzy
-    setReaction(taps.current.length >= 5 ? 'dizzy' : taps.current.length % 2 ? 'happy' : 'proud');
+    tapNo.current += 1;
+    setReaction(taps.current.length >= 5 ? 'dizzy' : TAPS[(tapNo.current - 1) % TAPS.length]);
     if (taps.current.length >= 5) taps.current = [];
     setHop((n) => n + 1);
     onTap?.();
@@ -245,7 +276,7 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
       style={{ width: size, height: size * 1.16 }}
       role={interactive ? 'button' : 'img'}
       tabIndex={interactive ? 0 : undefined}
-      aria-label={asleep ? 'Lera, asleep. Tap to wake her.' : 'Lera'}
+      aria-label={shown === 'sleepy' ? 'Lera, asleep and dreaming of formulas. Tap to wake her.' : 'Lera'}
       onClick={tap}
       onKeyDown={(e: ReactKeyboardEvent) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -308,10 +339,66 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
                   <path className="l-mouth m-flat line" d="M25 60.4q5.6 1.6 11.2 0" />
                   <path className="l-mouth m-wobble line" d="M23.6 61.4q3.5-3.2 7-.4t7.2-.5" />
                   <ellipse className="l-mouth m-talk" cx="30.6" cy="60.4" rx="5" ry="3.6" />
+                  <path className="l-mouth m-frown line" d="M23.6 63q7-5.4 14 0" />
+                  <path className="l-mouth m-smirk line" d="M24 59.6q7.2 4.6 13.6-1.4" />
                 </g>
+                <path className="l-acc a-tear" d="M21.3 51.5c2.3 3.3 2.5 5.4 0 6.4-2.5-1-2.3-3.1 0-6.4z" />
+                <g className="l-acc a-glasses">
+                  <rect x="13.2" y="28.2" width="16.2" height="24.4" rx="7.4" />
+                  <rect x="30.9" y="28.2" width="16.2" height="24.4" rx="7.4" />
+                  <path d="M29.4 38.5h1.5M13.2 38l-3.4-1.6M47.1 38l3.4-1.6" />
+                </g>
+                <g className="l-acc a-shades">
+                  <path d="M10.6 31.4h18.6v8.2a9.3 9.3 0 0 1-18.6 0zM31 31.4h18.6v8.2a9.3 9.3 0 0 1-18.6 0z" />
+                  <path className="bridge" d="M9 33h42.4" />
+                  <path className="glint" d="M14.6 35.4l5-2.4M35 35.4l5-2.4" />
+                </g>
+              </g>
+              <g className="l-acc a-cap">
+                <path d="M19.4 -1.2v7.4q11.2 5.4 22.4 0v-7.4z" fill="#4a3fe0" />
+                <path d="M30.6 -12.6l23.4 8.2-23.4 8.2-23.4-8.2z" fill="#372cc4" />
+                <path className="tassel" d="M30.6 -4.4l19.4 2.8v8.4" />
+                <circle cx="50" cy="8.2" r="2.2" fill="#ffc940" />
+              </g>
+              <g className="l-acc a-hat">
+                <path d="M33 -17l11 20.5q-11 4.6-22 0z" fill="#ff8a3d" />
+                <path d="M28.6 -8.6l8.6 2.6M25.4 -2.2l14.6 4" stroke="#ffe08a" strokeWidth="2.4" strokeLinecap="round" />
+                <circle cx="33" cy="-17.4" r="3.2" fill="#ffd24d" />
+              </g>
+              <g className="l-acc a-flame">
+                <path d="M30.6 -17c5.6 5 9.4 8.8 9.4 14.4a9.4 9.4 0 0 1-18.8 0c0-3.4 1.6-5.8 3.4-7.6.4 2.4 1.4 3.6 2.8 4.2-.8-4.2.6-7.8 3.2-11z" fill="#ff8a1f" />
+                <path className="core" d="M30.8 -8.6c2.6 2.4 4.2 4 4.2 6.6a4.4 4.4 0 0 1-8.8 0c0-1.6.8-2.8 1.8-3.6.2 1 .8 1.6 1.4 1.8-.2-1.8.4-3.4 1.4-4.8z" fill="#ffe066" />
               </g>
             </g>
           </g>
+        </g>
+
+        <g className="l-fx l-bulb">
+          <path className="rays" d="M61 -15v-4M71.4 -9.4l3-2.6M50.6 -9.4l-3-2.6M75 0h4M47 0h-4" />
+          <path d="M61 -9.6a7.6 7.6 0 0 1 4.4 13.8v2.6h-8.8V4.2A7.6 7.6 0 0 1 61 -9.6z" fill="#ffd24d" />
+          <path d="M57.6 9.2h6.8M58.6 11.8h4.8" stroke="#b9892a" strokeWidth="1.6" strokeLinecap="round" />
+        </g>
+        <g className="l-fx l-hearts">
+          <g transform="translate(61 3) scale(1.25)"><path d="M0 3.6C-6 -0.6 -4.6 -5.4 -1.9 -5.4C-0.8 -5.4 0 -4.6 0 -3.8C0 -4.6 0.8 -5.4 1.9 -5.4C4.6 -5.4 6 -0.6 0 3.6Z" /></g>
+          <g transform="translate(-4 0)"><path d="M0 3.6C-6 -0.6 -4.6 -5.4 -1.9 -5.4C-0.8 -5.4 0 -4.6 0 -3.8C0 -4.6 0.8 -5.4 1.9 -5.4C4.6 -5.4 6 -0.6 0 3.6Z" /></g>
+          <g transform="translate(70 27) scale(0.8)"><path d="M0 3.6C-6 -0.6 -4.6 -5.4 -1.9 -5.4C-0.8 -5.4 0 -4.6 0 -3.8C0 -4.6 0.8 -5.4 1.9 -5.4C4.6 -5.4 6 -0.6 0 3.6Z" /></g>
+        </g>
+        <g className="l-fx l-ops">
+          <text x="56" y="4">+</text>
+          <text x="66" y="24">×</text>
+          <text x="-9" y="10">÷</text>
+          <text x="-10" y="34">−</text>
+          <text x="60" y="-10">=</text>
+        </g>
+        <g className="l-fx l-bang">
+          <text x="57" y="8">!</text>
+        </g>
+        <g className="l-fx l-formulas">
+          <text x="50" y="8">x²</text>
+          <text x="58" y="-1">π</text>
+          <text x="64" y="-9">∫</text>
+          <text x="54" y="2">√x</text>
+          <text x="62" y="-5">∞</text>
         </g>
 
         <g className="l-fx l-sparkles">

@@ -382,8 +382,15 @@ button, .tabbar, .topbar, .kbd, .seltool, nav { -webkit-user-select: none; user-
 .pager button { flex: 1; height: 6px; border-radius: 999px; background: var(--tint-2); transition: background 0.3s, transform 0.3s var(--spring); min-width: 4px; }
 .pager button[data-state='done'] { background: var(--brand); }
 .pager button[data-state='now'] { background: var(--brand); transform: scaleY(1.5); box-shadow: 0 0 0 3px var(--tint); }
-.reader.turn-next { animation: push-in 0.36s var(--ease) both; }
-.reader.turn-prev { animation: pop-in 0.36s var(--ease) both; }
+.reader.turn-next { animation: page-next 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.reader.turn-prev { animation: page-prev 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@keyframes page-next { from { opacity: 0; transform: translateX(46%) rotate(1.2deg); } 60% { opacity: 1; } to { transform: none; } }
+@keyframes page-prev { from { opacity: 0; transform: translateX(-46%) rotate(-1.2deg); } 60% { opacity: 1; } to { transform: none; } }
+/* short pages: the controls rest at the bottom of the screen, not under the last line */
+.lesson-scroll { display: flex; flex-direction: column; overflow-x: hidden; touch-action: pan-y; }
+.lesson-scroll > .reader { flex: 0 0 auto; transform-origin: 50% 120%; will-change: transform; }
+.page-foot { margin-top: auto; }
+.page-foot.center { gap: 8px; padding: 14px 22px 96px; }
 .page-nav { display: flex; align-items: center; gap: 10px; padding: 10px 22px 96px; }
 .page-nav .btn3d { flex: 1; max-width: none; }
 .page-back { width: 54px; height: 54px; border-radius: 50%; border: 1.5px solid var(--line-d); box-shadow: 0 3px 0 var(--line-d); display: grid; place-items: center; color: var(--ink-2); flex-shrink: 0; background: #fff; }
@@ -461,3 +468,23 @@ button.unit-banner:active { transform: translateY(3px); }
 .tile { flex-direction: row; align-items: center; gap: 10px; flex-wrap: wrap; }
 .tile b { margin-top: 0; flex: 1; }
 .tile > span:last-child { flex-basis: 100%; }
+
+
+/* ───────── home-screen widget previews ───────── */
+.wg-card { display: flex; flex-direction: column; gap: 12px; overflow: hidden; }
+.wg-row { display: flex; gap: 12px; overflow-x: auto; margin: 0 -18px; padding: 2px 18px 4px; scroll-snap-type: x proximity; scrollbar-width: none; }
+.wg-row::-webkit-scrollbar { display: none; }
+.wg-cell { margin: 0; flex: 0 0 auto; scroll-snap-align: start; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.wg-cell figcaption { font-size: 11.5px; font-weight: 600; color: var(--ink-3); }
+.wg { position: relative; width: 138px; height: 138px; border-radius: 26px; padding: 13px; color: #fff; overflow: hidden; box-shadow: 0 6px 16px rgba(40, 30, 120, 0.18); }
+.wg b { display: flex; align-items: center; gap: 4px; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+.wg span { display: block; margin-top: 5px; font-size: 12.5px; font-weight: 600; line-height: 1.25; max-width: 96px; opacity: 0.96; }
+.wg i { position: absolute; right: 2px; bottom: -14px; }
+.wg i::before { content: ''; position: absolute; inset: -6px -8px 6px; border-radius: 50%; background: rgba(255, 255, 255, 0.2); }
+.wg i .lera { position: relative; animation: none; }
+.wg-purple { background: linear-gradient(180deg, #8880ff, #5a51ee); }
+.wg-violet { background: linear-gradient(180deg, #a06bff, #6a3fe0); }
+.wg-orange { background: linear-gradient(180deg, #ffb648, #ff7a1a); }
+.wg-red { background: linear-gradient(180deg, #ff7a6b, #c52a3f); }
+.wg-night { background: linear-gradient(180deg, #34308a, #14123a); }
+.wg-green { background: linear-gradient(180deg, #4fd89b, #1e9e69); }

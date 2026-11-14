@@ -9,11 +9,12 @@ import { PLAIN } from '../engine/concepts-calc';
 import { AttemptAnalysis, CheckedLine, Diagnosis, Problem } from '../engine/types';
 import { Lera, Mood } from '../mascot/Lera';
 import { actions, getState, useStore } from '../store';
-import { levelOf, totalXp, xpByDay } from '../store/game';
+import { levelOf, totalXp, weekStrip, xpByDay } from '../store/game';
 import { addDays, buildSession, dayOf, findTopic, Session, streak } from '../store/learner';
 import { weaknesses } from '../store/weakness';
 import { back, openOverlay, Route, setBackGuard } from '../store/nav';
 import { Button3D, Confetti, CountUp, LeraSays, Ring, haptic, toast } from '../ui/kit';
+import { CelebrationFlow, Scene } from '../ui/Celebrate';
 import { Icon } from '../ui/icons';
 import { MathView, RichText, typeset } from '../ui/math';
 import { WeakCard } from './Main';
@@ -317,16 +318,16 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       // nothing is marked yet: the learner finishes first, then asks
       setNote(null);
       setOpenDiag(null);
-      setMood('idle');
+      setMood('calculating'); // she reads along but keeps quiet until asked
       return;
     }
     setNote(line.status === 'unchecked' ? line.note ?? 'I can’t compare this line with the one above, so I’ve left it unmarked.' : null);
     const idx = next.length - 1;
     if (line.status === 'wrong') {
       setOpenDiag(idx);
-      setMood('oops');
+      setMood(line.diag?.severity === 'gap' ? 'shocked' : 'oops');
       haptic([14, 40, 14]);
-      setTimeout(() => setMood('thinking'), 1400);
+      setTimeout(() => setMood('thinking'), 1700);
       const st = getState();
       // the rules couldn't name it: ask the model for a second opinion in words, if one is connected
       if (line.diag?.code === 'unknown' && aiReady(st.ai)) {
@@ -342,7 +343,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       record(a, rung);
     } else {
       setOpenDiag(null);
-      setMood(line.status === 'carried' ? 'thinking' : 'happy');
+      setMood(line.status === 'carried' ? 'thinking' : line.status === 'recovered' ? 'eureka' : 'happy');
       if (line.status === 'carried') setNote('That follows from the line above — but that line was already off, so the mistake is carried along.');
       if (line.status === 'recovered') setNote('Back on track: this line is true to the original problem again.');
       setTimeout(() => setMood('idle'), 1100);
@@ -395,7 +396,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     setHint(ladder);
     setRung((r) => Math.min(3, hintOpen ? r + 1 : Math.max(1, r)));
     setHintOpen(true);
-    setMood('thinking');
+    setMood('eureka');
   };
 
   const reveal = () => {
@@ -826,6 +827,38 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
   const days = streak(attempts);
   const touched = new Set(list.map((m) => m.concept));
   const weak = weaknesses({ attempts, concepts, docs, understood }).filter((w) => (w.concept && touched.has(w.concept)) || w.kind === 'lesson').slice(0, 2);
+  const [party, setParty] = useState(true);
+  const scenes = useMemo<Scene[]>(() => {
+    if (solved === 0) return [];
+    const out: Scene[] = [
+      {
+        kind: 'done',
+        title: allClean ? 'Flawless session!' : 'Session complete!',
+        sub: allClean ? 'Every line followed from the one before.' : undefined,
+        stats: [
+          { label: 'XP earned', value: earned, tone: 'xp' },
+          { label: 'Solved', value: solved, of: results.length, tone: 'score' },
+        ],
+      },
+    ];
+    const solvedToday = attempts.filter((a) => a.day === today).length;
+    if (days > 0 && solvedToday <= done.length) {
+      out.push({
+        kind: 'streak',
+        value: days,
+        title: days === 1 ? 'Your streak starts today' : `${days} days in a row!`,
+        sub: days === 1 ? 'Come back tomorrow to make it two.' : 'You showed up again. That is how it sticks.',
+        week: weekStrip({ attempts, read }).map((d) => d.active),
+      });
+    }
+    if (xpToday >= goal && xpToday - earned < goal) out.push({ kind: 'goal', value: xpToday, title: 'Daily goal reached!', sub: 'Anything more today is a bonus.' });
+    const before = levelOf(Math.max(0, totalXp({ attempts, read }) - earned));
+    if (before.level < lv.level) out.push({ kind: 'level', value: lv.level, title: `Level ${lv.level} · ${lv.title}`, sub: 'A new level, earned one checked line at a time.' });
+    return out;
+    // the scenes are fixed the moment the session ends
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (party && scenes.length > 0) return <CelebrationFlow scenes={scenes} onDone={() => setParty(false)} />;
   const text = allClean
     ? 'Every line followed from the one before. That’s what solid looks like.'
     : gap

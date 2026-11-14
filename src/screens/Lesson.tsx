@@ -11,6 +11,7 @@ import { findTopic, statusOf, streak } from '../store/learner';
 import { back, go, openOverlay, replace, Route } from '../store/nav';
 import { Highlight, Note } from '../store/types';
 import { Button3D, LeraSays, Seg, Sheet, haptic, toast } from '../ui/kit';
+import { Celebration } from '../ui/Celebrate';
 import { Icon } from '../ui/icons';
 import { Graph } from '../ui/Graph';
 import { MathView, tokenize } from '../ui/math';
@@ -358,6 +359,7 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
   const [viewNote, setViewNote] = useState<Note | null>(null);
   const [pageNo, setPageNo] = useState(() => lastPage.get(route.topicId) ?? 0);
   const [turn, setTurn] = useState<1 | -1>(1);
+  const [chapterDone, setChapterDone] = useState(false);
   const scroller = useRef<HTMLDivElement | null>(null);
   const screen = useRef<HTMLDivElement | null>(null);
   const reader = useRef<HTMLDivElement | null>(null);
@@ -415,6 +417,78 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
     };
   }, [tab]);
 
+  /* swipe sideways to turn the page: the page follows the finger, then slides away or settles back */
+  const turnBy = useRef<(d: 1 | -1) => boolean>(() => false);
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el || tab !== 'lesson') return;
+    let x0 = 0;
+    let y0 = 0;
+    let state: 'idle' | 'maybe' | 'drag' | 'no' = 'idle';
+    let dx = 0;
+    const page = () => reader.current;
+    const sideScroller = (t: HTMLElement | null) => {
+      for (let n = t; n && n !== el; n = n.parentElement) {
+        if (n.matches('.graph, .graph-it, [data-noswipe]')) return true;
+        if (n.scrollWidth > n.clientWidth + 4 && /(auto|scroll)/.test(getComputedStyle(n).overflowX)) return true;
+      }
+      return false;
+    };
+    const start = (e: TouchEvent) => {
+      const t = e.touches[0];
+      const sel = window.getSelection();
+      if (e.touches.length !== 1 || (sel && !sel.isCollapsed) || sideScroller(e.target as HTMLElement)) {
+        state = 'no';
+        return;
+      }
+      x0 = t.clientX;
+      y0 = t.clientY;
+      dx = 0;
+      state = 'maybe';
+    };
+    const move = (e: TouchEvent) => {
+      if (state === 'no' || state === 'idle') return;
+      const t = e.touches[0];
+      dx = t.clientX - x0;
+      const dy = t.clientY - y0;
+      if (state === 'maybe') {
+        if (Math.abs(dy) > 10 && Math.abs(dy) > Math.abs(dx)) state = 'no';
+        else if (Math.abs(dx) > 14 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+          const sel = window.getSelection();
+          state = sel && !sel.isCollapsed ? 'no' : 'drag';
+        }
+      }
+      const a = page();
+      if (state !== 'drag' || !a) return;
+      a.style.animation = 'none';
+      a.style.transition = 'none';
+      a.style.transform = `translateX(${dx * 0.85}px) rotate(${dx * 0.006}deg)`;
+      a.style.opacity = String(Math.max(0.35, 1 - Math.abs(dx) / 420));
+    };
+    const end = () => {
+      const a = page();
+      const was = state;
+      state = 'idle';
+      if (was !== 'drag' || !a) return;
+      const far = Math.abs(dx) > Math.min(110, el.clientWidth * 0.24);
+      const turned = far && turnBy.current(dx < 0 ? 1 : -1);
+      if (turned) return; // a new page mounts and plays its own entrance
+      a.style.transition = 'transform 0.32s cubic-bezier(0.2, 0.9, 0.3, 1.2), opacity 0.25s';
+      a.style.transform = '';
+      a.style.opacity = '';
+    };
+    el.addEventListener('touchstart', start, { passive: true });
+    el.addEventListener('touchmove', move, { passive: true });
+    el.addEventListener('touchend', end, { passive: true });
+    el.addEventListener('touchcancel', end, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', start);
+      el.removeEventListener('touchmove', move);
+      el.removeEventListener('touchend', end);
+      el.removeEventListener('touchcancel', end);
+    };
+  }, [tab, route.topicId, !!found]);
+
   if (!found) {
     return (
       <div className="screen" data-dir={dir}>
@@ -435,7 +509,7 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
   const lastOne = at === pages.length - 1;
   const goPage = (n: number) => {
     const next = Math.max(0, Math.min(pages.length - 1, n));
-    if (next === at) return;
+    if (next === at) return false;
     haptic(5);
     window.getSelection()?.removeAllRanges();
     setPicked(null);
@@ -444,7 +518,11 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
     setPageNo(next);
     lastPage.set(topic.id, next);
     scroller.current?.scrollTo({ top: 0 });
+    return true;
   };
+  const hasPractice = topic.exercises.length > 0;
+  const showTab = hasPractice ? tab : 'lesson';
+  turnBy.current = (d) => goPage(at + d);
   const pageHeading = topic.blocks[page.start]?.t === 'h';
   const clearSel = () => {
     window.getSelection()?.removeAllRanges();
@@ -515,6 +593,12 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
   const topics = doc.units.flatMap((u) => u.topics);
   const topicAt = topics.findIndex((t) => t.id === topic.id);
   const nextTopic = topics[topicAt + 1];
+  const nextUnit = nextTopic ? doc.units.find((u) => u.topics.some((t) => t.id === nextTopic.id)) : null;
+  /** Move on; leaving the last lesson of a chapter gets its own moment first. */
+  const toNext = () => {
+    if (!nextTopic || nextUnit !== found.unit) setChapterDone(true);
+    else replace({ name: 'lesson', topicId: nextTopic.id });
+  };
   const barLeft = (x: number) => Math.max(150, Math.min((screen.current?.clientWidth ?? 390) - 150, x));
 
   return (
@@ -524,10 +608,10 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
         <button className="streakpill tap" onClick={() => go({ name: 'streak' })} aria-label={`${days}-day streak`}><Icon name="flame" size={17} fill /> Day {Math.max(1, days)}</button>
         <button className="navpill" onClick={() => go({ name: 'lessons' })}>Lessons <Icon name="book" size={18} /></button>
       </div>
-      <div style={{ padding: '2px 20px 10px' }}>
+      {hasPractice && <div style={{ padding: '2px 20px 10px' }}>
         <Seg options={[{ id: 'lesson', label: 'Lesson' }, { id: 'practice', label: `Practice${topic.exercises.length ? ` · ${topic.exercises.length}` : ''}` }]} value={tab} onChange={(v) => { clearSel(); setTerm(null); setTab(v); }} />
-      </div>
-      {tab === 'lesson' && pages.length > 1 ? (
+      </div>}
+      {showTab === 'lesson' && pages.length > 1 ? (
         <div className="pager" role="tablist" aria-label="Parts of this lesson">
           {pages.map((_, i) => (
             <button key={i} role="tab" aria-selected={i === at} aria-label={`Part ${i + 1} of ${pages.length}`} data-state={i < at ? 'done' : i === at ? 'now' : 'todo'} onClick={() => goPage(i)} />
@@ -537,10 +621,10 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
         <i className="read-progress" ref={progress} />
       )}
 
-      {tab === 'lesson' ? (
+      {showTab === 'lesson' ? (
         <div
           ref={scroller}
-          className="scroll"
+          className="scroll lesson-scroll"
           onScroll={(e: { currentTarget: HTMLElement }) => {
             const el = e.currentTarget;
             const k = el.scrollHeight > el.clientHeight ? el.scrollTop / (el.scrollHeight - el.clientHeight) : 1;
@@ -564,26 +648,37 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
             {topic.blocks.slice(page.start, page.end).map((b, k) => (
               <BlockView key={page.start + k} block={b} index={page.start + k} ctx={ctx} />
             ))}
-            {topic.blocks.length === 0 && <p className="rd-p muted">Your notes have exercises under this heading but no explanation. Head to Practice.</p>}
+            {topic.blocks.length === 0 && <p className="rd-p muted">{hasPractice ? 'Your notes have exercises under this heading but no explanation. Head to Practice.' : 'This heading has no text under it in your notes.'}</p>}
           </article>
           {lastOne ? (
-            <div className="center" style={{ gap: 8, padding: '8px 22px 96px' }}>
-              <Button3D sheen onClick={() => setTab('practice')}>
-                <Icon name="pencil" size={18} /> Practise this lesson
-              </Button3D>
+            <div className="page-foot center">
+              {hasPractice ? (
+                <Button3D sheen onClick={() => setTab('practice')}>
+                  <Icon name="pencil" size={18} /> Practise this lesson
+                </Button3D>
+              ) : nextTopic ? (
+                <Button3D sheen onClick={toNext}>
+                  Next lesson <Icon name="arrow" size={18} />
+                </Button3D>
+              ) : (
+                <Button3D sheen variant="ok" onClick={toNext}>
+                  <Icon name="check" size={18} stroke={3} /> Finish
+                </Button3D>
+              )}
+              {!hasPractice && nextTopic && <span className="faint" style={{ fontSize: 13, textAlign: 'center' }}>Up next: {nextTopic.title}</span>}
               {pages.length > 1 && (
                 <button className="linkbtn" onClick={() => goPage(at - 1)}>
                   <Icon name="back" size={15} /> Previous part
                 </button>
               )}
-              {nextTopic && (
-                <button className="linkbtn" onClick={() => replace({ name: 'lesson', topicId: nextTopic.id })}>
+              {hasPractice && nextTopic && (
+                <button className="linkbtn" onClick={toNext}>
                   Next: {nextTopic.title} <Icon name="chevron" size={15} />
                 </button>
               )}
             </div>
           ) : (
-            <div className="page-nav">
+            <div className="page-nav page-foot">
               <button className="page-back" onClick={() => goPage(at - 1)} disabled={at === 0} aria-label="Previous part"><Icon name="back" size={20} /></button>
               <Button3D onClick={() => goPage(at + 1)}>
                 Continue <span style={{ opacity: 0.75, fontWeight: 500 }}>· {at + 1}/{pages.length}</span> <Icon name="arrow" size={18} />
@@ -595,7 +690,17 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
         <TopicPractice topic={topic} doc={doc} />
       )}
 
-      {tab === 'lesson' && (
+      {chapterDone && (
+        <Celebration
+          scene={{ kind: 'chapter', title: 'Chapter complete!', sub: unitTitle, cta: nextTopic ? `Next: ${nextUnit?.title ?? 'next chapter'}` : 'Back to lessons' }}
+          onNext={() => {
+            setChapterDone(false);
+            if (nextTopic) replace({ name: 'lesson', topicId: nextTopic.id });
+            else go({ name: 'lessons' });
+          }}
+        />
+      )}
+      {showTab === 'lesson' && (
         <button className="ask-fab" onClick={() => openOverlay({ name: 'ask', topicId: topic.id })}>
           <Lera size={30} interactive={false} /> Ask Lera
         </button>

@@ -123,10 +123,13 @@ export function setState(patch: Partial<AppState> | ((s: AppState) => Partial<Ap
   saveTimer = setTimeout(save, 250);
 }
 
-const subscribe = (l: () => void) => {
+/** Run something after every change to the saved state (used to keep the home-screen widget current). */
+export const onChange = (l: () => void): (() => void) => subscribe(l);
+
+function subscribe(l: () => void) {
   listeners.add(l);
   return () => listeners.delete(l);
-};
+}
 
 /** Subscribe a component to a slice of the state. The selector must return a stable reference. */
 export function useStore<T>(selector: (s: AppState) => T): T {

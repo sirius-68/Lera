@@ -1,10 +1,11 @@
 import { useLayoutEffect, useRef, useState } from 'react';
-import { Lera } from '../mascot/Lera';
+import { Lera, Mood } from '../mascot/Lera';
 import { useStore } from '../store';
 import { badges, levelOf, longestStreak, monthGrid, totalXp, weekStrip, xpByDay } from '../store/game';
 import { dayOf, streak } from '../store/learner';
 import { back, go } from '../store/nav';
-import { Button3D, CountUp, Ring } from '../ui/kit';
+import { canPinWidget, hasWidget, pinWidget } from '../store/widget';
+import { Button3D, CountUp, Ring, haptic, toast } from '../ui/kit';
 import { Icon } from '../ui/icons';
 
 const MILESTONES = [3, 7, 14, 30, 50, 100];
@@ -89,6 +90,8 @@ export function StreakScreen() {
             </div>
           </section>
 
+          <WidgetCard days={days} />
+
           <section className="card">
             <div className="row" style={{ justifyContent: 'space-between' }}>
               <span className="label">Level {lv.level} · {lv.title}</span>
@@ -142,5 +145,51 @@ export function StreakScreen() {
         </div>
       </div>
     </div>
+  );
+}
+
+
+/* ───────────── the home-screen widget, shown as it will look through the day ───────────── */
+
+const WIDGETS: { mood: Mood; tone: string; line: string; when: string }[] = [
+  { mood: 'happy', tone: 'purple', line: 'Time to practise!', when: 'Morning' },
+  { mood: 'determined', tone: 'violet', line: 'Got 3 minutes?', when: 'Afternoon' },
+  { mood: 'shocked', tone: 'orange', line: 'Save your streak!', when: 'Evening' },
+  { mood: 'sad', tone: 'red', line: 'Last chance tonight!', when: 'Before midnight' },
+  { mood: 'fired', tone: 'orange', line: 'Streak safe. 12 XP to goal', when: 'After practice' },
+  { mood: 'cool', tone: 'green', line: 'Goal done. See you tomorrow!', when: 'Goal reached' },
+  { mood: 'sleepy', tone: 'night', line: 'Dreaming of x²…', when: 'At night' },
+];
+
+function WidgetCard({ days }: { days: number }) {
+  const inApp = hasWidget();
+  const add = () => {
+    haptic(6);
+    if (!(canPinWidget() && pinWidget())) toast('Long-press your home screen, choose Widgets, then Lera.', 4200);
+  };
+  return (
+    <section className="card wg-card">
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <span className="label">Home-screen widget</span>
+        <span className="chip plain">changes through the day</span>
+      </div>
+      <div className="wg-row" data-noswipe>
+        {WIDGETS.map((w) => (
+          <figure key={w.when} className="wg-cell">
+            <div className={`wg wg-${w.tone}`}>
+              <b><Icon name="flame" size={19} fill /> {Math.max(1, days)}</b>
+              <span>{w.line}</span>
+              <i><Lera size={64} mood={w.mood} interactive={false} /></i>
+            </div>
+            <figcaption>{w.when}</figcaption>
+          </figure>
+        ))}
+      </div>
+      {inApp ? (
+        <Button3D small variant="secondary" onClick={add}><Icon name="plus" size={17} /> Add to home screen</Button3D>
+      ) : (
+        <p className="faint" style={{ fontSize: 13 }}>In the Android app: long-press your home screen, choose Widgets, then Lera.</p>
+      )}
+    </section>
   );
 }

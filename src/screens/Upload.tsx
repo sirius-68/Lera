@@ -189,8 +189,9 @@ export function Processing({ source, onDone, onCancel }: { source: Source; onDon
           </p>
         )}
         <Button3D sheen onClick={() => onDone(doc)}>
-          Continue
+          Start at the beginning <Icon name="arrow" size={18} />
         </Button3D>
+        {doc.units[0]?.topics[0] && <span className="faint" style={{ fontSize: 13, textAlign: 'center' }}>{doc.units[0].title} · {doc.units[0].topics[0].title}</span>}
       </div>
     );
   }
@@ -235,7 +236,9 @@ export function UploadScreen() {
             onCancel={() => setSource(null)}
             onDone={(doc) => {
               actions.addDoc(doc);
-              replace({ name: 'lessons' });
+              // a new book opens on its first chapter's first lesson
+              const first = doc.units[0]?.topics[0];
+              replace(first ? { name: 'lesson', topicId: first.id } : { name: 'lessons' });
             }}
           />
         ) : (

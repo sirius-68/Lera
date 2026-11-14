@@ -13,7 +13,7 @@ import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 
 /**
- * Makes room for the keyboard.
+ * Makes room for the keyboard, and connects the home-screen widget.
  *
  * On current Android the app draws edge to edge and the system no longer
  * shrinks the window when the keyboard opens — so a field at the bottom of
@@ -44,5 +44,11 @@ public class MainActivity extends BridgeActivity {
             return WindowInsetsCompat.CONSUMED;
         });
         ViewCompat.requestApplyInsets(content);
+
+        // the home-screen widget gets its numbers from the app through window.LeraNative
+        if (getBridge() != null && getBridge().getWebView() != null) {
+            getBridge().getWebView().addJavascriptInterface(new WidgetBridge(this), "LeraNative");
+        }
+        StreakWidget.refresh(this);
     }
 }

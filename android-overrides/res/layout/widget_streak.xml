@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lera's home-screen widget: the streak, one line of encouragement, and her face for the moment. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_bg_purple"
+    android:clipToOutline="true"
+    android:padding="14dp">
+
+    <ImageView
+        android:id="@+id/widget_lera"
+        android:layout_width="92dp"
+        android:layout_height="104dp"
+        android:layout_gravity="bottom|end"
+        android:layout_marginBottom="-22dp"
+        android:layout_marginEnd="-10dp"
+        android:contentDescription="@string/widget_lera"
+        android:src="@drawable/widget_lera_happy" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:importantForAccessibility="no"
+                android:src="@drawable/widget_flame" />
+
+            <TextView
+                android:id="@+id/widget_count"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:fontFamily="sans-serif-black"
+                android:includeFontPadding="false"
+                android:text="0"
+                android:textColor="#FFFFFFFF"
+                android:textSize="30sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/widget_line"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:fontFamily="sans-serif-medium"
+            android:maxLines="2"
+            android:text="@string/widget_default_line"
+            android:textColor="#F2FFFFFF"
+            android:textSize="14sp" />
+    </LinearLayout>
+</FrameLayout>

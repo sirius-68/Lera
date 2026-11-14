@@ -115,16 +115,21 @@ export function HomeScreen() {
     mood = 'curious';
   } else if (xpToday >= goal) {
     line = 'Goal reached. Anything more today is a bonus.';
-    mood = 'proud';
+    mood = 'cool';
+  } else if (!doneToday && days > 0 && new Date().getHours() >= 19) {
+    line = `Your **${days}-day streak** ends tonight. One problem saves it.`;
+    mood = 'sad';
   } else if (due.length > 0) {
     line = `**${CONCEPTS[due[0].concept].title}** is ready to come back${due.length > 1 ? `, and ${due.length - 1} more` : ''}.`;
+    mood = 'determined';
   } else if (doneToday) {
     line = `${goal - xpToday} XP to today’s goal. One or two more problems.`;
-    mood = 'happy';
+    mood = days >= 3 ? 'fired' : 'happy';
   } else if (attempts.length === 0) {
     line = 'Your notes are ready. Read a lesson, then show me your working.';
   } else {
     line = days > 1 ? `Day ${days}. Shall we keep it going?` : 'Ready when you are.';
+    mood = days >= 3 ? 'fired' : 'idle';
   }
 
   const start = () => {
@@ -149,7 +154,7 @@ export function HomeScreen() {
         <div className="stagger" style={{ padding: '4px 18px 26px', display: 'flex', flexDirection: 'column', gap: 14 }}>
           <section className="today-card">
             <div className="today-top">
-              <span className="halo"><Lera size={66} mood={mood} sleepAfter={45000} /></span>
+              <span className="halo"><Lera size={66} mood={mood} sleepAfter={30000} /></span>
               <div className="grow">
                 <p className="today-say"><RichText text={line} /></p>
               </div>
@@ -196,12 +201,12 @@ export function HomeScreen() {
                 <Ring value={topicMastery(last.topic, state)} size={58}>{Math.round(topicMastery(last.topic, state) * 100)}%</Ring>
                 <div className="grow">
                   <b style={{ fontSize: 17, lineHeight: 1.25, display: 'block' }}>{last.topic.title}</b>
-                  <p className="muted" style={{ fontSize: 13.5, marginTop: 2 }}>{last.unit.title} · {last.topic.exercises.length} {last.topic.exercises.length === 1 ? 'exercise' : 'exercises'}</p>
+                  <p className="muted" style={{ fontSize: 13.5, marginTop: 2 }}>{last.unit.title} · {last.topic.exercises.length ? `${last.topic.exercises.length} ${last.topic.exercises.length === 1 ? 'exercise' : 'exercises'}` : 'reading'}</p>
                 </div>
               </div>
               <div className="row" style={{ gap: 10, marginTop: 14 }}>
-                <Button3D small variant="secondary" style={{ flex: 1 }} onClick={() => go({ name: 'lesson', topicId: last.topic.id })}><Icon name="book" size={17} /> Read</Button3D>
-                <Button3D small style={{ flex: 1 }} onClick={() => go({ name: 'session', topicId: last.topic.id })}><Icon name="pencil" size={17} /> Practise</Button3D>
+                <Button3D small variant={last.topic.exercises.length ? 'secondary' : 'primary'} style={{ flex: 1 }} onClick={() => go({ name: 'lesson', topicId: last.topic.id })}><Icon name="book" size={17} /> Read</Button3D>
+                {last.topic.exercises.length > 0 && <Button3D small style={{ flex: 1 }} onClick={() => go({ name: 'session', topicId: last.topic.id })}><Icon name="pencil" size={17} /> Practise</Button3D>}
               </div>
             </section>
           )}
