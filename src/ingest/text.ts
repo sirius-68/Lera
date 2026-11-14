@@ -48,7 +48,9 @@ export function toMathText(s: string): string {
 /** Prose rendering: x^2 → x², * → ·, <= → ≤. */
 export function prettyInline(s: string): string {
   const up: Record<string, string> = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻', n: 'ⁿ' };
+  const more: Record<string, string> = { ...up, '+': '⁺', '−': '⁻', a: 'ᵃ', b: 'ᵇ', x: 'ˣ', k: 'ᵏ', m: 'ᵐ' };
   return s
+    .replace(/\^\(([0-9a-z+\-−]{1,6})\)/g, (whole, e: string) => (e.split('').every((c) => more[c]) ? e.split('').map((c) => more[c]).join('') : whole))
     .replace(/\^\(?(-?[0-9n]{1,3})\)?/g, (_, e: string) => e.split('').map((c) => up[c] ?? c).join(''))
     .replace(/<=/g, '≤')
     .replace(/>=/g, '≥')

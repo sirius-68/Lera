@@ -3,6 +3,7 @@ import { E, ev, has, parseCalc, pending, pre, toText, tryParse } from '../engine
 import { PROMPTS } from '../engine/generate';
 import { mathLatex } from '../engine/latex';
 import { Problem, ProblemKind } from '../engine/types';
+import { Block } from './types';
 
 /** Calculus exercises and graphs found in a student's notes. */
 
@@ -232,4 +233,25 @@ export function markInlineMath(text: string): string {
   }
   parts.push(...words.slice(at));
   return parts.join(' ');
+}
+
+/**
+ * The same finishing touches for blocks from any source (the built-in reader or an AI model):
+ * typeset the powers in prose and put a graph under each sentence that names a function to draw.
+ */
+export function enrichBlocks(blocks: Block[]): Block[] {
+  const out: Block[] = [];
+  const drawn = new Set(blocks.filter((b): b is Extract<Block, { t: 'graph' }> => b.t === 'graph').map((b) => b.fns.join('|')));
+  for (const b of blocks) {
+    if (b.t === 'p' || b.t === 'note') {
+      out.push({ ...b, text: markInlineMath(b.text) });
+      const fns = b.t === 'p' ? graphFunctions(b.text) : [];
+      if (fns.length && !drawn.has(fns.join('|'))) {
+        drawn.add(fns.join('|'));
+        out.push({ t: 'graph', text: '', fns });
+      }
+    } else if (b.t === 'list') out.push({ ...b, items: b.items.map(markInlineMath) });
+    else out.push(b);
+  }
+  return out;
 }

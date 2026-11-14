@@ -1,5 +1,6 @@
 import { CONCEPTS } from '../engine/concepts';
 import { ConceptId, Diagnosis, Problem } from '../engine/types';
+import { enrichBlocks } from '../ingest/calc';
 import { buildProblem, plain, structureDoc } from '../ingest/structure';
 import { Block, LeraDoc, RawDoc, RawPara, Topic, Unit } from '../ingest/types';
 import { ChatMessage, chat, extractJson } from './client';
@@ -105,7 +106,8 @@ function toBlocks(raw: AiTopic['blocks']): Block[] {
         if (text) out.push({ t: 'p', text });
     }
   }
-  return out;
+  // whatever the model returned goes through the same finishing pass as the built-in reader
+  return enrichBlocks(out);
 }
 
 /**

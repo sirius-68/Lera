@@ -57,7 +57,7 @@ export function UploadPicker({ onPick, onSkip, compact }: { onPick: (s: Source) 
       {!compact && <img src={uploadImg} alt="" style={{ width: 210, height: 210, objectFit: 'contain', mixBlendMode: 'multiply' }} />}
       <h2 style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.2 }}>Upload your notes</h2>
       <p className="muted" style={{ fontSize: 15.5, lineHeight: 1.5, maxWidth: 300 }}>
-        A PDF or Word file with your algebra notes. Lera turns it into lessons and puts every exercise it finds under Practice.
+        A PDF or Word file with your algebra or calculus notes. Lera turns it into lessons, rebuilds its graphs and puts every exercise it finds under Practice.
       </p>
       <div
         className={`drop ${over ? 'over' : ''}`}
