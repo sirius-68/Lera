@@ -1,0 +1,302 @@
+import { ConceptId, Problem, ProblemKind } from './types';
+
+/** Small seeded RNG so a session can be rebuilt identically. */
+export function rng(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+export function seedFrom(text: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+type R = () => number;
+const int = (r: R, lo: number, hi: number): number => lo + Math.floor(r() * (hi - lo + 1));
+const pick = <T,>(r: R, xs: T[]): T => xs[Math.floor(r() * xs.length)];
+const nz = (r: R, lo: number, hi: number): number => {
+  let v = 0;
+  while (v === 0) v = int(r, lo, hi);
+  return v;
+};
+/** "+ 3" / "- 3" */
+const plus = (n: number): string => (n < 0 ? `- ${-n}` : `+ ${n}`);
+/** coefficient in front of a letter: 1 → "", -1 → "-" */
+const co = (n: number): string => (n === 1 ? '' : n === -1 ? '-' : String(n));
+
+export const PROMPTS: Record<ProblemKind, string> = {
+  linear: 'Solve for x',
+  quadratic: 'Solve for x',
+  equation: 'Solve for x',
+  inequality: 'Solve the inequality',
+  simplify: 'Simplify',
+  expand: 'Expand and simplify',
+  factor: 'Factorise',
+  evaluate: 'Work out',
+  system: 'Solve the system',
+  open: 'Work through this',
+};
+
+interface Draft {
+  kind: ProblemKind;
+  given: string;
+  prompt?: string;
+  subs?: Record<string, string>;
+  level?: 1 | 2 | 3;
+}
+
+/** Each concept can produce problems that exercise exactly that idea. */
+const MAKERS: Record<ConceptId, ((r: R) => Draft)[]> = {
+  'inverse-operations': [
+    (r) => {
+      const x = nz(r, -9, 9);
+      const a = int(r, 2, 12);
+      return { kind: 'linear', given: `x ${plus(a)} = ${x + a}`, level: 1 };
+    },
+    (r) => {
+      const x = nz(r, -9, 9);
+      const a = int(r, 2, 6);
+      const b = nz(r, -9, 9);
+      return { kind: 'linear', given: `${a}x ${plus(b)} = ${a * x + b}`, level: 1 };
+    },
+    (r) => {
+      const x = nz(r, -8, 8);
+      const a = int(r, 3, 7);
+      const c = int(r, 1, a - 1);
+      const b = nz(r, -9, 9);
+      return { kind: 'linear', given: `${a}x ${plus(b)} = ${co(c)}x ${plus((a - c) * x + b)}`, level: 2 };
+    },
+  ],
+  balance: [
+    (r) => {
+      const x = nz(r, -9, 9);
+      const a = int(r, 2, 9);
+      return { kind: 'linear', given: `${a}x = ${a * x}`, level: 1 };
+    },
+    (r) => {
+      const x = nz(r, -6, 6);
+      const a = pick(r, [2, 3, 4, 5]);
+      const b = a * int(r, 1, 4);
+      return { kind: 'linear', given: `${a}x ${plus(b)} = ${a * x + b}`, level: 1 };
+    },
+    (r) => {
+      const a = int(r, 2, 6);
+      const x = a * nz(r, -5, 5);
+      return { kind: 'linear', given: `x/${a} = ${x / a}`, level: 1 };
+    },
+  ],
+  distributive: [
+    (r) => ({ kind: 'expand', given: `${int(r, 2, 6)}(x ${plus(nz(r, -7, 7))})`, level: 1 }),
+    (r) => ({ kind: 'expand', given: `-${int(r, 2, 5)}(x ${plus(nz(r, -7, 7))})`, level: 2 }),
+    (r) => {
+      const a = int(r, 2, 5);
+      const b = nz(r, -6, 6);
+      const x = nz(r, -6, 6);
+      return { kind: 'linear', given: `${a}(x ${plus(b)}) = ${a * (x + b)}`, level: 2 };
+    },
+    (r) => {
+      const a = int(r, 2, 5);
+      const b = int(r, 2, 4);
+      return { kind: 'simplify', given: `${a}(x ${plus(nz(r, -5, 5))}) - ${b}(x ${plus(nz(r, -5, 5))})`, level: 3 };
+    },
+  ],
+  'like-terms': [
+    (r) => ({ kind: 'simplify', given: `${int(r, 2, 7)}x ${plus(nz(r, -9, 9))} ${plus(int(r, 2, 6))}x ${plus(nz(r, -9, 9))}`, level: 1 }),
+    (r) => ({ kind: 'simplify', given: `${int(r, 2, 6)}x^2 ${plus(nz(r, -6, 6))}x ${plus(nz(r, -5, 5))}x^2 ${plus(nz(r, -6, 6))}x`, level: 2 }),
+    (r) => ({ kind: 'simplify', given: `${int(r, 2, 6)}x ${plus(int(r, 2, 6))}y ${plus(nz(r, -5, 5))}x ${plus(nz(r, -5, 5))}y`, level: 2 }),
+  ],
+  'signed-arithmetic': [
+    (r) => ({ kind: 'evaluate', given: `-${int(r, 2, 9)} - ${int(r, 2, 9)}`, level: 1 }),
+    (r) => ({ kind: 'evaluate', given: `${int(r, 2, 9)} - (-${int(r, 2, 9)})`, level: 1 }),
+    (r) => ({ kind: 'evaluate', given: `(-${int(r, 2, 6)})(-${int(r, 2, 6)}) - ${int(r, 2, 9)}`, level: 2 }),
+    (r) => ({ kind: 'evaluate', given: `(-${int(r, 2, 6)})^2 - ${int(r, 2, 9)}`, level: 2 }),
+  ],
+  arithmetic: [
+    (r) => ({ kind: 'evaluate', given: `${int(r, 12, 40)} + ${int(r, 12, 40)} - ${int(r, 5, 20)}`, level: 1 }),
+    (r) => ({ kind: 'evaluate', given: `${int(r, 3, 9)} * ${int(r, 6, 12)} - ${int(r, 5, 30)}`, level: 1 }),
+  ],
+  'exponent-rules': [
+    (r) => ({ kind: 'simplify', given: `x^${int(r, 2, 5)} * x^${int(r, 2, 5)}`, level: 1 }),
+    (r) => ({ kind: 'simplify', given: `(x^${int(r, 2, 4)})^${int(r, 2, 3)}`, level: 1 }),
+    (r) => ({ kind: 'simplify', given: `(${int(r, 2, 4)}x)^${int(r, 2, 3)}`, level: 2 }),
+    (r) => {
+      const b = int(r, 2, 4);
+      return { kind: 'simplify', given: `x^${b + int(r, 1, 4)} / x^${b}`, level: 2 };
+    },
+    (r) => ({ kind: 'simplify', given: `${int(r, 2, 5)}x^${int(r, 2, 4)} * ${int(r, 2, 5)}x^${int(r, 1, 3)}`, level: 2 }),
+  ],
+  'expanding-binomials': [
+    (r) => ({ kind: 'expand', given: `(x ${plus(nz(r, -7, 7))})^2`, level: 2 }),
+    (r) => ({ kind: 'expand', given: `(x ${plus(nz(r, -7, 7))})(x ${plus(nz(r, -7, 7))})`, level: 2 }),
+    (r) => ({ kind: 'expand', given: `(${int(r, 2, 3)}x ${plus(nz(r, -5, 5))})(x ${plus(nz(r, -5, 5))})`, level: 3 }),
+  ],
+  factoring: [
+    (r) => {
+      const p = nz(r, -7, 7);
+      const q = nz(r, -7, 7);
+      const b = p + q;
+      return { kind: 'factor', given: `x^2 ${b === 0 ? '' : `${plus(b).replace(/ 1$/, ' ')}x `}${plus(p * q)}`.replace(/\s+/g, ' '), level: 2 };
+    },
+    (r) => {
+      const a = int(r, 2, 6);
+      return { kind: 'factor', given: `${a}x^2 ${plus(a * nz(r, -5, 5))}x`, level: 1 };
+    },
+    (r) => {
+      const k = int(r, 2, 9);
+      return { kind: 'factor', given: `x^2 - ${k * k}`, level: 2 };
+    },
+  ],
+  'zero-product': [
+    (r) => ({ kind: 'quadratic', given: `(x ${plus(nz(r, -8, 8))})(x ${plus(nz(r, -8, 8))}) = 0`, level: 1 }),
+    (r) => {
+      const p = nz(r, -6, 6);
+      let q = nz(r, -6, 6);
+      if (q === p) q = -p;
+      const b = -(p + q);
+      const c = p * q;
+      return { kind: 'quadratic', given: `x^2 ${b === 0 ? '' : `${plus(b).replace(/ 1$/, ' ')}x `}${plus(c)} = 0`.replace(/\s+/g, ' '), level: 2 };
+    },
+  ],
+  'square-root-pm': [
+    (r) => {
+      const k = int(r, 2, 12);
+      return { kind: 'quadratic', given: `x^2 = ${k * k}`, level: 1 };
+    },
+    (r) => {
+      const k = int(r, 2, 9);
+      const a = int(r, 2, 5);
+      return { kind: 'quadratic', given: `${a}x^2 = ${a * k * k}`, level: 2 };
+    },
+    (r) => {
+      const k = int(r, 2, 9);
+      return { kind: 'quadratic', given: `x^2 - ${k * k} = 0`, level: 1 };
+    },
+  ],
+  'dividing-by-variable': [
+    (r) => ({ kind: 'quadratic', given: `x^2 = ${int(r, 2, 9)}x`, level: 2 }),
+    (r) => {
+      const a = int(r, 2, 4);
+      return { kind: 'quadratic', given: `${a}x^2 = ${a * int(r, 2, 6)}x`, level: 2 };
+    },
+  ],
+  'inequality-flip': [
+    (r) => {
+      const a = int(r, 2, 6);
+      return { kind: 'inequality', given: `-${a}x ${pick(r, ['>', '<', '>=', '<='])} ${a * nz(r, -6, 6)}`, level: 1 };
+    },
+    (r) => {
+      const a = int(r, 2, 5);
+      const b = int(r, 1, 9);
+      return { kind: 'inequality', given: `${b} - ${a}x ${pick(r, ['>', '<'])} ${b - a * nz(r, -5, 5)}`, level: 2 };
+    },
+    (r) => {
+      const a = int(r, 2, 6);
+      return { kind: 'inequality', given: `${a}x ${plus(nz(r, -9, 9))} ${pick(r, ['>', '<='])} ${int(r, 5, 30)}`, level: 1 };
+    },
+  ],
+  fractions: [
+    (r) => {
+      const [b, d] = pick(r, [[2, 3], [3, 4], [2, 5], [4, 6], [3, 5]]);
+      return { kind: 'evaluate', given: `${int(r, 1, b - 1)}/${b} + ${int(r, 1, d - 1)}/${d}`, level: 1 };
+    },
+    (r) => {
+      const [b, d] = pick(r, [[2, 3], [3, 4], [2, 5]]);
+      return { kind: 'simplify', given: `x/${b} + x/${d}`, level: 2 };
+    },
+  ],
+  'clearing-fractions': [
+    (r) => {
+      const a = int(r, 2, 5);
+      const b = nz(r, -6, 6);
+      const x = a * nz(r, -4, 4);
+      return { kind: 'linear', given: `x/${a} ${plus(b)} = ${x / a + b}`, level: 2 };
+    },
+    (r) => {
+      const [a, b] = pick(r, [[2, 3], [2, 4], [3, 6]]);
+      const x = a * b * nz(r, -2, 2);
+      return { kind: 'linear', given: `x/${a} + x/${b} = ${x / a + x / b}`, level: 3 };
+    },
+  ],
+  'order-of-operations': [
+    (r) => ({ kind: 'evaluate', given: `${int(r, 2, 9)} + ${int(r, 2, 6)} * ${int(r, 2, 6)}`, level: 1 }),
+    (r) => ({ kind: 'evaluate', given: `${int(r, 20, 40)} - ${int(r, 2, 4)} * ${int(r, 2, 4)}^2`, level: 2 }),
+    (r) => ({ kind: 'evaluate', given: `(${int(r, 2, 6)} + ${int(r, 2, 6)}) * ${int(r, 2, 5)} - ${int(r, 2, 9)}`, level: 1 }),
+    (r) => {
+      const v = nz(r, -4, 4);
+      return { kind: 'evaluate', given: `${int(r, 2, 4)}x^2 ${plus(nz(r, -5, 5))}x`, subs: { x: String(v) }, prompt: `Evaluate when x = ${v}`, level: 2 };
+    },
+  ],
+  'quadratic-formula': [
+    (r) => {
+      const opts = [[1, 3, -1], [1, 5, 2], [1, -4, 1], [2, 3, -1], [1, 1, -3], [1, -6, 7], [2, -5, 1]];
+      const [a, b, c] = pick(r, opts);
+      return { kind: 'quadratic', given: `${co(a)}x^2 ${plus(b).replace(/ 1$/, ' ')}x ${plus(c)} = 0`.replace(/ x /, 'x ').replace(/\s+/g, ' '), level: 3 };
+    },
+  ],
+  systems: [
+    (r) => {
+      const x = nz(r, -6, 6);
+      const y = nz(r, -6, 6);
+      return { kind: 'system', given: `x + y = ${x + y}, x - y = ${x - y}`, level: 1 };
+    },
+    (r) => {
+      const x = nz(r, -5, 5);
+      const y = nz(r, -5, 5);
+      const a = int(r, 2, 4);
+      return { kind: 'system', given: `${a}x + y = ${a * x + y}, x - y = ${x - y}`, level: 2 };
+    },
+  ],
+  'simplest-form': [
+    (r) => {
+      const g = int(r, 2, 6);
+      const [n, d] = pick(r, [[2, 3], [3, 4], [1, 2], [3, 5], [5, 6]]);
+      return { kind: 'evaluate', given: `${n * g}/${d * g}`, prompt: 'Write in simplest form', level: 1 };
+    },
+  ],
+};
+
+let counter = 0;
+
+function build(d: Draft, concept: ConceptId, source: Problem['source']): Problem {
+  counter++;
+  const given = d.given.replace(/\+ -/g, '- ').replace(/\s+/g, ' ').replace(/ 1x/g, ' x').trim();
+  return {
+    id: `g-${concept}-${seedFrom(given)}-${counter}`,
+    kind: d.kind,
+    prompt: d.prompt ?? PROMPTS[d.kind],
+    given,
+    subs: d.subs,
+    concepts: [concept],
+    source,
+    level: d.level ?? 1,
+  };
+}
+
+/** n fresh problems that exercise one concept, easiest first. */
+export function practiceFor(concept: ConceptId, n: number, seed: number, source: Problem['source'] = 'generated'): Problem[] {
+  const r = rng(seed);
+  const makers = MAKERS[concept] ?? MAKERS['inverse-operations'];
+  const out: Problem[] = [];
+  const seen = new Set<string>();
+  let guard = 0;
+  while (out.length < n && guard++ < n * 12) {
+    const maker = makers[(out.length + Math.floor(r() * 2)) % makers.length];
+    const p = build(maker(r), concept, source);
+    if (seen.has(p.given)) continue;
+    seen.add(p.given);
+    out.push(p);
+  }
+  return out.sort((a, b) => (a.level ?? 1) - (b.level ?? 1));
+}
+
+export const ALL_CONCEPTS = Object.keys(MAKERS) as ConceptId[];

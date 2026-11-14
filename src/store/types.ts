@@ -1,0 +1,128 @@
+import { AiConfig } from '../ai/providers';
+import { ConceptId, LineStatus, ProblemKind, Severity, Verdict } from '../engine/types';
+import { LeraDoc } from '../ingest/types';
+
+export interface Profile {
+  name: string;
+  email: string;
+  age?: number;
+  language: string;
+  /** Answers from the onboarding quiz, in order. */
+  goal?: string;
+  struggle?: string;
+  explainStyle?: string;
+  frequency?: string;
+  focusMinutes: number;
+  notifications: boolean;
+  plan: 'none' | 'trial';
+  trialStarted?: string;
+  onboarded: boolean;
+  createdAt?: string;
+}
+
+export interface Highlight {
+  id: string;
+  topicId: string;
+  /** Index of the block inside the topic, and character range inside that block's text. */
+  block: number;
+  /** For list / example blocks: which item or line. */
+  item: number;
+  start: number;
+  end: number;
+  color: string;
+  underline?: boolean;
+}
+
+export interface Note {
+  id: string;
+  topicId: string;
+  block: number;
+  item: number;
+  offset: number;
+  title: string;
+  content: string;
+  quote: string;
+  createdAt: string;
+}
+
+export interface SavedItem {
+  id: string;
+  topicId: string;
+  topicTitle: string;
+  text: string;
+  createdAt: string;
+}
+
+/** What Lera knows about one concept for one learner. */
+export interface ConceptState {
+  id: ConceptId;
+  gaps: number;
+  slips: number;
+  strategy: number;
+  hints: number;
+  /** Problems on this concept solved with no mark against it. */
+  clean: number;
+  /** A gap that hasn't yet been cleared by two clean days. */
+  outstanding: boolean;
+  /** Slips keep recurring: treated as a pattern worth a prompt. */
+  rushing: boolean;
+  /** Distinct days with a clean solve since the last gap. */
+  cleanDays: string[];
+  slipDays: string[];
+  lastGap?: string;
+  lastSeen?: string;
+  /** Day (YYYY-MM-DD) this concept should come back. */
+  due?: string;
+  /** 0 = just flagged … 3 = held over a month. */
+  stage: number;
+  /** Most recent diagnosis title, for the queue. */
+  lastTitle?: string;
+}
+
+export interface AttemptLine {
+  text: string;
+  status: LineStatus;
+  code?: string;
+  concept?: ConceptId;
+  severity?: Severity;
+}
+
+export interface AttemptRecord {
+  id: string;
+  problemId: string;
+  topicId?: string;
+  day: string;
+  at: string;
+  kind: ProblemKind;
+  prompt: string;
+  given: string;
+  source: 'notes' | 'generated' | 'review';
+  concepts: ConceptId[];
+  lines: AttemptLine[];
+  verdict: Verdict;
+  marks: { code: string; concept: ConceptId; severity: Severity; title: string; line: number }[];
+  /** Highest hint rung used (0 = none). */
+  hintRung: number;
+  approach?: string;
+  steps: number;
+  cleanSteps: number;
+  seconds: number;
+}
+
+export interface AppState {
+  version: 1;
+  profile: Profile;
+  ai: AiConfig;
+  docs: LeraDoc[];
+  activeDocId?: string;
+  lastTopicId?: string;
+  highlights: Highlight[];
+  notes: Note[];
+  saved: SavedItem[];
+  concepts: Partial<Record<ConceptId, ConceptState>>;
+  attempts: AttemptRecord[];
+  /** problemId → day it was first solved */
+  solved: Record<string, string>;
+  /** topicIds whose lesson has been opened */
+  read: Record<string, string>;
+}

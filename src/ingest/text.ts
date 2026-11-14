@@ -1,0 +1,63 @@
+const SUP: Record<string, string> = {
+  '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9',
+  '⁺': '+', '⁻': '-', 'ⁿ': 'n', 'ˣ': 'x',
+};
+const SUB: Record<string, string> = {
+  '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9',
+};
+
+/**
+ * Make text from a PDF or Word file uniform: ligatures, maths-italic letters,
+ * odd spaces and dashes all become plain characters, and superscripts become ^n
+ * so powers survive.
+ */
+export function cleanText(input: string): string {
+  let s = input;
+  s = s.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻ⁿˣ]+/g, (m) => {
+    const plain = m.split('').map((c) => SUP[c] ?? c).join('');
+    return plain.length > 1 || plain.startsWith('-') ? `^(${plain})` : `^${plain}`;
+  });
+  s = s.replace(/[₀₁₂₃₄₅₆₇₈₉]+/g, (m) => '_' + m.split('').map((c) => SUB[c] ?? c).join(''));
+  // NFKC folds ligatures (ﬁ), maths alphabets (𝑥) and compatibility forms into ordinary letters
+  s = s.normalize('NFKC');
+  s = s
+    .replace(/⁄/g, '/')
+    .replace(/[−–‒]/g, '−')
+    .replace(/[­​‌‍﻿]/g, '')
+    .replace(/[  -   　]/g, ' ')
+    .replace(/[‘’‚′]/g, '’')
+    .replace(/[“”„″]/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return s;
+}
+
+/** Same line as maths the engine can parse: typographic minus and friends back to ASCII. */
+export function toMathText(s: string): string {
+  return s
+    .replace(/[−–—]/g, '-')
+    .replace(/[×·∙⋅]/g, '*')
+    .replace(/÷/g, '/')
+    .replace(/≤/g, '<=')
+    .replace(/≥/g, '>=')
+    .replace(/’/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Prose rendering: x^2 → x², * → ·, <= → ≤. */
+export function prettyInline(s: string): string {
+  const up: Record<string, string> = { '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹', '-': '⁻', n: 'ⁿ' };
+  return s
+    .replace(/\^\(?(-?[0-9n]{1,3})\)?/g, (_, e: string) => e.split('').map((c) => up[c] ?? c).join(''))
+    .replace(/<=/g, '≤')
+    .replace(/>=/g, '≥')
+    .replace(/(\w|\))\s*\*\s*(\w|\()/g, '$1·$2')
+    .replace(/sqrt\(([^()]+)\)/g, '√($1)')
+    .replace(/(^|[\s(=+*/·])-(?=[\dA-Za-z(])/g, '$1−');
+}
+
+export function slug(s: string, fallback = 'x'): string {
+  const base = s.toLowerCase().replace(/[^a-z0-9а-яё]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40);
+  return base || fallback;
+}

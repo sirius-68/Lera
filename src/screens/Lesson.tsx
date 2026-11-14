@@ -1,0 +1,590 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { MouseEvent as ReactMouseEvent } from 'react';
+import { CONCEPTS } from '../engine/concepts';
+import { isMathLine, plain } from '../ingest/structure';
+import { prettyInline } from '../ingest/text';
+import { Block, LeraDoc, Topic } from '../ingest/types';
+import { Lera } from '../mascot/Lera';
+import { actions, useStore } from '../store';
+import { findTopic, statusOf, streak } from '../store/learner';
+import { back, go, openOverlay, replace, Route } from '../store/nav';
+import { Highlight, Note } from '../store/types';
+import { Button3D, LeraSays, Seg, Sheet, haptic, toast } from '../ui/kit';
+import { Icon } from '../ui/icons';
+import { MathView, tokenize } from '../ui/math';
+
+export const HIGHLIGHT_COLORS = ['#22c55e', '#3b82f6', '#06b6d4', '#f59e0b', '#ec4899', '#a855f7', '#ef4444', '#6366f1'];
+
+const tintOf = (hex: string): string => `${hex}40`;
+
+/* ───────────── text with highlights and glossary terms ───────────── */
+
+interface Piece {
+  start: number;
+  end: number;
+  kind: 'text' | 'math' | 'bold';
+  s: string;
+  hl?: Highlight;
+  term?: string;
+}
+
+function pieces(text: string, highlights: Highlight[], termRe: RegExp | null, usedTerms: Set<string>): Piece[] {
+  const out: Piece[] = [];
+  for (const tok of tokenize(text)) {
+    const hlFor = (a: number, b: number) => highlights.find((h) => h.start < b && a < h.end);
+    if (tok.t !== 'text') {
+      out.push({ start: tok.start, end: tok.end, kind: tok.t, s: tok.s, hl: hlFor(tok.start, tok.end) });
+      continue;
+    }
+    // cut the run wherever a highlight or a glossary term starts or ends
+    const cuts = new Set<number>([tok.start, tok.end]);
+    for (const h of highlights) {
+      if (h.start > tok.start && h.start < tok.end) cuts.add(h.start);
+      if (h.end > tok.start && h.end < tok.end) cuts.add(h.end);
+    }
+    const terms: { a: number; b: number; key: string }[] = [];
+    if (termRe) {
+      termRe.lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = termRe.exec(tok.s))) {
+        const key = m[1].toLowerCase();
+        if (usedTerms.has(key)) continue;
+        usedTerms.add(key);
+        const a = tok.start + m.index;
+        const b = a + m[0].length;
+        terms.push({ a, b, key });
+        cuts.add(a);
+        cuts.add(b);
+      }
+    }
+    const marks = [...cuts].sort((x, y) => x - y);
+    for (let i = 0; i < marks.length - 1; i++) {
+      const a = marks[i];
+      const b = marks[i + 1];
+      out.push({ start: a, end: b, kind: 'text', s: text.slice(a, b), hl: hlFor(a, b), term: terms.find((t) => t.a <= a && b <= t.b)?.key });
+    }
+  }
+  return out;
+}
+
+interface SegProps {
+  text: string;
+  block: number;
+  item: number;
+  ctx: ReaderCtx;
+}
+
+interface ReaderCtx {
+  topicId: string;
+  highlights: Highlight[];
+  notes: Note[];
+  termRe: RegExp | null;
+  usedTerms: Set<string>;
+  texts: Map<string, string>;
+  onTerm: (term: string, el: HTMLElement) => void;
+  onNote: (n: Note) => void;
+}
+
+/** One selectable run of lesson text. Offsets in data-o refer to the raw string, so highlights survive re-rendering. */
+function SegText({ text, block, item, ctx }: SegProps) {
+  const key = `${block}:${item}`;
+  ctx.texts.set(key, text);
+  const mine = ctx.highlights.filter((h) => h.block === block && h.item === item);
+  const notes = ctx.notes.filter((n) => n.block === block && n.item === item);
+  const parts = pieces(text, mine, ctx.termRe, ctx.usedTerms);
+  return (
+    <span data-seg={key} data-len={text.length}>
+      {parts.map((p) => {
+        const style = p.hl ? (p.hl.underline ? { textDecoration: `underline 2.5px ${p.hl.color}`, textUnderlineOffset: 4 } : { background: tintOf(p.hl.color) }) : undefined;
+        const common = { 'data-o': p.start, 'data-hl': p.hl?.id, style, className: p.hl ? 'hl' : undefined };
+        if (p.kind === 'math') {
+          return (
+            <span key={p.start} {...common} data-math={p.end - p.start}>
+              <MathView text={p.s} />
+            </span>
+          );
+        }
+        if (p.kind === 'bold') {
+          // the visible text starts after the two asterisks
+          return (
+            <strong key={p.start} {...common} data-o={p.start + 2}>
+              {p.s}
+            </strong>
+          );
+        }
+        if (p.term) {
+          return (
+            <span
+              key={p.start}
+              {...common}
+              className={`term ${p.hl ? 'hl' : ''}`}
+              role="button"
+              tabIndex={0}
+              onClick={(e: ReactMouseEvent<HTMLElement>) => {
+                const sel = window.getSelection();
+                if (sel && !sel.isCollapsed) return;
+                e.stopPropagation();
+                ctx.onTerm(p.term as string, e.currentTarget);
+              }}
+            >
+              {p.s}
+            </span>
+          );
+        }
+        return (
+          <span key={p.start} {...common}>
+            {p.s}
+          </span>
+        );
+      })}
+      {notes.map((n) => (
+        <button key={n.id} className="note-pin" onClick={() => ctx.onNote(n)} aria-label={`Your note: ${n.title || 'untitled'}`}>
+          <Icon name="note" size={14} />
+        </button>
+      ))}
+    </span>
+  );
+}
+
+function BlockView({ block, index, ctx }: { block: Block; index: number; ctx: ReaderCtx }) {
+  switch (block.t) {
+    case 'h':
+      return <h3 className="rd-h"><SegText text={block.text} block={index} item={0} ctx={ctx} /></h3>;
+    case 'p':
+      return <p className="rd-p"><SegText text={block.text} block={index} item={0} ctx={ctx} /></p>;
+    case 'math':
+      return <div className="rd-math"><MathView text={plain(block.text)} block /></div>;
+    case 'list': {
+      const items = block.items.map((it, i) => <li key={i}><SegText text={it} block={index} item={i} ctx={ctx} /></li>);
+      return block.ordered ? <ol className="rd-list">{items}</ol> : <ul className="rd-list">{items}</ul>;
+    }
+    case 'example':
+      return <ExampleCard block={block} index={index} ctx={ctx} />;
+    case 'note':
+      return (
+        <aside className="rd-note">
+          <span className="label" style={{ color: 'var(--brand-d)' }}>{block.label}</span>
+          <p className="cap"><SegText text={block.text} block={index} item={0} ctx={ctx} /></p>
+        </aside>
+      );
+  }
+}
+
+/** Worked examples from the notes are revealed a line at a time: predict, then look. */
+function ExampleCard({ block, index, ctx }: { block: Extract<Block, { t: 'example' }>; index: number; ctx: ReaderCtx }) {
+  const [shown, setShown] = useState(1);
+  const total = block.lines.length;
+  return (
+    <div className="rd-example">
+      <span className="label">{block.title || 'Example'}</span>
+      <div className="col" style={{ gap: 8, marginTop: 8 }}>
+        {block.lines.slice(0, shown).map((line, i) => (
+          <div key={i} className="ex-line">
+            {isMathLine(plain(line)) ? <MathView text={plain(line)} block /> : <p className="rd-p" style={{ margin: 0 }}><SegText text={line} block={index} item={i} ctx={ctx} /></p>}
+          </div>
+        ))}
+      </div>
+      {shown < total && (
+        <button
+          className="reveal"
+          onClick={() => {
+            haptic(5);
+            setShown(shown + 1);
+          }}
+        >
+          Next line <span className="faint">· {shown}/{total}</span> <Icon name="down" size={16} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/* ───────────── selection → offsets ───────────── */
+
+interface Picked {
+  block: number;
+  item: number;
+  start: number;
+  end: number;
+  text: string;
+  x: number;
+  top: number;
+  bottom: number;
+  hl?: Highlight;
+}
+
+function locate(node: Node, offset: number, edge: 'start' | 'end'): { seg: HTMLElement; at: number } | null {
+  const el = node.nodeType === 3 ? node.parentElement : (node as HTMLElement);
+  if (!el) return null;
+  const seg = el.closest<HTMLElement>('[data-seg]');
+  if (!seg) return null;
+  const len = Number(seg.dataset.len ?? 0);
+  const math = el.closest<HTMLElement>('[data-math]');
+  if (math) {
+    const o = Number(math.dataset.o ?? 0);
+    return { seg, at: edge === 'start' ? o : o + Number(math.dataset.math ?? 0) };
+  }
+  const piece = el.closest<HTMLElement>('[data-o]');
+  if (piece && node.nodeType === 3) return { seg, at: Math.min(len, Number(piece.dataset.o ?? 0) + offset) };
+  return { seg, at: edge === 'start' ? 0 : len };
+}
+
+/* ───────────── the screen ───────────── */
+
+export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'lesson' }>; dir: number }) {
+  const docs = useStore((s) => s.docs);
+  const allHighlights = useStore((s) => s.highlights);
+  const allNotes = useStore((s) => s.notes);
+  const attempts = useStore((s) => s.attempts);
+  const found = findTopic(docs, route.topicId);
+  const [tab, setTab] = useState<'lesson' | 'practice'>(route.tab ?? 'lesson');
+  const [picked, setPicked] = useState<Picked | null>(null);
+  const [term, setTerm] = useState<{ key: string; x: number; top: number } | null>(null);
+  const [noteDraft, setNoteDraft] = useState<Picked | null>(null);
+  const [viewNote, setViewNote] = useState<Note | null>(null);
+  const screen = useRef<HTMLDivElement | null>(null);
+  const reader = useRef<HTMLDivElement | null>(null);
+  const progress = useRef<HTMLElement | null>(null);
+  const texts = useRef(new Map<string, string>());
+
+  useEffect(() => {
+    if (found) actions.openTopic(route.topicId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.topicId]);
+
+  const highlights = useMemo(() => allHighlights.filter((h) => h.topicId === route.topicId), [allHighlights, route.topicId]);
+  const notes = useMemo(() => allNotes.filter((n) => n.topicId === route.topicId), [allNotes, route.topicId]);
+  const termRe = useMemo(() => {
+    const keys = Object.keys(found?.doc.glossary ?? {}).sort((a, b) => b.length - a.length);
+    if (!keys.length) return null;
+    return new RegExp(`\\b(${keys.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})(?:s|es)?\\b`, 'gi');
+  }, [found?.doc]);
+
+  // read the browser selection and turn it into a range inside one run of text
+  useEffect(() => {
+    if (tab !== 'lesson') return;
+    let timer: ReturnType<typeof setTimeout>;
+    const read = () => {
+      const sel = window.getSelection();
+      const root = reader.current;
+      const frame = screen.current;
+      if (!sel || sel.isCollapsed || !root || !frame || sel.rangeCount === 0) {
+        setPicked((p) => (p && !p.hl ? null : p));
+        return;
+      }
+      const range = sel.getRangeAt(0);
+      if (!root.contains(range.commonAncestorContainer)) return;
+      const a = locate(range.startContainer, range.startOffset, 'start');
+      const b = locate(range.endContainer, range.endOffset, 'end');
+      if (!a) return;
+      const [block, item] = (a.seg.dataset.seg ?? '0:0').split(':').map(Number);
+      const len = Number(a.seg.dataset.len ?? 0);
+      const end = b && b.seg === a.seg ? b.at : len;
+      if (end <= a.at) return;
+      const raw = texts.current.get(`${block}:${item}`) ?? '';
+      const rect = range.getBoundingClientRect();
+      const host = frame.getBoundingClientRect();
+      setTerm(null);
+      setPicked({ block, item, start: a.at, end, text: plain(raw.slice(a.at, end)).replace(/\*\*/g, ''), x: rect.left + rect.width / 2 - host.left, top: rect.top - host.top, bottom: rect.bottom - host.top });
+    };
+    const onChange = () => {
+      clearTimeout(timer);
+      timer = setTimeout(read, 180);
+    };
+    document.addEventListener('selectionchange', onChange);
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('selectionchange', onChange);
+    };
+  }, [tab]);
+
+  if (!found) {
+    return (
+      <div className="screen" data-dir={dir}>
+        <div className="topbar"><button className="iconbtn" onClick={back} aria-label="Back"><Icon name="back" /></button></div>
+        <div className="scroll center" style={{ justifyContent: 'center', gap: 12 }}>
+          <Lera size={90} mood="curious" />
+          <p className="muted">This lesson isn’t here any more.</p>
+          <Button3D small onClick={() => go({ name: 'lessons' })}>Open lessons</Button3D>
+        </div>
+      </div>
+    );
+  }
+
+  const { topic, doc } = found;
+  const clearSel = () => {
+    window.getSelection()?.removeAllRanges();
+    setPicked(null);
+  };
+  const usedTerms = new Set<string>();
+  const ctx: ReaderCtx = {
+    topicId: topic.id,
+    highlights,
+    notes,
+    termRe,
+    usedTerms,
+    texts: texts.current,
+    onNote: setViewNote,
+    onTerm: (key, el) => {
+      const host = screen.current?.getBoundingClientRect();
+      const r = el.getBoundingClientRect();
+      if (!host) return;
+      haptic(5);
+      setPicked(null);
+      setTerm({ key, x: r.left + r.width / 2 - host.left, top: r.bottom - host.top });
+    },
+  };
+
+  const onReaderClick = (e: ReactMouseEvent<HTMLDivElement>) => {
+    const sel = window.getSelection();
+    if (sel && !sel.isCollapsed) return;
+    setTerm(null);
+    const mark = (e.target as HTMLElement).closest<HTMLElement>('[data-hl]');
+    const host = screen.current?.getBoundingClientRect();
+    if (!mark || !host) return setPicked(null);
+    const hl = highlights.find((h) => h.id === mark.dataset.hl);
+    if (!hl) return;
+    const r = mark.getBoundingClientRect();
+    const raw = texts.current.get(`${hl.block}:${hl.item}`) ?? '';
+    setPicked({ block: hl.block, item: hl.item, start: hl.start, end: hl.end, text: plain(raw.slice(hl.start, hl.end)), x: r.left + r.width / 2 - host.left, top: r.top - host.top, bottom: r.bottom - host.top, hl });
+  };
+
+  const paint = (color: string, underline = false) => {
+    if (!picked) return;
+    haptic(6);
+    actions.addHighlight({ topicId: topic.id, block: picked.block, item: picked.item, start: picked.start, end: picked.end, color, underline });
+    clearSel();
+  };
+
+  const copy = async (text: string, done = 'Copied') => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(done);
+    } catch {
+      toast('Copying isn’t allowed here — select and copy by hand.');
+    }
+  };
+
+  const share = async (text: string) => {
+    const payload = { title: topic.title, text: `“${text}” — from my notes on ${topic.title}` };
+    try {
+      if (navigator.share) await navigator.share(payload);
+      else await copy(payload.text, 'Copied, ready to share');
+    } catch (e) {
+      // closing the share sheet is fine; a refusal (embedded pages) falls back to copying
+      if (!(e instanceof DOMException && e.name === 'AbortError')) await copy(payload.text, 'Copied, ready to share');
+    }
+  };
+
+  const days = streak(attempts);
+  const unitTitle = found.unit.title;
+  const topics = doc.units.flatMap((u) => u.topics);
+  const at = topics.findIndex((t) => t.id === topic.id);
+  const nextTopic = topics[at + 1];
+  const barLeft = (x: number) => Math.max(150, Math.min((screen.current?.clientWidth ?? 390) - 150, x));
+
+  return (
+    <div className="screen lesson" data-dir={dir} ref={screen}>
+      <div className="lesson-nav">
+        <button className="navpill" onClick={() => go({ name: 'home' })}><Icon name="home" size={18} /> Home</button>
+        <span className="streakpill" title={`${days}-day streak`}><Icon name="flame" size={17} fill /> Day {Math.max(1, days)}</span>
+        <button className="navpill" onClick={() => go({ name: 'lessons' })}>Lessons <Icon name="book" size={18} /></button>
+      </div>
+      <div style={{ padding: '2px 20px 10px' }}>
+        <Seg options={[{ id: 'lesson', label: 'Lesson' }, { id: 'practice', label: `Practice${topic.exercises.length ? ` · ${topic.exercises.length}` : ''}` }]} value={tab} onChange={(v) => { clearSel(); setTerm(null); setTab(v); }} />
+      </div>
+      <i className="read-progress" ref={progress} />
+
+      {tab === 'lesson' ? (
+        <div
+          className="scroll"
+          onScroll={(e: { currentTarget: HTMLElement }) => {
+            const el = e.currentTarget;
+            const k = el.scrollHeight > el.clientHeight ? el.scrollTop / (el.scrollHeight - el.clientHeight) : 1;
+            progress.current?.style.setProperty('--k', String(k));
+            if (picked?.hl || term) {
+              setPicked(null);
+              setTerm(null);
+            }
+          }}
+        >
+          <article className="reader stagger" ref={reader} onClick={onReaderClick}>
+            <span className="label">{unitTitle}</span>
+            <h1 className="rd-title">{topic.title}</h1>
+            {topic.blocks.map((b, i) => (
+              <BlockView key={i} block={b} index={i} ctx={ctx} />
+            ))}
+            {topic.blocks.length === 0 && <p className="rd-p muted">Your notes have exercises under this heading but no explanation. Head to Practice.</p>}
+          </article>
+          <div className="center" style={{ gap: 8, padding: '8px 22px 96px' }}>
+            <Button3D sheen onClick={() => setTab('practice')}>
+              <Icon name="pencil" size={18} /> Practise this lesson
+            </Button3D>
+            {nextTopic && (
+              <button className="linkbtn" onClick={() => replace({ name: 'lesson', topicId: nextTopic.id })}>
+                Next: {nextTopic.title} <Icon name="chevron" size={15} />
+              </button>
+            )}
+          </div>
+        </div>
+      ) : (
+        <TopicPractice topic={topic} doc={doc} />
+      )}
+
+      {tab === 'lesson' && (
+        <button className="ask-fab" onClick={() => openOverlay({ name: 'ask', topicId: topic.id })}>
+          <Lera size={30} interactive={false} /> Ask Lera
+        </button>
+      )}
+
+      {picked && (
+        <div className="seltool" style={{ left: barLeft(picked.x), top: picked.top > 150 ? picked.top - 12 : picked.bottom + 12 }} data-below={picked.top > 150 ? undefined : ''} onPointerDown={(e: { preventDefault(): void }) => e.preventDefault()}>
+          <div className="swatches">
+            {HIGHLIGHT_COLORS.map((c) => (
+              <button key={c} style={{ background: c }} onClick={() => paint(c)} aria-label={`Highlight ${c}`} data-on={picked.hl?.color === c && !picked.hl.underline ? '' : undefined} />
+            ))}
+            <button className="under" onClick={() => paint(picked.hl?.color ?? '#6c63ff', true)} aria-label="Underline"><Icon name="underline" size={16} /></button>
+            {picked.hl && (
+              <button className="under" onClick={() => { actions.removeHighlight(picked.hl!.id); setPicked(null); }} aria-label="Remove highlight"><Icon name="trash" size={16} /></button>
+            )}
+          </div>
+          <div className="actions">
+            {(
+              [
+                ['copy', 'Copy', () => { void copy(picked.text); clearSel(); }],
+                ['bulb', 'Explain', () => { openOverlay({ name: 'ask', topicId: topic.id, seed: `Explain this: “${picked.text.slice(0, 300)}”` }); clearSel(); }],
+                ['note', 'Note', () => { setNoteDraft(picked); clearSel(); }],
+                ['chat', 'Ask Lera', () => { openOverlay({ name: 'ask', topicId: topic.id, seed: `Tell me more about “${picked.text.slice(0, 300)}”` }); clearSel(); }],
+                ['bookmark', 'Save', () => { actions.save({ topicId: topic.id, topicTitle: topic.title, text: picked.text }); toast('Saved to your notebook'); clearSel(); }],
+                ['share', 'Share', () => { void share(picked.text); clearSel(); }],
+              ] as [string, string, () => void][]
+            ).map(([icon, label, fn]) => (
+              <button key={label} onClick={fn}>
+                <Icon name={icon} size={18} />
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {term && (
+        <div className="termpop" style={{ left: barLeft(term.x), top: term.top + 10 }}>
+          <b>{term.key.charAt(0).toUpperCase() + term.key.slice(1)}</b>
+          <p>{doc.glossary[term.key]}</p>
+          <button className="linkbtn" style={{ padding: '4px 0', fontSize: 14 }} onClick={() => { openOverlay({ name: 'ask', topicId: topic.id, seed: `What is ${/^[aeiou]/.test(term.key) ? 'an' : 'a'} ${term.key}?` }); setTerm(null); }}>
+            Learn more <Icon name="chevron" size={14} />
+          </button>
+        </div>
+      )}
+
+      {noteDraft && <NoteEditor quote={noteDraft.text} onClose={() => setNoteDraft(null)} onSave={(title, content) => { actions.addNote({ topicId: topic.id, block: noteDraft.block, item: noteDraft.item, offset: noteDraft.end, title, content, quote: noteDraft.text }); setNoteDraft(null); toast('Note added'); }} />}
+
+      {viewNote && (
+        <Sheet onClose={() => setViewNote(null)} label="Your note">
+          <div className="sheet-body">
+            <span className="label">Your note</span>
+            <h3 style={{ fontSize: 20, margin: '6px 0 8px' }}>{viewNote.title || 'Untitled'}</h3>
+            <blockquote className="quote">{prettyInline(viewNote.quote)}</blockquote>
+            <p style={{ lineHeight: 1.55, whiteSpace: 'pre-wrap', margin: '12px 0 18px' }}>{viewNote.content}</p>
+            <button className="linkbtn" style={{ color: 'var(--gap)', paddingLeft: 0 }} onClick={() => { actions.removeNote(viewNote.id); setViewNote(null); }}>
+              <Icon name="trash" size={16} /> Delete note
+            </button>
+          </div>
+        </Sheet>
+      )}
+    </div>
+  );
+}
+
+function NoteEditor({ quote, onClose, onSave }: { quote: string; onClose: () => void; onSave: (title: string, content: string) => void }) {
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  return (
+    <Sheet onClose={onClose} label="Add a note">
+      <div className="sheet-body col" style={{ gap: 10 }}>
+        <span className="label">New note</span>
+        <blockquote className="quote">{prettyInline(quote)}</blockquote>
+        <input className="field" placeholder="Title" value={title} maxLength={60} onChange={(e: { target: { value: string } }) => setTitle(e.target.value)} aria-label="Note title" autoFocus />
+        <textarea className="field" style={{ minHeight: 110, resize: 'none' }} placeholder="What do you want to remember?" value={content} maxLength={200} onChange={(e: { target: { value: string } }) => setContent(e.target.value)} aria-label="Note" />
+        <span className="faint" style={{ fontSize: 12.5, alignSelf: 'flex-end' }}>{content.length}/200</span>
+        <div className="center"><Button3D disabled={!title.trim() && !content.trim()} onClick={() => onSave(title.trim(), content.trim())}>Save note</Button3D></div>
+      </div>
+    </Sheet>
+  );
+}
+
+/* ───────────── practice tab ───────────── */
+
+function TopicPractice({ topic, doc }: { topic: Topic; doc: LeraDoc }) {
+  const solved = useStore((s) => s.solved);
+  const concepts = useStore((s) => s.concepts);
+  const attempts = useStore((s) => s.attempts);
+  const n = topic.exercises.length;
+  const done = topic.exercises.filter((e) => solved[e.id]).length;
+  const text =
+    n === 0
+      ? 'I didn’t find exercises under this heading, so I’ll write problems that fit the topic.'
+      : done === n
+        ? `You’ve solved all **${n}** exercises from this part of your notes. I can still bring fresh ones.`
+        : `I found **${n}** ${n === 1 ? 'exercise' : 'exercises'} in this part of your notes${done ? ` — ${done} solved` : ''}. Write every line; I read the working.`;
+  const lastFor = (id: string) => [...attempts].reverse().find((a) => a.problemId === id);
+  return (
+    <div className="scroll">
+      <div className="stagger" style={{ padding: '6px 20px 28px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <LeraSays size={54} text={text} mood={done === n && n > 0 ? 'proud' : 'idle'} />
+        <div className="center">
+          <Button3D sheen onClick={() => go({ name: 'session', topicId: topic.id })}>
+            <Icon name="play" size={17} fill /> Start practice
+          </Button3D>
+        </div>
+
+        {n > 0 && (
+          <section>
+            <span className="label">From your notes</span>
+            <div className="col" style={{ gap: 10, marginTop: 8 }}>
+              {topic.exercises.map((e, i) => {
+                const last = lastFor(e.id);
+                const gaps = last?.marks.filter((m) => m.severity === 'gap').length ?? 0;
+                return (
+                  <button key={e.id} className="card tap exercise" onClick={() => go({ name: 'session', topicId: topic.id, problems: [e], title: `${topic.title} · exercise ${i + 1}` })}>
+                    <span className={`exn ${solved[e.id] ? 'done' : ''}`}>{solved[e.id] ? <Icon name="check" size={15} stroke={3} /> : i + 1}</span>
+                    <span className="grow">
+                      <span className="muted" style={{ fontSize: 13.5, display: 'block' }}>{e.kind === 'open' ? 'Written answer' : e.prompt}</span>
+                      {e.kind === 'open' ? <span style={{ fontSize: 15, lineHeight: 1.4 }}>{prettyInline(plain(e.original ?? e.prompt)).slice(0, 110)}</span> : <MathView text={e.given} block />}
+                      {last && !solved[e.id] && <span className="chip slip" style={{ marginTop: 6 }}>Tried · not solved yet</span>}
+                      {last && solved[e.id] && gaps > 0 && <span className="chip gap" style={{ marginTop: 6 }}>Solved with a gap</span>}
+                    </span>
+                    <Icon name="chevron" size={17} />
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {topic.concepts.length > 0 && (
+          <section>
+            <span className="label">Ideas this lesson leans on</span>
+            <div className="col" style={{ gap: 8, marginTop: 8 }}>
+              {topic.concepts.map((id) => {
+                const st = statusOf(concepts[id]);
+                return (
+                  <button key={id} className="noticed" style={{ borderTop: 0 }} onClick={() => openOverlay({ name: 'review', concept: id })}>
+                    <span className={`dot ${st}`} />
+                    <span className="grow">
+                      <b style={{ fontSize: 14.5, display: 'block' }}>{CONCEPTS[id].title}</b>
+                      <span className="muted" style={{ fontSize: 13 }}>{CONCEPTS[id].short}</span>
+                    </span>
+                    <Icon name="chevron" size={16} />
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
+        <p className="faint" style={{ fontSize: 12.5, textAlign: 'center' }}>{doc.title}</p>
+      </div>
+    </div>
+  );
+}

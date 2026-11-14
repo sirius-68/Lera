@@ -1,0 +1,191 @@
+.lera {
+  --lx: 0;
+  --ly: 0;
+  position: relative;
+  display: inline-block;
+  flex-shrink: 0;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  animation: lera-arrive 0.7s var(--spring, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+}
+.lera[role='img'] { cursor: default; }
+.lera:focus-visible { outline: none; }
+.lera:focus-visible svg { filter: drop-shadow(0 0 0 3px rgba(108, 99, 255, 0.5)); }
+.lera svg { display: block; overflow: visible; }
+.lera g, .lera path, .lera rect, .lera ellipse, .lera circle { transform-box: fill-box; }
+
+.l-shadow { fill: rgba(40, 34, 120, 0.16); transform-origin: center; animation: lera-shadow 3.8s ease-in-out infinite; }
+.l-jump { transform-origin: 50% 100%; }
+.l-tilt {
+  transform-origin: 50% 92%;
+  transform: translateX(calc(var(--lx) * 0.35px)) rotate(calc(var(--lx) * 1.15deg));
+  transition: transform 0.5s var(--spring, ease-out);
+}
+.l-breathe { transform-origin: 50% 100%; animation: lera-breathe 3.8s ease-in-out infinite; }
+.l-shine { stroke: rgba(255, 255, 255, 0.22); stroke-width: 2.6; stroke-linecap: round; }
+.l-hair { transform-origin: 50% 0%; }
+.l-face { transform: translate(calc(var(--lx) * 0.45px), calc(var(--ly) * 0.3px)); }
+
+/* eyes */
+.l-eye { transform-origin: center; transition: transform 0.09s ease-in; }
+.lera.blink .l-eye { transform: scaleY(0.08); }
+.l-pupil { transform: translate(calc(var(--lx) * 1px), calc(var(--ly) * 1px)); }
+.l-eyes-arc path, .l-eyes-shut path { stroke: #fff; stroke-width: 3.4; stroke-linecap: round; }
+.l-eyes-arc, .l-eyes-shut { opacity: 0; transform-origin: center; transform: scale(0.7); transition: opacity 0.14s, transform 0.3s var(--spring, ease-out); }
+.l-eyes-open { transform-origin: center; transition: opacity 0.12s, transform 0.3s var(--spring, ease-out); }
+
+.l-brow { stroke: #2b2494; stroke-width: 2.2; stroke-linecap: round; opacity: 0; transform-origin: center; transition: opacity 0.2s, transform 0.3s var(--spring, ease-out); }
+.l-cheek { fill: #ff9fc0; opacity: 0; transform-origin: center; transform: scale(0.4); transition: opacity 0.25s, transform 0.4s var(--spring, ease-out); }
+
+/* mouths: one visible at a time, the others shrink away */
+.l-mouth { fill: #fff; opacity: 0; transform-origin: 50% 20%; transform: scale(0.5); transition: opacity 0.14s, transform 0.32s var(--spring, ease-out); }
+.l-mouth.line { fill: none; stroke: #fff; stroke-width: 2.8; stroke-linecap: round; }
+.lera[data-mood='idle'] .m-smile,
+.lera[data-mood='wave'] .m-smile,
+.lera[data-mood='happy'] .m-big,
+.lera[data-mood='proud'] .m-smile,
+.lera[data-mood='celebrate'] .m-big,
+.lera[data-mood='dizzy'] .m-wobble,
+.lera[data-mood='thinking'] .m-flat,
+.lera[data-mood='oops'] .m-wobble,
+.lera[data-mood='curious'] .m-o,
+.lera[data-mood='sleepy'] .m-o,
+.lera[data-mood='talking'] .m-talk { opacity: 1; transform: none; }
+.lera[data-mood='talking'] .m-talk { animation: lera-talk 0.34s ease-in-out infinite alternate; }
+.lera[data-mood='sleepy'] .m-o { transform: scale(0.6); animation: lera-snore 3.6s ease-in-out infinite; }
+.lera[data-mood='thinking'] .m-flat { transform: translateX(2.5px); }
+
+/* moods */
+.lera[data-mood='happy'] .l-eyes-open,
+.lera[data-mood='proud'] .l-eyes-open,
+.lera[data-mood='sleepy'] .l-eyes-open { opacity: 0; transform: scaleY(0.2); }
+.lera[data-mood='happy'] .l-eyes-arc,
+.lera[data-mood='proud'] .l-eyes-arc { opacity: 1; transform: none; }
+.lera[data-mood='sleepy'] .l-eyes-shut { opacity: 1; transform: none; }
+.lera[data-mood='happy'] .l-cheek,
+.lera[data-mood='proud'] .l-cheek,
+.lera[data-mood='celebrate'] .l-cheek { opacity: 0.75; transform: none; }
+.lera[data-mood='celebrate'] .l-eyes-open { transform: scale(1.08); }
+.lera[data-mood='curious'] .l-eyes-open { transform: scale(1.1); }
+.lera[data-mood='curious'] .l-tilt { transform: rotate(8deg); }
+.lera[data-mood='thinking'] .l-tilt { transform: rotate(-5deg); }
+.lera[data-mood='thinking'] .l-brow { opacity: 1; }
+.lera[data-mood='thinking'] .l-brow-r { transform: translateY(-2.4px) rotate(-8deg); }
+.lera[data-mood='oops'] .l-brow { opacity: 1; }
+.lera[data-mood='oops'] .l-brow-l { transform: rotate(-16deg) translateY(1px); }
+.lera[data-mood='oops'] .l-brow-r { transform: rotate(16deg) translateY(1px); }
+.lera[data-mood='oops'] .l-jump { animation: lera-shake 0.6s var(--ease, ease-out) 1; }
+.lera[data-mood='sleepy'] .l-breathe { animation-duration: 5.2s; }
+.lera[data-mood='sleepy'] .l-tilt { transform: rotate(4deg) translateY(1px); }
+.lera[data-mood='celebrate'] .l-jump { animation: lera-jump 0.62s cubic-bezier(0.3, 0, 0.3, 1) 3; }
+.lera[data-mood='celebrate'] .l-shadow { animation: lera-shadow-jump 0.62s cubic-bezier(0.3, 0, 0.3, 1) 3; }
+.lera[data-mood='celebrate'] .l-hair-a { animation: lera-hair-a 0.62s ease-in-out 3; }
+.lera[data-mood='celebrate'] .l-hair-b { animation: lera-hair-b 0.62s ease-in-out 3; }
+.lera[data-mood='wave'] .l-jump { animation: lera-wave 1.1s ease-in-out 2; }
+.lera[data-mood='happy'] .l-jump { animation: lera-nod 0.5s var(--ease, ease-out) 1; }
+.lera[data-mood='dizzy'] .l-pupil { animation: lera-orbit 0.5s linear infinite; }
+.lera[data-mood='dizzy'] .l-jump { animation: lera-sway 0.9s ease-in-out 2; }
+
+/* a tap: squash, hop, land — alternate attributes so the animation restarts every time */
+.lera[data-hop='a'] .l-jump { animation: lera-hop-a 0.56s cubic-bezier(0.3, 0, 0.3, 1) 1; }
+.lera[data-hop='b'] .l-jump { animation: lera-hop-b 0.56s cubic-bezier(0.3, 0, 0.3, 1) 1; }
+.lera[data-hop] .l-hair-a { animation: lera-hair-a 0.56s ease-in-out 1; }
+.lera[data-hop] .l-hair-b { animation: lera-hair-b 0.56s ease-in-out 1; }
+.lera:active .l-breathe { animation: none; transform: scale(1.07, 0.9); transition: transform 0.08s; }
+
+/* little effects around her */
+.l-fx { opacity: 0; pointer-events: none; }
+.l-sparkles path { fill: #ffc940; transform-origin: center; }
+.lera[data-mood='celebrate'] .l-sparkles { opacity: 1; }
+.lera[data-mood='celebrate'] .l-sparkles path { animation: lera-sparkle 0.9s var(--spring, ease-out) infinite alternate; }
+.lera[data-mood='celebrate'] .l-sparkles path:nth-child(2) { animation-delay: 0.2s; }
+.lera[data-mood='celebrate'] .l-sparkles path:nth-child(3) { animation-delay: 0.4s; }
+.lera[data-mood='celebrate'] .l-sparkles path:nth-child(4) { animation-delay: 0.1s; }
+.l-dots circle { fill: #b9b4ff; transform-origin: center; }
+.lera[data-mood='thinking'] .l-dots { opacity: 1; }
+.lera[data-mood='thinking'] .l-dots circle { animation: lera-dot 1.1s ease-in-out infinite; }
+.lera[data-mood='thinking'] .l-dots circle:nth-child(2) { animation-delay: 0.16s; }
+.lera[data-mood='thinking'] .l-dots circle:nth-child(3) { animation-delay: 0.32s; }
+.l-zzz text, .l-what text { font: 700 11px 'DM Sans', system-ui, sans-serif; fill: #8f88ff; }
+.l-what text { font-size: 16px; fill: #6c63ff; }
+.lera[data-mood='sleepy'] .l-zzz { opacity: 1; }
+.lera[data-mood='sleepy'] .l-zzz text { animation: lera-zzz 2.6s ease-in-out infinite; }
+.lera[data-mood='sleepy'] .l-zzz text:nth-child(2) { animation-delay: 0.5s; }
+.lera[data-mood='sleepy'] .l-zzz text:nth-child(3) { animation-delay: 1s; }
+.lera[data-mood='curious'] .l-what { opacity: 1; animation: lera-pop 0.4s var(--spring, ease-out) both; transform-origin: center; }
+.l-sweat path { fill: #a8d4ff; }
+.lera[data-mood='oops'] .l-sweat { opacity: 1; animation: lera-drip 0.9s ease-in 1 both; }
+
+@keyframes lera-arrive { from { opacity: 0; transform: translateY(16px) scale(0.6); } }
+@keyframes lera-breathe { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(0.988, 1.024); } }
+@keyframes lera-shadow { 0%, 100% { transform: scale(1); } 50% { transform: scale(0.96); } }
+@keyframes lera-talk { from { transform: scale(0.75, 0.35); } to { transform: scale(1, 1.15); } }
+@keyframes lera-snore { 0%, 100% { transform: scale(0.5); } 50% { transform: scale(0.75); } }
+@keyframes lera-hop-a {
+  0% { transform: scale(1.09, 0.88); }
+  35% { transform: translateY(-11px) scale(0.95, 1.07); }
+  70% { transform: translateY(0) scale(1.07, 0.92); }
+  100% { transform: none; }
+}
+@keyframes lera-hop-b {
+  0% { transform: scale(1.09, 0.88); }
+  35% { transform: translateY(-11px) scale(0.95, 1.07) rotate(4deg); }
+  70% { transform: translateY(0) scale(1.07, 0.92); }
+  100% { transform: none; }
+}
+@keyframes lera-jump {
+  0%, 100% { transform: scale(1.1, 0.86); }
+  45% { transform: translateY(-15px) scale(0.94, 1.08) rotate(-4deg); }
+  55% { transform: translateY(-15px) scale(0.94, 1.08) rotate(4deg); }
+}
+@keyframes lera-shadow-jump { 0%, 100% { transform: scale(1.08); opacity: 1; } 50% { transform: scale(0.6); opacity: 0.5; } }
+@keyframes lera-hair-a { 0%, 100% { transform: rotate(0); } 40% { transform: rotate(3.5deg); } 75% { transform: rotate(-2deg); } }
+@keyframes lera-hair-b { 0%, 100% { transform: rotate(0); } 40% { transform: rotate(-3.5deg); } 75% { transform: rotate(2deg); } }
+@keyframes lera-shake { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(-6deg); } 45% { transform: rotate(5deg); } 70% { transform: rotate(-2.5deg); } }
+@keyframes lera-nod { 0%, 100% { transform: none; } 40% { transform: translateY(2.5px) scale(1.04, 0.95); } 70% { transform: translateY(-2px); } }
+@keyframes lera-wave { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-9deg); } 75% { transform: rotate(9deg); } }
+@keyframes lera-sway { 0%, 100% { transform: rotate(0); } 30% { transform: rotate(-7deg) translateX(-2px); } 70% { transform: rotate(7deg) translateX(2px); } }
+@keyframes lera-orbit { from { transform: rotate(0) translateX(1.7px) rotate(0); } to { transform: rotate(360deg) translateX(1.7px) rotate(-360deg); } }
+@keyframes lera-sparkle { from { transform: scale(0.2) rotate(-30deg); opacity: 0; } to { transform: scale(1.1) rotate(15deg); opacity: 1; } }
+@keyframes lera-dot { 0%, 100% { transform: translateY(0); opacity: 0.45; } 40% { transform: translateY(-3px); opacity: 1; } }
+@keyframes lera-zzz { 0% { transform: translate(0, 4px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(4px, -8px); opacity: 0; } }
+@keyframes lera-pop { from { transform: scale(0); } }
+@keyframes lera-drip { 0% { transform: translateY(-3px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(7px); opacity: 0; } }
+
+/* speech */
+.says { display: flex; align-items: flex-end; gap: 10px; }
+.says.stack { flex-direction: column; align-items: center; gap: 14px; }
+.bubble {
+  position: relative;
+  background: var(--tint);
+  border-radius: 18px;
+  padding: 12px 16px;
+  font-size: 15.5px;
+  line-height: 1.45;
+  color: var(--ink);
+  animation: bubble-in 0.45s var(--spring) both;
+  transform-origin: 0% 100%;
+  min-width: 0;
+}
+.says.stack .bubble { transform-origin: 50% 0%; text-align: center; max-width: 300px; padding: 14px 20px; }
+.bubble::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  bottom: 14px;
+  width: 16px;
+  height: 16px;
+  background: inherit;
+  clip-path: polygon(100% 0, 0 55%, 100% 100%);
+}
+.says.stack .bubble::before { left: 50%; top: -9px; bottom: auto; margin-left: -9px; width: 18px; height: 12px; clip-path: polygon(50% 0, 0 100%, 100% 100%); }
+.bubble .w { display: inline-block; white-space: pre-wrap; animation: word-in 0.28s var(--ease) both; }
+.bubble.solid { background: #fff; border: 1.5px solid var(--line); }
+@keyframes bubble-in { from { opacity: 0; transform: scale(0.7); } }
+@keyframes word-in { from { opacity: 0; transform: translateY(5px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .lera *, .lera { animation: none !important; }
+}

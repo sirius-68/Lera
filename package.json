@@ -1,0 +1,32 @@
+{
+  "name": "lera",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Lera — Learning Enhanced by Recursive Analysis. An algebra tutor that reads your notes and your working.",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "build:single": "node scripts/build.mjs --single",
+    "preview": "node scripts/build.mjs && node scripts/server.mjs dist",
+    "test": "tsx --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "jszip": "3.10.1",
+    "katex": "0.16.47",
+    "pdfjs-dist": "6.2.108",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "esbuild": "0.28.2",
+    "tsx": "4.23.12",
+    "typescript": "6.0.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

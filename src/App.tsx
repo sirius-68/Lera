@@ -1,0 +1,73 @@
+import { useEffect } from 'react';
+import { HomeScreen, LessonsScreen, PracticeScreen, ProgressScreen } from './screens/Main';
+import { LessonScreen } from './screens/Lesson';
+import { Onboarding } from './screens/Onboarding';
+import { AskSheet, ReviewSheet } from './screens/Overlays';
+import { SessionScreen } from './screens/Session';
+import { SettingsScreen } from './screens/Settings';
+import { UploadScreen } from './screens/Upload';
+import { useStore } from './store';
+import { back, Route, useNav } from './store/nav';
+import { Confirmer, Toaster } from './ui/kit';
+
+function Screen({ route, dir }: { route: Route; dir: number }) {
+  switch (route.name) {
+    case 'home':
+      return <HomeScreen />;
+    case 'lessons':
+      return <LessonsScreen />;
+    case 'practice':
+      return <PracticeScreen />;
+    case 'progress':
+      return <ProgressScreen />;
+    case 'lesson':
+      return <LessonScreen route={route} dir={dir} />;
+    case 'session':
+      return <SessionScreen route={route} />;
+    case 'settings':
+      return <SettingsScreen />;
+    case 'upload':
+      return <UploadScreen />;
+  }
+}
+
+export function App() {
+  const onboarded = useStore((s) => s.profile.onboarded);
+  const { stack, dir, overlay } = useNav();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !overlay && stack.length > 1 && stack[stack.length - 1].name !== 'session') back();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [overlay, stack]);
+
+  if (!onboarded) {
+    return (
+      <div className="app">
+        <Onboarding />
+        <Toaster />
+      </div>
+    );
+  }
+
+  return (
+    <div className="app">
+      {/* every screen in the stack stays mounted, so a practice session survives a detour into a review */}
+      {stack.map((route, i) => {
+        const top = i === stack.length - 1;
+        const key = `${i}:${route.name}:${'topicId' in route ? route.topicId ?? '' : ''}`;
+        return (
+          <div key={key} className="layer" hidden={!top} aria-hidden={!top}>
+            <Screen route={route} dir={top ? dir : 0} />
+          </div>
+        );
+      })}
+      {overlay?.name === 'review' && <ReviewSheet key={overlay.concept} concept={overlay.concept} />}
+      {overlay?.name === 'ask' && <AskSheet topicId={overlay.topicId} seed={overlay.seed} problem={overlay.problem} lines={overlay.lines} />}
+      <Confirmer />
+      <Toaster />
+    </div>
+  );
+}
