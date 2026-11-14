@@ -23,7 +23,67 @@ export type Mood =
   | 'cool' // shades: goal done
   | 'shocked' // that line really did not follow
   | 'graduate' // a cap: chapter finished
-  | 'party'; // a hat: level up
+  | 'party' // a hat: level up
+  | MoreMood;
+
+/** Thirty more, each put together from parts: eyes, brows, mouth, hands, something worn or held, and what floats around her. */
+export type MoreMood =
+  | 'wink' | 'laugh' | 'cry' | 'angry' | 'menace' | 'pleading' | 'bored' | 'tired' | 'yawn' | 'confused'
+  | 'nervous' | 'scared' | 'frozen' | 'melting' | 'ghost' | 'dusty' | 'fossil' | 'skeptical' | 'focused' | 'writing'
+  | 'reading' | 'teacher' | 'detective' | 'wizard' | 'strong' | 'clap' | 'thumbsup' | 'facepalm' | 'shy' | 'starstruck';
+
+interface Look {
+  eyes?: 'arc' | 'shut' | 'wink' | 'half' | 'star' | 'shiny' | 'tiny' | 'hollow' | 'glow' | 'x';
+  brow?: 'angry' | 'worried' | 'up' | 'one' | 'flat';
+  mouth?: 'smile' | 'big' | 'o' | 'flat' | 'wobble' | 'talk' | 'frown' | 'smirk' | 'yawn' | 'grit' | 'tiny' | 'wail';
+  hands?: 'up' | 'cheeks' | 'together' | 'clap' | 'thumb' | 'face' | 'mouth' | 'hold' | 'book' | 'flex';
+  item?: 'pencil' | 'wand' | 'pointer' | 'glass';
+  /** Worn things, space separated. */
+  acc?: string;
+  /** Effects around her, space separated. */
+  fx?: string;
+  tint?: 'hot' | 'menace' | 'frozen' | 'ghost' | 'dusty' | 'fossil';
+  move?: string;
+  cheeks?: boolean;
+  /** Where she looks: a fixed point, along a line of working, or darting about. */
+  look?: [number, number] | 'scan' | 'dart';
+}
+
+export const LOOKS: Record<MoreMood, Look> = {
+  wink: { eyes: 'wink', mouth: 'smirk', cheeks: true, move: 'nod' },
+  laugh: { eyes: 'arc', mouth: 'big', cheeks: true, fx: 'joy', move: 'bounce' },
+  cry: { eyes: 'shut', brow: 'worried', mouth: 'wail', fx: 'streams', move: 'sob' },
+  angry: { brow: 'angry', mouth: 'grit', fx: 'steam', tint: 'hot', move: 'shiver', look: [0, 0.6] },
+  menace: { eyes: 'glow', mouth: 'flat', tint: 'menace', move: 'loom' },
+  pleading: { eyes: 'shiny', brow: 'worried', mouth: 'tiny', hands: 'together', cheeks: true, look: [0, -1.2] },
+  bored: { eyes: 'half', mouth: 'flat', look: [2.4, 0.4], move: 'slump' },
+  tired: { eyes: 'half', brow: 'worried', mouth: 'wobble', fx: 'sweat', look: [0, 1.6], move: 'slump' },
+  yawn: { eyes: 'shut', mouth: 'yawn', hands: 'mouth', move: 'stretch' },
+  confused: { brow: 'one', mouth: 'wobble', fx: 'qmarks', move: 'tilt', look: [1.5, -1.5] },
+  nervous: { brow: 'worried', mouth: 'wobble', fx: 'sweat', look: 'dart', move: 'shiver' },
+  scared: { eyes: 'tiny', brow: 'up', mouth: 'o', hands: 'cheeks', move: 'shiver' },
+  frozen: { eyes: 'tiny', mouth: 'grit', tint: 'frozen', acc: 'ice', fx: 'snow', move: 'shiver' },
+  melting: { eyes: 'half', brow: 'worried', mouth: 'wobble', acc: 'drip', fx: 'sweat', move: 'melt', look: [0, 2] },
+  ghost: { eyes: 'hollow', mouth: 'o', tint: 'ghost', move: 'float' },
+  dusty: { eyes: 'half', mouth: 'flat', tint: 'dusty', acc: 'web', fx: 'dust', look: [0, 1] },
+  fossil: { eyes: 'x', mouth: 'flat', tint: 'fossil', acc: 'cracks' },
+  skeptical: { eyes: 'half', brow: 'one', mouth: 'smirk', look: [-2.2, 0], move: 'tilt' },
+  focused: { brow: 'angry', mouth: 'flat', acc: 'band', look: [0, 1.4] },
+  writing: { brow: 'flat', mouth: 'flat', hands: 'hold', item: 'pencil', look: 'scan', move: 'scribble' },
+  reading: { mouth: 'smile', hands: 'book', acc: 'book specs', look: 'scan' },
+  teacher: { brow: 'up', mouth: 'talk', hands: 'hold', item: 'pointer', acc: 'specs' },
+  detective: { brow: 'one', mouth: 'smirk', hands: 'hold', item: 'glass', look: [2.4, -1] },
+  wizard: { mouth: 'big', hands: 'hold', item: 'wand', acc: 'wizard', fx: 'sparkles', cheeks: true },
+  strong: { brow: 'angry', mouth: 'big', hands: 'flex', acc: 'band', move: 'pump' },
+  clap: { eyes: 'arc', mouth: 'big', hands: 'clap', cheeks: true, move: 'bounce' },
+  thumbsup: { eyes: 'wink', mouth: 'big', hands: 'thumb', cheeks: true },
+  facepalm: { eyes: 'shut', brow: 'worried', mouth: 'flat', hands: 'face', move: 'slump' },
+  shy: { mouth: 'tiny', cheeks: true, hands: 'together', look: [-1.5, 2.4], move: 'tilt' },
+  starstruck: { eyes: 'star', mouth: 'big', cheeks: true, fx: 'sparkles', hands: 'up', move: 'bounce' },
+};
+
+/** Every mood there is, for galleries and tests. */
+export const ALL_MOODS: Mood[] = ['idle', 'happy', 'proud', 'celebrate', 'thinking', 'oops', 'curious', 'sleepy', 'talking', 'wave', 'eureka', 'calculating', 'fired', 'love', 'sad', 'determined', 'cool', 'shocked', 'graduate', 'party', ...(Object.keys(LOOKS) as MoreMood[])];
 
 interface Props {
   size?: number;
@@ -42,10 +102,10 @@ const reduced = (): boolean =>
 const rand = (a: number, b: number): number => a + Math.random() * (b - a);
 
 /** Moods shown for a moment before she settles back to looking around. */
-const BRIEF = new Set<string>(['happy', 'proud', 'celebrate', 'wave', 'oops', 'eureka', 'shocked', 'love']);
+const BRIEF = new Set<string>(['happy', 'proud', 'celebrate', 'wave', 'oops', 'eureka', 'shocked', 'love', 'wink', 'laugh', 'clap', 'thumbsup', 'facepalm', 'yawn']);
 
 /** What a tap brings out, in turn. */
-const TAPS: Mood[] = ['happy', 'love', 'proud', 'eureka', 'cool', 'party'];
+const TAPS: Mood[] = ['happy', 'wink', 'laugh', 'love', 'thumbsup', 'starstruck', 'cool', 'clap', 'wizard', 'party'];
 
 /** Let Lera, wherever she is on screen, react to something that just happened. */
 export function leraReact(mood: Mood): void {
@@ -65,6 +125,7 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
   const [settled, setSettled] = useState(false);
   const shown = asleep ? 'sleepy' : reaction ?? (settled && BRIEF.has(mood) ? 'idle' : mood);
   moodRef.current = shown;
+  const look = (LOOKS as Record<string, Look>)[shown];
 
   // a change of mood from outside wakes her and clears any tap reaction
   useEffect(() => {
@@ -146,9 +207,19 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
       raf = requestAnimationFrame(tick);
       if (document.hidden) return;
       const m = moodRef.current;
+      const fixed = (LOOKS as Record<string, Look>)[m]?.look;
       let tx = 0;
       let ty = 0;
-      if (m === 'thinking') {
+      if (fixed === 'scan') {
+        const k = (now / 1500) % 1;
+        tx = -2.6 + 5.2 * Math.min(1, k * 1.25);
+        ty = 1.6;
+      } else if (fixed === 'dart') {
+        tx = Math.sin(now / 170) > 0 ? 2.4 : -2.4;
+        ty = 0.4;
+      } else if (fixed) {
+        [tx, ty] = fixed;
+      } else if (m === 'thinking') {
         tx = 1.9 + Math.sin(now / 900) * 0.5;
         ty = -2.7;
       } else if (m === 'calculating') {
@@ -272,6 +343,16 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
       ref={root}
       className={`lera ${className}`}
       data-mood={shown}
+      data-eyes={look?.eyes}
+      data-brow={look?.brow}
+      data-mouth={look?.mouth}
+      data-hands={look?.hands}
+      data-item={look?.item}
+      data-acc={look?.acc}
+      data-fx={look?.fx}
+      data-tint={look?.tint}
+      data-move={look?.move}
+      data-cheeks={look?.cheeks ? '' : undefined}
       data-hop={hop % 2 ? 'a' : hop ? 'b' : undefined}
       style={{ width: size, height: size * 1.16 }}
       role={interactive ? 'button' : 'img'}
@@ -290,10 +371,12 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
         <g className="l-jump">
           <g className="l-tilt">
             <g className="l-breathe">
-              <rect y="0.57" width="61.25" height="70" rx="30.63" fill="#6C63FF" />
+              <ellipse className="l-acc2 a-puddle" cx="30.6" cy="71.5" rx="34" ry="4.6" />
+              <rect className="l-body" y="0.57" width="61.25" height="70" rx="30.63" fill="#6C63FF" />
+              <path className="l-acc2 a-drips" d="M6.5 60q2.4 12 4.8 0zM47 62q2.6 13 5.2 0zM24 68q2 8 4 0z" />
               <path className="l-shine" d="M9 44c-1.6-9 .8-17 5-22" />
               <g className="l-hair l-hair-a">
-                <path d="M0.547 33.928C11.12 29.049 32.266 15.105 32.266 0.568 21.693 0.399-0.547 6.584 0.547 33.928Z" fill="#050505" />
+                <path d="M0.547 33.928C11.12 29.049 32.266 15.105 32.266 0.568 21.693 0.399-0.547 6.584 0.547 33.928Z" className="l-hairfill" fill="#050505" />
               </g>
               <g className="l-hair l-hair-b">
                 <path d="M61.168 35.063C50.601 29.714 29.622 14.768 30.162 0.003 40.916 0.225 63.295 7.332 61.168 35.063Z" fill="#050505" />
@@ -308,21 +391,39 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
                 <circle className="l-cheek" cx="48.6" cy="53.5" r="3.6" />
 
                 <g className="l-eyes-open">
-                  <g className="l-eye">
+                  <g className="l-eye l-eye-l">
                     <rect x="15.31" y="30.1" width="12.03" height="20.78" rx="4.5" fill="#fff" />
                     <g className="l-pupil">
-                      <rect x="18.59" y="37.76" width="6.56" height="8.75" rx="3.28" fill="#1B1B1B" />
+                      <rect className="l-iris" x="18.59" y="37.76" width="6.56" height="8.75" rx="3.28" fill="#1B1B1B" />
                       <circle cx="20.3" cy="39.9" r="1.05" fill="#fff" />
+                      <circle className="l-hl2" cx="23.2" cy="44.2" r="0.8" fill="#fff" />
+                      <path className="l-star" d="M21.87 36.2l1.7 4.2 4.2 1.7-4.2 1.7-1.7 4.2-1.7-4.2-4.2-1.7 4.2-1.7z" />
                     </g>
                   </g>
-                  <g className="l-eye">
+                  <g className="l-eye l-eye-r">
                     <rect x="32.81" y="30.1" width="12.03" height="20.78" rx="4.5" fill="#fff" />
                     <g className="l-pupil">
-                      <rect x="36.09" y="37.76" width="6.56" height="8.75" rx="3.28" fill="#1B1B1B" />
+                      <rect className="l-iris" x="36.09" y="37.76" width="6.56" height="8.75" rx="3.28" fill="#1B1B1B" />
                       <circle cx="37.8" cy="39.9" r="1.05" fill="#fff" />
+                      <circle className="l-hl2" cx="40.7" cy="44.2" r="0.8" fill="#fff" />
+                      <path className="l-star" d="M39.37 36.2l1.7 4.2 4.2 1.7-4.2 1.7-1.7 4.2-1.7-4.2-4.2-1.7 4.2-1.7z" />
                     </g>
                   </g>
+                  <g className="l-lids">
+                    <rect x="14.6" y="29.2" width="13.4" height="10.6" rx="4.6" />
+                    <rect x="32.1" y="29.2" width="13.4" height="10.6" rx="4.6" />
+                  </g>
                 </g>
+                <path className="l-alt l-wink" d="M33.1 43.5q5.7-9.4 11.4 0" />
+                <g className="l-alt l-hollow">
+                  <ellipse cx="21.3" cy="40.6" rx="5.2" ry="8.2" />
+                  <ellipse cx="38.8" cy="40.6" rx="5.2" ry="8.2" />
+                </g>
+                <g className="l-alt l-glow">
+                  <path d="M13.6 36.4l13.6 5v3.4a6.8 5.4 0 0 1-13.6-1.6z" />
+                  <path d="M47 36.4l-13.6 5v3.4a6.8 5.4 0 0 0 13.6-1.6z" />
+                </g>
+                <path className="l-alt l-x" d="M17 36.2l8.6 9M25.6 36.2l-8.6 9M34.6 36.2l8.6 9M43.2 36.2l-8.6 9" />
                 <g className="l-eyes-arc">
                   <path d="M15.6 43.5q5.7-9.4 11.4 0" />
                   <path d="M33.1 43.5q5.7-9.4 11.4 0" />
@@ -341,6 +442,13 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
                   <ellipse className="l-mouth m-talk" cx="30.6" cy="60.4" rx="5" ry="3.6" />
                   <path className="l-mouth m-frown line" d="M23.6 63q7-5.4 14 0" />
                   <path className="l-mouth m-smirk line" d="M24 59.6q7.2 4.6 13.6-1.4" />
+                  <ellipse className="l-mouth m-yawn" cx="30.6" cy="61.6" rx="5.6" ry="7" />
+                  <g className="l-mouth m-grit">
+                    <rect x="22.4" y="56.8" width="16.4" height="7.6" rx="3.2" />
+                    <path className="teeth" d="M27.9 56.8v7.6M33.3 56.8v7.6M22.4 60.6h16.4" />
+                  </g>
+                  <path className="l-mouth m-tiny line" d="M27.8 61.2q2.8-1.8 5.6 0" />
+                  <path className="l-mouth m-wail" d="M21 66.4c1.5-12 17.7-12 19.2 0z" />
                 </g>
                 <path className="l-acc a-tear" d="M21.3 51.5c2.3 3.3 2.5 5.4 0 6.4-2.5-1-2.3-3.1 0-6.4z" />
                 <g className="l-acc a-glasses">
@@ -369,9 +477,56 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
                 <path d="M30.6 -17c5.6 5 9.4 8.8 9.4 14.4a9.4 9.4 0 0 1-18.8 0c0-3.4 1.6-5.8 3.4-7.6.4 2.4 1.4 3.6 2.8 4.2-.8-4.2.6-7.8 3.2-11z" fill="#ff8a1f" />
                 <path className="core" d="M30.8 -8.6c2.6 2.4 4.2 4 4.2 6.6a4.4 4.4 0 0 1-8.8 0c0-1.6.8-2.8 1.8-3.6.2 1 .8 1.6 1.4 1.8-.2-1.8.4-3.4 1.4-4.8z" fill="#ffe066" />
               </g>
+              <g className="l-acc2 a-band">
+                <path d="M2.4 23q28.2-9.6 56.6 0l-.8 5.8q-27.4-8.8-55 0z" fill="#ff5a5f" />
+                <path d="M58 24.4l8-4 1.4 5.2-7.4 2.8zM58.6 27.2l6.6 5.6-4.4 2.4-3.6-5.2z" fill="#e14349" />
+              </g>
+              <g className="l-acc2 a-specs">
+                <rect x="13.2" y="28.2" width="16.2" height="24.4" rx="7.4" />
+                <rect x="30.9" y="28.2" width="16.2" height="24.4" rx="7.4" />
+                <path d="M29.4 38.5h1.5" />
+              </g>
+              <g className="l-acc2 a-wizard">
+                <path d="M32 -24l17.6 26.4q-19 6.4-38 0z" fill="#3b2fd6" />
+                <path d="M4.6 3q26-9.2 52 0q-26 8.4-52 0z" fill="#2a21a8" />
+                <path d="M30 -10l1 2.6 2.6 1-2.6 1-1 2.6-1-2.6-2.6-1 2.6-1zM38 -3l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="#ffd24d" />
+              </g>
+              <g className="l-acc2 a-ice">
+                <path d="M11 4.6q19.6-13 39.2 0q-4.2 4.2-9.4 2.4q-5 3.2-10.2.6q-5.2 2.8-10.2-.4q-5.2 1.6-9.4-2.6z" fill="#f2f9ff" />
+                <path d="M2.6 34l2.2 9 2.2-8zM53.8 35l2.2 9 2.4-8zM8.6 30l1.8 6.6 1.8-5.6zM48.2 31l1.8 6.6 1.8-5.6z" fill="#dff1ff" />
+              </g>
+              <g className="l-acc2 a-web">
+                <path d="M40 -7L64 17M64 -9L47 13M69 4H41M50 -3q7 2.4 9 9M45 2q11 3.4 14 14M62 17v8" />
+                <circle cx="62" cy="27" r="2.2" />
+              </g>
+              <path className="l-acc2 a-cracks" d="M8 20l6 6-3 6 7 5M50 58l-5 4 4 5M40 8l3 7-4 4M20 62l4-4" />
+              <g className="l-acc2 a-book">
+                <path d="M13 59q8.8-3.8 17.6 0q8.8-3.8 17.6 0v13q-8.8-3.8-17.6 0q-8.8-3.8-17.6 0z" />
+                <path d="M30.6 59v13M17 63.4q4.6-1.6 9.6 0M34.6 63.4q4.6-1.6 9.6 0" />
+              </g>
+              <g className="l-arms">
+                <path d="M3 47q-13-3-11.5-19" />
+                <path d="M58.2 47q13-3 11.5-19" />
+              </g>
+              <g className="l-hand l-hand-l"><circle cx="-2.5" cy="52" r="6.4" /></g>
+              <g className="l-hand l-hand-r">
+                <path className="l-item i-pencil" d="M60.4 55l11-23.4 4.4 2-11 23.4-5.4 3.6z" />
+                <path className="l-item i-wand" d="M62 56L76 26M77.5 17.5l1.6 4 4 1.6-4 1.6-1.6 4-1.6-4-4-1.6 4-1.6z" />
+                <path className="l-item i-pointer" d="M62 56L84 18" />
+                <g className="l-item i-glass"><circle cx="73" cy="33" r="9.4" /><path d="M67 41l-4.6 9" /></g>
+                <circle cx="63.7" cy="52" r="6.4" />
+                <path className="l-thumb" d="M63.7 47.5v-8" />
+              </g>
             </g>
           </g>
         </g>
+
+        <g className="l-fx l-streams"><path d="M19.6 47v24M41.6 47v24" /></g>
+        <g className="l-fx l-joy"><path d="M6 38c-3.4 1-5.4 2.6-5.4 4.8 2.4.6 4.4-.8 5.4-4.8zM55.2 38c3.4 1 5.4 2.6 5.4 4.8-2.4.6-4.4-.8-5.4-4.8z" /></g>
+        <g className="l-fx l-qmarks"><text x="56" y="4">?</text><text x="66" y="-6">?</text><text x="-8" y="2">?</text></g>
+        <g className="l-fx l-steam"><path d="M12 -5q-4.4-4 0-8t0-8M48 -5q4.4-4 0-8t0-8" /></g>
+        <g className="l-fx l-snow"><text x="-9" y="8">*</text><text x="66" y="0">*</text><text x="70" y="40">*</text><text x="-11" y="46">*</text></g>
+        <g className="l-fx l-dust"><circle cx="-6" cy="60" r="2.2" /><circle cx="68" cy="52" r="1.8" /><circle cx="-2" cy="20" r="1.5" /><circle cx="66" cy="70" r="2.4" /></g>
 
         <g className="l-fx l-bulb">
           <path className="rays" d="M61 -15v-4M71.4 -9.4l3-2.6M50.6 -9.4l-3-2.6M75 0h4M47 0h-4" />

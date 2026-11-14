@@ -1,5 +1,6 @@
 package com.sirius68.lera;
 
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.View;
@@ -50,5 +51,14 @@ public class MainActivity extends BridgeActivity {
             getBridge().getWebView().addJavascriptInterface(new WidgetBridge(this), "LeraNative");
         }
         StreakWidget.refresh(this);
+        WidgetBridge.pendingAction = getIntent() == null ? null : getIntent().getStringExtra("lera_action");
+    }
+
+    /** The app was already open and a widget was tapped: pass on where it wants to go. */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        String action = intent == null ? null : intent.getStringExtra("lera_action");
+        if (action != null) WidgetBridge.pendingAction = action;
     }
 }

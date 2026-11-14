@@ -476,15 +476,33 @@ button.unit-banner:active { transform: translateY(3px); }
 .wg-row::-webkit-scrollbar { display: none; }
 .wg-cell { margin: 0; flex: 0 0 auto; scroll-snap-align: start; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .wg-cell figcaption { font-size: 11.5px; font-weight: 600; color: var(--ink-3); }
-.wg { position: relative; width: 138px; height: 138px; border-radius: 26px; padding: 13px; color: #fff; overflow: hidden; box-shadow: 0 6px 16px rgba(40, 30, 120, 0.18); }
-.wg b { display: flex; align-items: center; gap: 4px; font-size: 26px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
-.wg span { display: block; margin-top: 5px; font-size: 12.5px; font-weight: 600; line-height: 1.25; max-width: 96px; opacity: 0.96; }
-.wg i { position: absolute; right: 2px; bottom: -14px; }
-.wg i::before { content: ''; position: absolute; inset: -6px -8px 6px; border-radius: 50%; background: rgba(255, 255, 255, 0.2); }
+.wg-hero { display: flex; justify-content: center; padding: 6px 0 2px; }
+.wg { position: relative; width: 138px; height: 138px; border-radius: 26px; padding: 11px 8px 0; color: #fff; overflow: hidden; box-shadow: 0 6px 16px rgba(40, 30, 120, 0.18); text-align: center; flex: 0 0 auto; }
+.wg.live { width: 176px; height: 176px; border-radius: 34px; padding-top: 15px; animation: wg-in 0.5s var(--spring) both; box-shadow: 0 14px 30px rgba(40, 30, 120, 0.25); }
+.wg b { position: relative; z-index: 2; display: inline-flex; align-items: center; gap: 3px; font-size: 25px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); }
+.wg.live b { font-size: 31px; }
+.wg b.out svg { opacity: 0.45; }
+.wg b.alert::after { content: '!'; position: absolute; left: 9px; top: 9px; width: 13px; height: 13px; border-radius: 50%; background: #ff3b4e; font-size: 10px; line-height: 13px; font-weight: 800; text-shadow: none; }
+.wg span { position: relative; z-index: 2; display: block; margin-top: 4px; font-size: 12.5px; font-weight: 600; line-height: 1.2; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.35); }
+.wg.live span { font-size: 15px; margin-top: 6px; }
+.wg i { position: absolute; left: 50%; bottom: -34px; transform: translateX(-50%); z-index: 1; }
+.wg.live i { bottom: -30px; transform: translateX(-50%) scale(1.3); transform-origin: 50% 100%; }
+.wg i::before { content: ''; position: absolute; inset: -8px -10px 10px; border-radius: 50%; background: rgba(255, 255, 255, 0.18); }
+.wg.fill i { bottom: -62px; }
+.wg.fill.live i { bottom: -78px; }
+.wg.fill i::before { display: none; }
 .wg i .lera { position: relative; animation: none; }
+.wg i .l-shadow { display: none; }
 .wg-purple { background: linear-gradient(180deg, #8880ff, #5a51ee); }
+.wg-blue { background: linear-gradient(180deg, #4da3ff, #2f6be0); }
 .wg-violet { background: linear-gradient(180deg, #a06bff, #6a3fe0); }
 .wg-orange { background: linear-gradient(180deg, #ffb648, #ff7a1a); }
-.wg-red { background: linear-gradient(180deg, #ff7a6b, #c52a3f); }
+.wg-red { background: linear-gradient(180deg, #ff6b7a, #c81e4a); }
+.wg-maroon { background: linear-gradient(180deg, #5a1220, #24060c); }
 .wg-night { background: linear-gradient(180deg, #34308a, #14123a); }
 .wg-green { background: linear-gradient(180deg, #4fd89b, #1e9e69); }
+.wg-ice { background: linear-gradient(180deg, #9db0cc, #5d6e8c); }
+.wg-dust { background: linear-gradient(180deg, #b9b6c9, #807d94); }
+.wg-mist { background: linear-gradient(180deg, #3d3a66, #1b1930); }
+.wg-stone { background: linear-gradient(180deg, #c9bfa6, #8c8169); }
+@keyframes wg-in { from { opacity: 0; transform: scale(0.8) rotate(-4deg); } }

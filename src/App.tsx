@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { HomeScreen, LessonsScreen, PracticeScreen, ProgressScreen } from './screens/Main';
 import { LessonScreen } from './screens/Lesson';
+import { AuthGate } from './screens/Auth';
 import { Onboarding } from './screens/Onboarding';
 import { AskSheet, ReviewSheet } from './screens/Overlays';
 import { SessionScreen } from './screens/Session';
@@ -40,6 +41,7 @@ function Screen({ route, dir }: { route: Route; dir: number }) {
 
 export function App() {
   const onboarded = useStore((s) => s.profile.onboarded);
+  const lockedOut = useStore((s) => !!s.profile.email && s.profile.signedIn === false);
   const { stack, dir, overlay } = useNav();
 
   useEffect(() => {
@@ -64,6 +66,16 @@ export function App() {
     return (
       <div className="app">
         <Onboarding />
+        <Toaster />
+      </div>
+    );
+  }
+
+  if (lockedOut) {
+    // signed out: nothing of the app is shown until the password is given again
+    return (
+      <div className="app">
+        <AuthGate />
         <Toaster />
       </div>
     );

@@ -1,10 +1,10 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Lera, Mood } from '../mascot/Lera';
 import { useStore } from '../store';
 import { badges, levelOf, longestStreak, monthGrid, totalXp, weekStrip, xpByDay } from '../store/game';
 import { dayOf, streak } from '../store/learner';
 import { back, go } from '../store/nav';
-import { canPinWidget, hasWidget, pinWidget } from '../store/widget';
+import { canPinWidget, hasWidget, pinWidget, setWidgetTestMode, widgetTestMode } from '../store/widget';
 import { Button3D, CountUp, Ring, haptic, toast } from '../ui/kit';
 import { Icon } from '../ui/icons';
 
@@ -149,44 +149,84 @@ export function StreakScreen() {
 }
 
 
-/* ───────────── the home-screen widget, shown as it will look through the day ───────────── */
+/* ───────────── the home-screen widget, shown as it changes the longer it is ignored ───────────── */
 
-const WIDGETS: { mood: Mood; tone: string; line: string; when: string }[] = [
-  { mood: 'happy', tone: 'purple', line: 'Time to practise!', when: 'Morning' },
-  { mood: 'determined', tone: 'violet', line: 'Got 3 minutes?', when: 'Afternoon' },
-  { mood: 'shocked', tone: 'orange', line: 'Save your streak!', when: 'Evening' },
-  { mood: 'sad', tone: 'red', line: 'Last chance tonight!', when: 'Before midnight' },
-  { mood: 'fired', tone: 'orange', line: 'Streak safe. 12 XP to goal', when: 'After practice' },
-  { mood: 'cool', tone: 'green', line: 'Goal done. See you tomorrow!', when: 'Goal reached' },
+const WIDGETS: { mood: Mood; tone: string; line: string; when: string; fill?: boolean; flame?: 'alert' | 'out'; n?: number }[] = [
+  { mood: 'strong', tone: 'green', line: 'Streak safe!', when: 'Done today' },
+  { mood: 'happy', tone: 'blue', line: 'Get started early!', when: 'Morning' },
+  { mood: 'pleading', tone: 'violet', line: 'Got 3 minutes?', when: 'Afternoon', fill: true },
+  { mood: 'scared', tone: 'orange', line: 'Save your streak!', when: 'Evening', flame: 'alert' },
+  { mood: 'menace', tone: 'maroon', line: 'Now or never!', when: 'Before midnight', fill: true, flame: 'alert' },
+  { mood: 'cry', tone: 'ice', line: 'It’s gone… start again?', when: 'Streak lost', flame: 'out', n: 0 },
+  { mood: 'bored', tone: 'violet', line: 'I’m waiting…', when: 'Days later', fill: true, flame: 'out', n: 0 },
+  { mood: 'dusty', tone: 'dust', line: 'A week. I have cobwebs.', when: 'A week', flame: 'out', n: 0 },
+  { mood: 'ghost', tone: 'mist', line: 'Remember me?', when: 'A month', flame: 'out', n: 0 },
+  { mood: 'fossil', tone: 'stone', line: 'Lera, fossil. Dig me up?', when: 'A year', flame: 'out', n: 0 },
   { mood: 'sleepy', tone: 'night', line: 'Dreaming of x²…', when: 'At night' },
+  { mood: 'laugh', tone: 'purple', line: 'Hey, that tickles!', when: 'When you tap her' },
 ];
+
+export function WidgetTile({ w, days, live }: { w: (typeof WIDGETS)[number]; days: number; live?: boolean }) {
+  return (
+    <div className={`wg wg-${w.tone} ${w.fill ? 'fill' : ''} ${live ? 'live' : ''}`}>
+      <b className={w.flame ?? ''}><Icon name="flame" size={19} fill /> {w.n ?? Math.max(1, days)}</b>
+      <span>{w.line}</span>
+      <i><Lera size={w.fill ? 150 : 84} mood={w.mood} interactive={false} /></i>
+    </div>
+  );
+}
 
 function WidgetCard({ days }: { days: number }) {
   const inApp = hasWidget();
-  const add = () => {
+  const [test, setTest] = useState(widgetTestMode);
+  const [at, setAt] = useState(0);
+  // the big one fast-forwards through the ladder, so the whole story plays in half a minute
+  useEffect(() => {
+    const id = setInterval(() => setAt((n) => (n + 1) % 10), 2600);
+    return () => clearInterval(id);
+  }, []);
+  const add = (wide: boolean) => {
     haptic(6);
-    if (!(canPinWidget() && pinWidget())) toast('Long-press your home screen, choose Widgets, then Lera.', 4200);
+    if (!(canPinWidget() && pinWidget(wide))) toast('Long-press your home screen, choose Widgets, then Lera.', 4200);
   };
   return (
     <section className="card wg-card">
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <span className="label">Home-screen widget</span>
-        <span className="chip plain">changes through the day</span>
+        <span className="chip plain">{WIDGETS[at].when}</span>
       </div>
+      <div className="wg-hero"><WidgetTile key={at} w={WIDGETS[at]} days={days} live /></div>
+      <p className="muted" style={{ fontSize: 13.5, textAlign: 'center' }}>The longer I’m ignored, the more I change. Tap me on the widget and I react.</p>
       <div className="wg-row" data-noswipe>
         {WIDGETS.map((w) => (
           <figure key={w.when} className="wg-cell">
-            <div className={`wg wg-${w.tone}`}>
-              <b><Icon name="flame" size={19} fill /> {Math.max(1, days)}</b>
-              <span>{w.line}</span>
-              <i><Lera size={64} mood={w.mood} interactive={false} /></i>
-            </div>
+            <WidgetTile w={w} days={days} />
             <figcaption>{w.when}</figcaption>
           </figure>
         ))}
       </div>
       {inApp ? (
-        <Button3D small variant="secondary" onClick={add}><Icon name="plus" size={17} /> Add to home screen</Button3D>
+        <>
+          <div className="row" style={{ gap: 10 }}>
+            <Button3D small variant="secondary" style={{ flex: 1 }} onClick={() => add(false)}><Icon name="plus" size={17} /> Small</Button3D>
+            <Button3D small variant="secondary" style={{ flex: 1 }} onClick={() => add(true)}><Icon name="plus" size={17} /> Wide</Button3D>
+          </div>
+          <button
+            className={`option ${test ? 'on' : ''}`}
+            onClick={() => {
+              haptic(5);
+              setWidgetTestMode(!test);
+              setTest(!test);
+              toast(!test ? 'Test mode on: a new mood every minute after you leave the app' : 'Test mode off: moods follow real hours and days', 3800);
+            }}
+          >
+            <span className="grow" style={{ textAlign: 'left' }}>
+              <b>Test mode</b>
+              <span className="sub">A new mood every minute after you leave the app, instead of hours and days.</span>
+            </span>
+            <span className="radio" />
+          </button>
+        </>
       ) : (
         <p className="faint" style={{ fontSize: 13 }}>In the Android app: long-press your home screen, choose Widgets, then Lera.</p>
       )}

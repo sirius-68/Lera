@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { SUBJECT_LABEL } from '../engine/concepts-calc';
 import { Subject } from '../engine/types';
 import { actions, getState, useStore } from '../store';
 import { GOALS } from '../store/game';
 import { back, resetNav } from '../store/nav';
+import { AuthPanel } from './Auth';
 import { STUDY_TIMES, disableReminders, enableReminders } from '../store/remind';
 import { Button3D, confirmDialog, haptic, toast } from '../ui/kit';
 import { Icon } from '../ui/icons';
@@ -11,6 +13,7 @@ const SUBJECTS: Subject[] = ['algebra', 'calc1', 'calc2'];
 
 export function SettingsScreen() {
   const profile = useStore((s) => s.profile);
+  const [accountOpen, setAccountOpen] = useState(false);
   const subjects = profile.subjects?.length ? profile.subjects : (['algebra'] as Subject[]);
 
   const exportData = async () => {
@@ -131,9 +134,28 @@ export function SettingsScreen() {
           </section>
 
           <section className="col" style={{ gap: 8 }}>
+            <span className="label">Profile</span>
+            {profile.email ? (
+              <>
+                <p className="muted" style={{ fontSize: 14 }}>Signed in as <b>{profile.email}</b></p>
+                <Button3D small variant="secondary" style={{ alignSelf: 'flex-start' }} onClick={async () => { if (await confirmDialog('Sign out?', { body: 'Your notes and progress stay on this phone. You’ll need your password to get back in.', yes: 'Sign out' })) { actions.setProfile({ signedIn: false }); resetNav(); } }}>
+                  <Icon name="lock" size={16} /> Sign out
+                </Button3D>
+              </>
+            ) : accountOpen ? (
+              <AuthPanel mode="signup" name={profile.name} onDone={() => setAccountOpen(false)} />
+            ) : (
+              <>
+                <p className="muted" style={{ fontSize: 14 }}>No profile yet. Create one to lock the app behind a password.</p>
+                <Button3D small variant="secondary" style={{ alignSelf: 'flex-start' }} onClick={() => setAccountOpen(true)}><Icon name="plus" size={16} /> Create a profile</Button3D>
+              </>
+            )}
+          </section>
+
+          <section className="col" style={{ gap: 8 }}>
             <span className="label">About</span>
             <p className="muted" style={{ fontSize: 14, lineHeight: 1.5 }}>
-              Lera checks algebra and calculus on this device with its own engine. Your notes, working and progress stay here — there is no account behind the app.
+              Lera checks algebra and calculus on this device with its own engine. Your notes, working and progress stay on this phone.
             </p>
           </section>
 

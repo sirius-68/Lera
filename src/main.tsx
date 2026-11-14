@@ -5,7 +5,8 @@ import './styles/screens.css';
 import './styles/v2.css';
 import { App } from './App';
 import { getState, onChange } from './store';
-import { syncWidget } from './store/widget';
+import { go } from './store/nav';
+import { syncWidget, takeWidgetAction } from './store/widget';
 
 /*
  * The on-screen keyboard must never cover what is being typed.
@@ -38,12 +39,21 @@ window.addEventListener('resize', () => {
 const el = document.getElementById('root');
 if (el) createRoot(el).render(<App />);
 
-// keep the Android home-screen widget in step with the app (does nothing in a browser)
+// keep the Android home-screen widgets in step with the app (does nothing in a browser)
 let widgetTimer: ReturnType<typeof setTimeout> | undefined;
-const pushWidget = () => {
+const pushWidget = (force = false) => {
   clearTimeout(widgetTimer);
-  widgetTimer = setTimeout(() => syncWidget(getState()), 400);
+  widgetTimer = setTimeout(() => syncWidget(getState(), force), 400);
 };
-onChange(pushWidget);
-pushWidget();
-document.addEventListener('visibilitychange', pushWidget);
+// a tap on the widget's card opens the app on Practice
+const followWidget = () => {
+  const s = getState();
+  if (takeWidgetAction() === 'practice' && s.profile.onboarded && !(s.profile.email && s.profile.signedIn === false)) go({ name: 'practice' });
+};
+onChange(() => pushWidget());
+pushWidget(true);
+setTimeout(followWidget, 900);
+document.addEventListener('visibilitychange', () => {
+  pushWidget(true);
+  if (!document.hidden) followWidget();
+});

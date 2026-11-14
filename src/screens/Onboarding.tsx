@@ -4,14 +4,18 @@ import { Subject } from '../engine/types';
 import { Lera, Mood } from '../mascot/Lera';
 import { actions, useStore } from '../store';
 import { GOALS } from '../store/game';
+import { getAccount } from '../store/auth';
 import { resetNav } from '../store/nav';
 import { enableReminders } from '../store/remind';
 import { Celebration } from '../ui/Celebrate';
-import { Button3D, Confetti, haptic } from '../ui/kit';
+import { Button3D, Confetti, haptic, toast } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import { MathView } from '../ui/math';
 import '../styles/onb.css';
 import { SceneBell, SceneGraph, SceneLines, ScenePath, ScenePlain, SceneReturn, SceneReward } from './onb/Scenes';
+import { canPinWidget, hasWidget, pinWidget } from '../store/widget';
+import { AuthPanel } from './Auth';
+import { SceneWidget, TileArt } from './onb/Art';
 import { Processing, Source, UploadPicker } from './Upload';
 
 /**
@@ -26,7 +30,9 @@ import { Processing, Source, UploadPicker } from './Upload';
 
 type Step =
   | 'splash' | 'hello' | 'how' | 'subjects' | 'stage' | 'goal' | 'path' | 'spot' | 'feel' | 'struggle'
-  | 'return' | 'check' | 'plain' | 'daily' | 'graph' | 'when' | 'reward' | 'name' | 'plan' | 'remind' | 'upload' | 'done';
+  | 'return' | 'check' | 'plain' | 'daily' | 'graph' | 'when' | 'reward' | 'name' | 'account' | 'signin' | 'plan' | 'remind' | 'widget' | 'upload' | 'done';
+
+const HELLO: Mood[] = ['wave', 'wink', 'writing', 'detective', 'wizard', 'starstruck', 'teacher', 'thumbsup'];
 
 const LANGS = [
   { id: 'en', label: 'English' },
@@ -80,11 +86,11 @@ const WHEN: (Choice & { time: string })[] = [
   { id: 'night', emoji: '🌙', title: 'Late at night', sub: 'When it’s finally quiet', time: '22:00' },
 ];
 
-const FEEL: { mood: Mood; label: string; line: string }[] = [
-  { mood: 'sad', label: 'Lost', line: 'That’s an honest answer. We’ll start where it’s solid and build from there.' },
-  { mood: 'thinking', label: 'Shaky', line: 'Shaky usually means two or three rules aren’t fixed yet. I’ll find which.' },
-  { mood: 'happy', label: 'Okay', line: 'Okay is a good place to start. Let’s turn it into reliable.' },
-  { mood: 'cool', label: 'Confident', line: 'Then I’ll be picky — and show you the faster routes.' },
+const FEEL: { mood: Mood; label: string; short: string; line: string }[] = [
+  { mood: 'sad', label: 'Lost', short: 'We’ll start where it’s solid.', line: 'That’s an honest answer. We’ll start where it’s solid and build from there.' },
+  { mood: 'nervous', label: 'Shaky', short: 'I’ll find the loose rules.', line: 'Shaky usually means two or three rules aren’t fixed yet. I’ll find which.' },
+  { mood: 'happy', label: 'Okay', short: 'Let’s make it reliable.', line: 'Okay is a good place to start. Let’s turn it into reliable.' },
+  { mood: 'cool', label: 'Confident', short: 'Then I’ll be picky.', line: 'Then I’ll be picky — and show you the faster routes.' },
 ];
 
 interface Spot {
@@ -118,15 +124,14 @@ function Rich({ text }: { text: string }) {
   return <>{text.split(/(\*\*[^*]+\*\*)/g).map((part, i) => (part.startsWith('**') ? <b key={i}>{part.slice(2, -2)}</b> : <span key={i}>{part}</span>))}</>;
 }
 
-/** A screen that shows one idea in motion. */
-function Show({ kicker, title, text, tone, children }: { kicker: string; title: ReactNode; text: ReactNode; tone?: string; children: ReactNode }) {
+/** A screen that shows one idea in motion: the picture in the middle, a title, one short line. */
+function Show({ title, text, children }: { title: ReactNode; text: ReactNode; children: ReactNode }) {
   return (
-    <>
-      <div className={`ob-stage ${tone ?? ''}`}>{children}</div>
-      <span className="ob-kicker mid">{kicker}</span>
+    <div className="ob-show">
+      <div className="ob-pic">{children}</div>
       <h2 className="ob-h mid">{title}</h2>
       <p className="ob-p mid">{text}</p>
-    </>
+    </div>
   );
 }
 
@@ -171,10 +176,11 @@ export function Onboarding() {
   const [built, setBuilt] = useState(0);
   const [tour, setTour] = useState(true);
   const [cheer, setCheer] = useState(false);
+  const [helloAt, setHelloAt] = useState(0);
 
   const calc = subjects.includes('calc1') || subjects.includes('calc2');
   // the graph scene is only for people doing calculus
-  const all: Step[] = ['hello', 'how', 'subjects', 'stage', 'goal', 'path', 'spot', 'feel', 'struggle', 'return', 'check', 'plain', 'daily', ...(calc ? (['graph'] as Step[]) : []), 'when', 'reward', 'name', 'plan', 'remind', 'upload', 'done'];
+  const all: Step[] = ['hello', 'how', 'subjects', 'stage', 'goal', 'path', 'spot', 'feel', 'struggle', 'return', 'check', 'plain', 'daily', ...(calc ? (['graph'] as Step[]) : []), 'when', 'reward', 'name', ...(profile.email ? [] : (['account'] as Step[])), 'plan', 'remind', ...(hasWidget() ? (['widget'] as Step[]) : []), 'upload', 'done'];
   // "Skip the tour" keeps the questions and drops the moving pictures
   const order = tour ? all : all.filter((s) => !['how', 'path', 'return', 'plain', 'graph', 'reward'].includes(s));
 
@@ -182,6 +188,13 @@ export function Onboarding() {
     if (step !== 'splash') return;
     const id = setTimeout(() => setStep('hello'), 1900);
     return () => clearTimeout(id);
+  }, [step]);
+
+  // on the welcome screen she runs through a few faces
+  useEffect(() => {
+    if (step !== 'hello') return;
+    const id = setInterval(() => setHelloAt((n) => n + 1), 2600);
+    return () => clearInterval(id);
   }, [step]);
 
   useEffect(() => {
@@ -199,6 +212,7 @@ export function Onboarding() {
   const next = () => go(order[Math.min(order.length - 1, order.indexOf(step) + 1)]);
   const backStep = () => {
     if (step === 'upload' && source) return setSource(null);
+    if (step === 'signin') return go('hello', -1);
     const i = order.indexOf(step);
     if (i > 0) go(order[i - 1], -1);
   };
@@ -254,9 +268,8 @@ export function Onboarding() {
     <div className="ob-tiles">
       {items.map((c, i) => (
         <button key={c.id} className={`ob-tile ${value === c.id ? 'on' : ''}`} aria-pressed={value === c.id} style={{ '--i': i } as CSSProperties} onClick={() => { haptic(6); set(c.id); }}>
-          <span className="ob-art">{c.emoji}</span>
+          <span className="ob-art"><TileArt id={c.id} /></span>
           <b>{c.title}</b>
-          {c.sub && <span className="sub">{c.sub}</span>}
         </button>
       ))}
     </div>
@@ -293,33 +306,28 @@ export function Onboarding() {
         <div className="ob-welcome" key="hello">
           <div className="ob-hero">
             <Orbit />
-            <span className="halo big"><Lera size={132} mood="wave" /></span>
+            <span className="halo big"><Lera size={140} mood={HELLO[helloAt % HELLO.length]} /></span>
           </div>
           <div className="ob-sheet">
-            <h2 className="ob-h">Hi, I’m Lera.</h2>
-            <p className="ob-p">A maths tutor that reads <b>your working</b>, not just your answer.</p>
-            <div className="ob-points">
-              <span><Icon name="check" size={13} stroke={3} /> Line by line</span>
-              <span><Icon name="file" size={13} /> From your notes</span>
-              <span><Icon name="refresh" size={13} /> Until it sticks</span>
-            </div>
-            <div className="lang-row" role="radiogroup" aria-label="Language">
-              {LANGS.map((l) => (
-                <button key={l.id} role="radio" aria-checked={profile.language === l.id} className={profile.language === l.id ? 'on' : ''} onClick={() => actions.setProfile({ language: l.id })}>{l.label}</button>
-              ))}
-            </div>
-            {profile.language !== 'en' && <p className="faint" style={{ fontSize: 12.5, textAlign: 'center' }}>The app is in English for now; your choice is saved for when translations arrive.</p>}
-            <div className="center" style={{ marginTop: 4 }}>
-              <Button3D sheen onClick={next}>Show me how</Button3D>
-              <button className="linkbtn" onClick={() => { setTour(false); go('subjects'); }}>Skip the tour</button>
+            <h2 className="ob-h">A maths tutor that reads your working</h2>
+            <p className="ob-p">Line by line, until it sticks.</p>
+            <div className="center" style={{ marginTop: 10, gap: 12 }}>
+              <Button3D sheen onClick={next}>Get started</Button3D>
+              <Button3D variant="secondary" onClick={() => go('signin')}>I already have a profile</Button3D>
             </div>
           </div>
         </div>
       )}
 
+      {step === 'signin' && (
+        <div className={cls} key="signin" style={{ justifyContent: 'center' }}>
+          <AuthPanel mode={getAccount() ? 'signin' : 'signup'} onDone={() => (profile.name ? finish() : go('how'))} />
+        </div>
+      )}
+
       {step === 'how' && (
         <div className={cls} key="how">
-          <Show kicker="How I teach · 1 of 5" title={<>I read <em>every line</em> you write.</>} text="Most apps only check the final answer. I follow your working, find the exact line where a rule breaks, and tell you which rule — so one mistake is fixed once, not repeated for a year.">
+          <Show title={<>I read <em>every line</em> you write.</>} text="Not just the final answer.">
             <SceneLines />
           </Show>
           {foot('Continue')}
@@ -328,7 +336,7 @@ export function Onboarding() {
 
       {step === 'subjects' && (
         <div className={cls} key="subjects">
-          <Ask mood={subjects.length > 1 ? 'eureka' : 'curious'} hint={'Pick everything that fits. You can change it later.'}>What are you working on?</Ask>
+          <Ask mood={subjects.length > 1 ? 'eureka' : 'curious'}>What are you working on?</Ask>
           <div className="ob-list">
             {SUBJECTS.map((s) => {
               const on = subjects.includes(s.id);
@@ -350,25 +358,23 @@ export function Onboarding() {
 
       {step === 'stage' && (
         <div className={cls} key="stage">
-          <Ask mood={stage === 'uni' || stage === 'school' ? 'graduate' : stage ? 'happy' : 'curious'} hint={'So I know what pace to expect.'}>Where are you studying?</Ask>
+          <Ask mood={stage === 'uni' || stage === 'school' ? 'graduate' : stage ? 'happy' : 'curious'}>Where are you studying?</Ask>
           {pickTiles(STAGE, stage, setStage)}
-          {stage && <Reply text={STAGE.find((s) => s.id === stage)!.reply as string} />}
           {foot('Continue', { disabled: !stage })}
         </div>
       )}
 
       {step === 'goal' && (
         <div className={cls} key="goal">
-          <Ask mood={why === 'exam' ? 'determined' : why === 'ahead' ? 'fired' : why === 'understand' ? 'eureka' : why === 'sharp' ? 'cool' : why ? 'happy' : 'curious'} hint={'Choose the one that matters most right now.'}>What brings you here?</Ask>
+          <Ask mood={why === 'exam' ? 'determined' : why === 'ahead' ? 'fired' : why === 'understand' ? 'eureka' : why === 'sharp' ? 'cool' : why ? 'happy' : 'curious'}>What brings you here?</Ask>
           {pickList(WHY, why, setWhy)}
-          {why && <Reply text={WHY.find((w) => w.id === why)!.reply as string} />}
           {foot('Continue', { disabled: !why })}
         </div>
       )}
 
       {step === 'path' && (
         <div className={cls} key="path">
-          <Show kicker="How I teach · 2 of 5" title={<>Your notes become <em>your path</em>.</>} text="Upload a PDF or Word file — a page of class notes or a whole textbook. I find its chapters and sections, turn them into short lessons, rebuild its graphs, and pull every exercise into practice.">
+          <Show title={<>Your notes become <em>your path</em>.</>} text="Upload a PDF. Get lessons and practice.">
             <ScenePath />
           </Show>
           {foot('Continue')}
@@ -377,8 +383,8 @@ export function Onboarding() {
 
       {step === 'spot' && (
         <div className={cls} key="spot">
-          <Ask mood={found ? 'eureka' : tapped !== null ? 'thinking' : 'calculating'} hint={found ? 'That’s what I do for you — I find the line, not just the wrong answer.' : tapped !== null ? 'That line follows from the one above it. Look for where a rule first breaks.' : 'Tap the line where it first goes wrong.'}>
-            {found ? 'Exactly.' : 'Your turn. One line breaks a rule.'}
+          <Ask mood={found ? 'eureka' : tapped !== null ? 'thinking' : 'calculating'} hint={found ? undefined : tapped !== null ? 'Not that one. Look higher.' : 'Tap it.'}>
+            {found ? 'Exactly.' : 'One line breaks a rule.'}
           </Ask>
           <div className="spot" style={{ marginTop: 8 }}>
             <span className="label">{spot.prompt}</span>
@@ -434,7 +440,7 @@ export function Onboarding() {
             <Lera size={124} mood={feel === null ? 'curious' : FEEL[feel].mood} />
           </div>
           <h2 className="ob-q" style={{ textAlign: 'center' }}>How does maths feel right now?</h2>
-          <p className="ob-hint" style={{ textAlign: 'center', minHeight: 44 }}>{feel === null ? 'No wrong answers. This sets how gently I start.' : FEEL[feel].line}</p>
+          <p className="ob-hint" style={{ textAlign: 'center', minHeight: 22 }}>{feel === null ? 'No wrong answers.' : FEEL[feel].short}</p>
           <div className="feel-row" role="radiogroup" aria-label="How maths feels">
             {FEEL.map((f, i) => (
               <button key={f.label} role="radio" aria-checked={feel === i} className={feel === i ? 'on' : ''} onClick={() => { haptic(6); setFeel(i); }}>
@@ -449,7 +455,7 @@ export function Onboarding() {
 
       {step === 'struggle' && (
         <div className={cls} key="struggle">
-          <Ask mood={trips.length ? 'calculating' : 'thinking'} hint={'Choose up to three — I’ll watch for them.'}>What usually trips you up?</Ask>
+          <Ask mood={trips.length ? 'calculating' : 'thinking'}>What usually trips you up?</Ask>
           <div className="ob-grid2">
             {TRIPS.map((t) => {
               const on = trips.includes(t.id);
@@ -467,12 +473,7 @@ export function Onboarding() {
 
       {step === 'return' && (
         <div className={cls} key="return">
-          <Show
-            kicker="How I teach · 3 of 5"
-            tone="green"
-            title={<>Ideas come back <em>before they fade</em>.</>}
-            text={trips.includes('forget') ? 'You said you understand things and then forget them. That’s how memory works for everyone. So when I find a gap, I bring that idea back a day later, then three, then seven — each time it holds a little longer.' : 'A gap isn’t fixed by one right answer. When I find one, I bring that idea back a day later, then three, then seven — until it holds without help.'}
-          >
+          <Show title={<>Ideas come back <em>before they fade</em>.</>} text="A day later. Then three. Then seven.">
             <SceneReturn />
           </Show>
           {foot('Continue')}
@@ -481,7 +482,7 @@ export function Onboarding() {
 
       {step === 'check' && (
         <div className={cls} key="check">
-          <Ask mood={mode === 'line' ? 'calculating' : 'thinking'} hint={'You can switch any time, even in the middle of a problem.'}>When should I check your working?</Ask>
+          <Ask mood={mode === 'line' ? 'calculating' : 'thinking'}>When should I check your working?</Ask>
           <div className="ob-list">
             {(
               [
@@ -507,7 +508,7 @@ export function Onboarding() {
 
       {step === 'plain' && (
         <div className={cls} key="plain">
-          <Show kicker="How I teach · 4 of 5" title={<>Explained in <em>plain words</em>.</>} text="No jargon first. Every idea has a version you could tell a friend, and I always ask whether it made sense. If it didn’t, I say it again more simply — and walk you through an example.">
+          <Show title={<>Explained in <em>plain words</em>.</>} text="And I always ask if it made sense.">
             <ScenePlain />
           </Show>
           {foot('Continue')}
@@ -516,7 +517,7 @@ export function Onboarding() {
 
       {step === 'daily' && (
         <div className={cls} key="daily">
-          <Ask mood={daily >= 50 ? 'fired' : daily >= 30 ? 'determined' : 'happy'} hint={'Small and regular beats big and rare.'}>How much each day?</Ask>
+          <Ask mood={daily >= 50 ? 'fired' : daily >= 30 ? 'determined' : 'happy'}>How much each day?</Ask>
           <div className="ob-list">
             {GOALS.map((g) => (
               <button key={g.xp} className={`ob-card ${daily === g.xp ? 'on' : ''}`} aria-pressed={daily === g.xp} onClick={() => { haptic(6); setDaily(g.xp); }}>
@@ -533,14 +534,14 @@ export function Onboarding() {
               <i key={d} style={{ height: `${Math.min(100, 22 + perDay * 14 + (d % 3) * 6)}%`, animationDelay: `${d * 60}ms` } as CSSProperties} />
             ))}
           </div>
-          <p className="ob-projection-cap">That’s about <b>{perDay * 7} problems a week</b> — roughly {perDay * 30} a month, each one checked line by line.</p>
+          <p className="ob-projection-cap"><b>{perDay * 7} problems a week</b>, each one checked line by line.</p>
           {foot('Continue')}
         </div>
       )}
 
       {step === 'graph' && (
         <div className={cls} key="graph">
-          <Show kicker="For calculus" title={<>Graphs you can <em>touch</em>.</>} text="When your notes mention a curve, I rebuild it as a live graph. Drag along it to read any point and its slope, and switch on the derivative to see how the two are tied together.">
+          <Show title={<>Graphs you can <em>touch</em>.</>} text="Drag a curve. See its slope.">
             <SceneGraph />
           </Show>
           {foot('Continue')}
@@ -549,7 +550,7 @@ export function Onboarding() {
 
       {step === 'when' && (
         <div className={cls} key="when">
-          <Ask mood={when === 'night' ? 'sleepy' : when === 'morning' ? 'happy' : when === 'evening' ? 'cool' : when ? 'idle' : 'curious'} hint={'I’ll time reminders for then — never in the middle of the night.'}>When do you usually study?</Ask>
+          <Ask mood={when === 'night' ? 'sleepy' : when === 'morning' ? 'happy' : when === 'evening' ? 'cool' : when ? 'idle' : 'curious'}>When do you usually study?</Ask>
           {pickTiles(WHEN, when, setWhen)}
           {foot('Continue', { disabled: !when })}
         </div>
@@ -557,7 +558,7 @@ export function Onboarding() {
 
       {step === 'reward' && (
         <div className={cls} key="reward">
-          <Show kicker="How I teach · 5 of 5" tone="warm" title={<>Showing up <em>counts</em>.</>} text={`Every solved problem earns XP, and a clean one earns more. Hit ${goalInfo.xp} XP in a day to keep your streak alive, level up, and collect badges for the things that actually matter — like closing a gap.`}>
+          <Show title={<>Showing up <em>counts</em>.</>} text="XP, streaks and levels for real progress.">
             <SceneReward />
           </Show>
           {foot('Continue')}
@@ -572,19 +573,40 @@ export function Onboarding() {
             e.preventDefault();
             if (!name.trim()) return;
             savePlan();
-            go('plan');
+            next();
           }}
         >
           <div className="center" style={{ paddingTop: 6 }}>
             <Lera size={112} mood={name.trim() ? 'love' : 'curious'} />
           </div>
           <h2 className="ob-q" style={{ textAlign: 'center' }}>What should I call you?</h2>
-          <p className="ob-hint" style={{ textAlign: 'center' }}>Everything stays on this device. No account, no sign-in.</p>
           <input className="field big" placeholder="First name" value={name} maxLength={24} onChange={(e: { target: { value: string } }) => setName(e.target.value)} autoComplete="given-name" aria-label="First name" />
           <div className="ob-foot">
             <Button3D type="submit" disabled={!name.trim()}>Build my plan</Button3D>
           </div>
         </form>
+      )}
+
+      {step === 'account' && (
+        <div className={cls} key="account" style={{ justifyContent: 'center' }}>
+          <AuthPanel mode="signup" name={name.trim()} onDone={next} onSkip={next} />
+        </div>
+      )}
+
+      {step === 'widget' && (
+        <div className={cls} key="widget">
+          <Show title={<>I’ll cheer you on from your <em>home screen</em>.</>} text="My mood changes with your streak.">
+            <SceneWidget />
+          </Show>
+          {foot('Add widget', {
+            sheen: true,
+            onClick: () => {
+              if (!(canPinWidget() && pinWidget())) toast('Long-press your home screen, choose Widgets, then Lera.', 4200);
+              next();
+            },
+            under: <button className="linkbtn" onClick={next}>Not now</button>,
+          })}
+        </div>
       )}
 
       {step === 'plan' && (
@@ -617,7 +639,7 @@ export function Onboarding() {
 
       {step === 'remind' && (
         <div className={cls} key="remind">
-          <Show kicker="One last thing" tone="warm" title={<>A nudge at the <em>right moment</em>.</>} text={`A review does the most good on the day an idea is about to fade. Let me tell you when that is — and remind you to keep your streak, around ${whenInfo.time}. No spam, ever.`}>
+          <Show title={<>A nudge at the <em>right moment</em>.</>} text={`Around ${whenInfo.time}. No spam, ever.`}>
             <SceneBell time={whenInfo.time} />
           </Show>
           {foot('Allow notifications', {

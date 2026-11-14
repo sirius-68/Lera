@@ -13,6 +13,8 @@ export interface Profile {
   stage?: string;
   /** 'morning' | 'afternoon' | 'evening' | 'night': when reminders should land. */
   studyTime?: string;
+  /** False after signing out: the app then asks for the password before showing anything. */
+  signedIn?: boolean;
   struggle?: string;
   explainStyle?: string;
   frequency?: string;

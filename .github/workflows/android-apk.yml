@@ -62,7 +62,7 @@ jobs:
         run: |
           pkg=android/app/src/main/java/com/sirius68/lera
           manifest=android/app/src/main/AndroidManifest.xml
-          cp android-overrides/StreakWidget.java android-overrides/WidgetBridge.java "$pkg/"
+          cp android-overrides/StreakWidget.java android-overrides/StreakWidgetWide.java android-overrides/WidgetBridge.java "$pkg/"
           cp -r android-overrides/res/. android/app/src/main/res/
           grep -q 'StreakWidget' "$manifest" || python3 - "$manifest" <<'PY'
           import sys
@@ -74,6 +74,12 @@ jobs:
                           <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
                       </intent-filter>
                       <meta-data android:name="android.appwidget.provider" android:resource="@xml/streak_widget_info" />
+                  </receiver>
+                  <receiver android:name=".StreakWidgetWide" android:exported="false" android:label="@string/widget_wide_name">
+                      <intent-filter>
+                          <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                      </intent-filter>
+                      <meta-data android:name="android.appwidget.provider" android:resource="@xml/streak_widget_wide_info" />
                   </receiver>
               </application>"""
           assert "</application>" in text
@@ -89,8 +95,9 @@ jobs:
       - name: Use Lera's icon
         run: |
           res=android/app/src/main/res
-          # drop the default adaptive (vector) icons so the PNGs below are used
+          # her face fills the icon: an adaptive icon on Android 8+, the same picture as a PNG before that
           rm -rf $res/mipmap-anydpi-v26
+          cp -r android-overrides/res/mipmap-anydpi-v26 $res/
           for d in mdpi hdpi xhdpi xxhdpi xxxhdpi; do
             cp public/icon-192.png $res/mipmap-$d/ic_launcher.png
             cp public/icon-192.png $res/mipmap-$d/ic_launcher_round.png
