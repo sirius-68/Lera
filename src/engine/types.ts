@@ -19,7 +19,23 @@ export type ConceptId =
   | 'order-of-operations'
   | 'quadratic-formula'
   | 'systems'
-  | 'simplest-form';
+  | 'simplest-form'
+  // calculus 1
+  | 'limits'
+  | 'power-rule'
+  | 'product-rule'
+  | 'quotient-rule'
+  | 'chain-rule'
+  | 'trig-derivatives'
+  | 'exp-log-derivatives'
+  // calculus 2
+  | 'antiderivatives'
+  | 'constant-of-integration'
+  | 'u-substitution'
+  | 'integration-by-parts'
+  | 'definite-integrals';
+
+export type Subject = 'algebra' | 'calc1' | 'calc2';
 
 export type ProblemKind =
   | 'linear'
@@ -31,6 +47,10 @@ export type ProblemKind =
   | 'factor'
   | 'evaluate'
   | 'system'
+  | 'derivative'
+  | 'integral'
+  | 'definite'
+  | 'limit'
   | 'open';
 
 export interface Problem {
@@ -111,7 +131,7 @@ export interface AttemptAnalysis {
 
 export type StepTag =
   | 'clear-fractions' | 'expand' | 'collect' | 'move' | 'divide' | 'standard-form' | 'factor' | 'common-factor'
-  | 'zero-product' | 'sqrt' | 'formula' | 'substitute' | 'evaluate' | 'cancel' | 'system' | 'final';
+  | 'zero-product' | 'sqrt' | 'formula' | 'substitute' | 'evaluate' | 'cancel' | 'system' | 'calc' | 'final';
 
 export interface SolutionStep {
   line: string;

@@ -228,6 +228,8 @@ export async function readDocx(data: ArrayBuffer | Uint8Array, fileName: string)
       if (para.level === 0 && !title) title = text;
       paras.push(para);
     }
+    // a drawing or picture in this paragraph: leave a marker so its graph can be rebuilt from the text beside it
+    if (find(p, 'w:drawing').length || find(p, 'w:pict').length) paras.push({ text: '[figure]', figure: true });
   };
 
   const walkBody = (n: XNode) => {

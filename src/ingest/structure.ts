@@ -2,11 +2,12 @@ import { Statement, statementToText, statementVars, walk, Node } from '../engine
 import { finalForm, isCollected, prepare } from '../engine/check';
 import { cleanPath } from '../engine/analyze';
 import { CONCEPTS, conceptsForText } from '../engine/concepts';
+import { buildCalcProblem, graphFunctions } from './calc';
 import { PROMPTS } from '../engine/generate';
 import { parseLine } from '../engine/parse';
 import { ConceptId, Problem, ProblemKind } from '../engine/types';
 import { GLOSSARY } from './glossary';
-import { slug, toMathText } from './text';
+import { repairFlatPowers, slug, toMathText } from './text';
 import { Block, LeraDoc, RawDoc, RawPara, Topic, Unit } from './types';
 
 /**
@@ -23,7 +24,7 @@ const EXERCISE_LEAD = /^(exercise|problem|question|q|упражнение|зад
 const EXAMPLE_LEAD = /^((?:worked\s+)?example|пример)\s*(\d+)?\s*[:.)–-]?\s*/i;
 const NOTE_LEAD = /^(definition|note|remember|key\s+idea|key\s+point|rule|tip|important|recall|property|theorem|правило|определение|запомни)\s*[:.–-]\s*/i;
 const VERB =
-  /^(solve|simplify|factor(?:ise|ize)?|expand|evaluate|calculate|work\s+out|find|determine|compute|multiply\s+out|reduce|write|решите|упростите|разложите|вычислите|найдите|раскройте)\b/i;
+  /^(solve|simplify|factor(?:ise|ize)?|expand|evaluate|calculate|work\s+out|find|determine|compute|multiply\s+out|reduce|write|differentiate|integrate|sketch|продифференцируйте|проинтегрируйте|решите|упростите|разложите|вычислите|найдите|раскройте)\b/i;
 const NUMBERING = /^(?:\(?\d{1,2}[.)]|\(?[a-hA-H][.)]|\([ivx]{1,4}\)|[•▪◦●○■□➢➤✓–—-])\s+/;
 const MATH_WORDS = new Set(['sqrt', 'and', 'or', 'abs']);
 
@@ -190,9 +191,15 @@ export function buildProblem(text: string, inherited: string | undefined, topicI
   if (plain(clean).length < 2) return null;
   const ownVerb = VERB.exec(clean)?.[1];
   const verb = ownVerb ?? (inherited ? VERB.exec(inherited.trim())?.[1] : undefined);
-  const ex = extractMath(clean);
-  const id = `${topicId}-e${++exerciseCounter}`;
   const original = inherited && !ownVerb ? `${plain(inherited).replace(/[:.]\s*$/, '')}: ${clean}` : clean;
+  // calculus first: d/dx, ∫ and lim never parse as algebra
+  const calc = buildCalcProblem(repairFlatPowers(clean), ownVerb ? undefined : inherited, topicId, original);
+  if (calc) return calc;
+  // powers that arrived flattened ("x2 − 5x + 6 = 0") are repaired before the algebra is read
+  // "12x^7 / 4x^3" in notes means the whole 4x^3 is underneath
+  const repaired = repairFlatPowers(clean).replace(/\s\/\s*(\d+(?:[a-z](?:\^\(?-?\d+\)?)?)+)(?=\s|[.,;]|$)/g, ' / ($1)');
+  const ex = (repaired !== clean ? extractMath(repaired) : null) ?? extractMath(clean);
+  const id = `${topicId}-e${++exerciseCounter}`;
 
   const open = (): Problem => ({
     id,
@@ -430,7 +437,10 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
     else t.blocks.push(b);
   };
 
-  for (const tg of tagged) {
+  const drawn = new Set<string>();
+  let pendingFigure: { fns: string[]; caption: string } | null = null;
+  for (let i = 0; i < tagged.length; i++) {
+    const tg = tagged[i];
     const text = tg.text;
     if (tg.role === 'title') continue;
     if (tg.role === 'unit') {
@@ -548,11 +558,34 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
       pushBlock({ t: 'list', ordered: tg.para.list === 'number', items: [bare] });
       continue;
     }
+    if (tg.para.figure) {
+      // a picture in the file: rebuild it from the function its caption (or the text beside it) names
+      const near = [tagged[i + 1], tagged[i - 1], tagged[i + 2], tagged[i - 2]].filter((x) => x && !x.para.figure && x.role === 'content');
+      for (const n of near) {
+        const fns = graphFunctions(n.text, true);
+        if (fns.length) {
+          pendingFigure = { fns, caption: /^(fig|figure|graph|рис)/i.test(n.text) ? n.text : '' };
+          break;
+        }
+      }
+      if (pendingFigure && !drawn.has(pendingFigure.fns.join('|'))) {
+        drawn.add(pendingFigure.fns.join('|'));
+        pushBlock({ t: 'graph', text: pendingFigure.caption, fns: pendingFigure.fns });
+      }
+      pendingFigure = null;
+      continue;
+    }
     if (mathy) {
       pushBlock({ t: 'math', text: toMathText(plain(text)).replace(/[.;,]+$/, '') });
       continue;
     }
     pushBlock({ t: 'p', text });
+    // "The graph of y = x² − 4 is a parabola." → the graph itself, right under the sentence
+    const fns = graphFunctions(text);
+    if (fns.length && !drawn.has(fns.join('|'))) {
+      drawn.add(fns.join('|'));
+      pushBlock({ t: 'graph', text: '', fns });
+    }
   }
 
   // 4. no headings at all: cut long text into readable topics

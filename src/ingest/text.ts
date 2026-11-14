@@ -61,3 +61,21 @@ export function slug(s: string, fallback = 'x'): string {
   const base = s.toLowerCase().replace(/[^a-z0-9а-яё]+/gi, '-').replace(/^-+|-+$/g, '').slice(0, 40);
   return base || fallback;
 }
+
+/**
+ * Some files lose their superscripts on the way in (copy-paste, plain-text export, PDFs that
+ * only shrink the glyph): "x2 − 5x + 6 = 0". Nobody writes 2x as "x2", so a digit glued to
+ * the back of a letter or a closing bracket is a power — unless the line is using x1, x2 as names.
+ */
+export function repairFlatPowers(s: string): string {
+  if (!/[=+\-−*/·<>]/.test(s)) return s;
+  const subs = new Set<string>();
+  for (const m of s.matchAll(/(?<![A-Za-z])([a-zA-Z])([0-9])(?![0-9^])/g)) subs.add(m[1] + m[2]);
+  // x1 and x2 side by side are subscripts (two unknowns), not powers
+  const letters = new Map<string, Set<string>>();
+  for (const k of subs) letters.set(k[0], (letters.get(k[0]) ?? new Set()).add(k[1]));
+  const named = new Set([...letters.entries()].filter(([, d]) => d.has('1') && d.size >= 2).map(([l]) => l));
+  return s
+    .replace(/(?<![A-Za-z])([a-zA-Z])([0-9]{1,2})(?![0-9.^])/g, (m, l: string, d: string) => (named.has(l) || d === '0' || d === '1' ? m : `${l}^${d}`))
+    .replace(/\)([2-9])(?![0-9.^])/g, ')^$1');
+}

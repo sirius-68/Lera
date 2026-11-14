@@ -11,6 +11,8 @@ export interface RawPara {
   scale?: number;
   /** The paragraph is an equation on its own line. */
   math?: boolean;
+  /** A picture or drawing sits here in the file. */
+  figure?: boolean;
   page?: number;
 }
 
@@ -28,7 +30,9 @@ export type Block =
   | { t: 'math'; text: string }
   | { t: 'list'; ordered: boolean; items: string[] }
   | { t: 'example'; title: string; lines: string[] }
-  | { t: 'note'; label: string; text: string };
+  | { t: 'note'; label: string; text: string }
+  /** A graph rebuilt from the functions the notes name. `text` is the caption. */
+  | { t: 'graph'; text: string; fns: string[] };
 
 export interface Topic {
   id: string;

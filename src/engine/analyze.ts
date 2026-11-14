@@ -3,6 +3,7 @@ import { Prepared, exprChain, finalForm, prepare, relate } from './check';
 import { diagnose, hasProductOfSums } from './diagnose';
 import { parseLine } from './parse';
 import { nextStep, solutionSteps } from './steps';
+import { calcAnalyze, calcAnswer, calcHint, calcPath, isCalc } from './calc/check';
 import { AttemptAnalysis, CheckedLine, ConceptId, Diagnosis, Problem, SolutionStep, StepTag } from './types';
 
 /**
@@ -13,6 +14,7 @@ import { AttemptAnalysis, CheckedLine, ConceptId, Diagnosis, Problem, SolutionSt
  * mistake is marked once instead of on every line after it.
  */
 export function analyze(problem: Problem, rawLines: string[]): AttemptAnalysis {
+  if (isCalc(problem.kind)) return calcAnalyze(problem, rawLines);
   const prep = prepare(problem);
   const texts = rawLines.map((l) => l.trim()).filter((l) => l.length > 0);
   if (!prep) {
@@ -216,6 +218,7 @@ const NUDGE: Record<StepTag, string> = {
   evaluate: 'Which operation has to happen first here?',
   cancel: 'Is there a factor that appears on both the top and the bottom?',
   system: 'Could you add or subtract the two equations so that one letter disappears?',
+  calc: 'Which rule fits the shape of this one?',
   final: 'You’re nearly there. What does the last line need to look like?',
 };
 
@@ -249,6 +252,10 @@ const TAG_CONCEPT: Partial<Record<StepTag, ConceptId>> = {
 
 /** Three rungs of help for wherever the student currently is. */
 export function hintLadder(problem: Problem, rawLines: string[]): HintLadder | null {
+  if (isCalc(problem.kind)) {
+    const h = calcHint(problem, rawLines);
+    return h ? { nudge: h.nudge, method: h.method, line: h.line, tag: 'calc', concept: h.concept } : null;
+  }
   const prep = prepare(problem);
   if (!prep) return null;
   const a = analyze(problem, rawLines);
@@ -267,12 +274,14 @@ export function hintLadder(problem: Problem, rawLines: string[]): HintLadder | n
 
 /** The clean path for a problem, for the "your route vs a clean route" comparison. */
 export function cleanPath(problem: Problem): SolutionStep[] {
+  if (isCalc(problem.kind)) return calcPath(problem);
   const prep = prepare(problem);
   return prep ? solutionSteps(prep) : [];
 }
 
 /** Final answer as text, when the engine can work it out. */
 export function answerOf(problem: Problem): string | null {
+  if (isCalc(problem.kind)) return calcAnswer(problem);
   const path = cleanPath(problem);
   return path.length ? path[path.length - 1].line : null;
 }

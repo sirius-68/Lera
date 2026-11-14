@@ -1,3 +1,4 @@
+import { CALC_CONCEPTS } from './concepts-calc';
 import { ConceptId, SolutionStep } from './types';
 
 /**
@@ -23,7 +24,7 @@ export interface Concept {
   keywords: string[];
 }
 
-export const CONCEPTS: Record<ConceptId, Concept> = {
+const ALGEBRA_CONCEPTS: Partial<Record<ConceptId, Concept>> = {
   'inverse-operations': {
     id: 'inverse-operations',
     title: 'Moving terms across the equals sign',
@@ -419,6 +420,8 @@ export const CONCEPTS: Record<ConceptId, Concept> = {
     keywords: ['simplest form', 'lowest terms'],
   },
 };
+
+export const CONCEPTS = { ...ALGEBRA_CONCEPTS, ...CALC_CONCEPTS } as Record<ConceptId, Concept>;
 
 export function conceptsForText(text: string): ConceptId[] {
   const t = text.toLowerCase();

@@ -1001,6 +1001,10 @@ const KIND_CONCEPT: Record<ProblemKind, ConceptId> = {
   factor: 'factoring',
   evaluate: 'order-of-operations',
   system: 'systems',
+  derivative: 'power-rule',
+  integral: 'antiderivatives',
+  definite: 'definite-integrals',
+  limit: 'limits',
   open: 'arithmetic',
 };
 

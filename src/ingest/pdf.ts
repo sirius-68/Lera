@@ -94,29 +94,48 @@ function buildLines(glyphs: Glyph[], page: number, pageWidth: number, pageHeight
     row.sort((a, b) => a.x - b.x);
     let text = '';
     let prevEnd: number | null = null;
+    // a raised (or lowered) run can be split over several glyphs: "n", "−1" → ^(n−1)
+    type Script = { kind: '^' | '_'; s: string };
+    let script = null as Script | null;
+    const flush = () => {
+      if (!script) return;
+      const t = script.s.trim();
+      if (t) text += script.kind === '^' ? (/^[\w]$/.test(t) ? `^${t}` : `^(${t})`) : `_${t}`;
+      script = null;
+    };
     for (const g of row) {
-      let s = g.str;
+      const s = g.str;
       if (!s.trim()) {
+        if (script) {
+          // a space set at the raised baseline ends the exponent; one on the main baseline is just a space
+          flush();
+        }
         if (text && !text.endsWith(' ')) text += ' ';
         prevEnd = g.x + g.w;
         continue;
       }
-      const small = g.h > 0 && g.h < 0.82 * dom;
-      const raised = g.y > baseline + 0.18 * dom;
-      const lowered = g.y < baseline - 0.12 * dom;
-      if (small && raised && s.trim().length <= 4) {
-        const t = s.trim();
-        s = /^[\w]$/.test(t) ? `^${t}` : `^(${t})`;
-        text = text.replace(/\s+$/, '');
-      } else if (small && lowered && s.trim().length <= 3) {
-        s = `_${s.trim()}`;
-        text = text.replace(/\s+$/, '');
-      } else if (prevEnd !== null && g.x - prevEnd > 0.2 * dom && !text.endsWith(' ') && !s.startsWith(' ')) {
-        text += ' ';
+      const rise = g.y - baseline;
+      // exporters disagree about superscript size (Word ≈ 65%, LaTeX ≈ 70%, browsers ≈ 83%), and some
+      // keep the full size and only lift the glyph — so go by the lift, with size as supporting evidence
+      const smaller = g.h > 0 && g.h < 0.93 * dom;
+      const attached = prevEnd !== null && g.x - prevEnd < 0.25 * dom && /[\w)\]}]$/.test(text.trimEnd()) && !text.endsWith(' ');
+      const short = s.trim().length <= 6 && !/\s/.test(s.trim());
+      const raised: boolean = short && (attached || !!script) && ((smaller && rise > 0.15 * dom) || rise > 0.28 * dom);
+      const lowered: boolean = short && (attached || !!script) && smaller && rise < -0.1 * dom && s.trim().length <= 3;
+      if (raised || lowered) {
+        const kind: '^' | '_' = raised ? '^' : '_';
+        if (script && script.kind !== kind) flush();
+        if (!script) script = { kind, s: '' };
+        script.s += s.trim();
+        prevEnd = g.x + g.w;
+        continue;
       }
+      flush();
+      if (prevEnd !== null && g.x - prevEnd > 0.2 * dom && !text.endsWith(' ') && !s.startsWith(' ')) text += ' ';
       text += s;
       prevEnd = g.x + g.w;
     }
+    flush();
     const clean = cleanText(text);
     if (!clean) continue;
     lines.push({

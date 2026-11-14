@@ -1,5 +1,5 @@
 import katex from 'katex';
-import { lineToLatex } from '../engine/parse';
+import { mathLatex } from '../engine/latex';
 import { prettyInline } from '../ingest/text';
 
 const cache = new Map<string, string | null>();
@@ -11,7 +11,7 @@ export function typeset(text: string, display = false): string | null {
   if (hit !== undefined) return hit;
   let html: string | null = null;
   try {
-    const latex = lineToLatex(text);
+    const latex = mathLatex(text);
     if (latex) html = katex.renderToString(latex, { displayMode: display, throwOnError: false, output: 'html', strict: 'ignore' });
   } catch {
     html = null;

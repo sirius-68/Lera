@@ -6,6 +6,8 @@ import { ALL_CONCEPTS, practiceFor } from '../generate';
 import { lineToLatex, parseLine } from '../parse';
 import { prepare } from '../check';
 import { Problem } from '../types';
+import { calcLatex, isCalc, prepCalc } from '../calc/check';
+import { mathLatex } from '../latex';
 
 test('every concept has a review and a generator', () => {
   for (const id of ALL_CONCEPTS) {
@@ -18,7 +20,11 @@ test('every concept has a review and a generator', () => {
 
 test('worked examples in the library pass the checker', () => {
   for (const c of Object.values(CONCEPTS)) {
-    const kind = /Solve the system/.test(c.example.prompt) ? 'system'
+    const kind = /^d\/d/.test(c.example.given) ? 'derivative'
+      : /^∫\[/.test(c.example.given) ? 'definite'
+      : /^∫/.test(c.example.given) ? 'integral'
+      : /^lim/.test(c.example.given) ? 'limit'
+      : /Solve the system/.test(c.example.prompt) ? 'system'
       : /inequality/.test(c.example.prompt) ? 'inequality'
       : /Solve/.test(c.example.prompt) ? 'equation'
       : /Expand/.test(c.example.prompt) ? 'expand'
@@ -36,12 +42,12 @@ test('maths quoted inside explanations can be typeset', () => {
     const texts = [...c.explain, c.short];
     for (const t of texts) {
       for (const m of t.matchAll(/\$([^$]+)\$/g)) {
-        assert.ok(lineToLatex(m[1]) !== null, `${c.id}: cannot typeset "${m[1]}"`);
+        assert.ok(mathLatex(m[1]) !== null, `${c.id}: cannot typeset "${m[1]}"`);
       }
     }
     if (c.trap) {
       for (const side of [c.trap.wrong, c.trap.right]) {
-        for (const part of side.split(/→|stays/)) assert.ok(parseLine(part.trim()).ok, `${c.id}: trap "${part}"`);
+        for (const part of side.split(/→|stays/)) assert.ok(parseLine(part.trim()).ok || calcLatex(part.trim()) !== null, `${c.id}: trap "${part}"`);
       }
     }
   }
@@ -53,7 +59,7 @@ test('generated problems are solvable and their clean path is accepted', () => {
     for (let seed = 1; seed <= 25; seed++) {
       for (const p of practiceFor(id, 3, seed * 7919)) {
         count++;
-        assert.ok(prepare(p), `${id}: cannot prepare "${p.given}"`);
+        assert.ok(isCalc(p.kind) ? prepCalc(p) : prepare(p), `${id}: cannot prepare "${p.given}"`);
         const path = cleanPath(p).map((s) => s.line);
         assert.ok(path.length > 0, `${id}: no path for "${p.given}"`);
         const a = analyze(p, path);
