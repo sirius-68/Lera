@@ -1,4 +1,5 @@
 import { cleanText } from './text';
+import { TocEntry, applyBookStructure } from './toc';
 import { RawDoc, RawPara } from './types';
 
 /**
@@ -22,9 +23,18 @@ interface PdfPage {
   getTextContent(): Promise<{ items: unknown[] }>;
   getViewport(o: { scale: number }): { width: number; height: number };
 }
+interface OutlineItem {
+  title?: string;
+  dest?: unknown;
+  items?: OutlineItem[];
+}
 interface PdfDocument {
   numPages: number;
   getPage(n: number): Promise<PdfPage>;
+  getOutline?: () => Promise<OutlineItem[] | null>;
+  getDestination?: (name: string) => Promise<unknown[] | null>;
+  getPageIndex?: (ref: unknown) => Promise<number>;
+  getMetadata?: () => Promise<{ info?: { Title?: string } }>;
   destroy?: () => Promise<void> | void;
 }
 export interface PdfModule {
@@ -252,7 +262,7 @@ function assemble(lines: Line[]): RawPara[] {
       else text += ' ' + part.text;
     }
     const size = round(dft.parts[0].size);
-    const para: RawPara = { text, scale: size / body, page: dft.parts[0].page };
+    const para: RawPara = { text, scale: size / body, page: dft.parts[0].page, x: dft.parts[0].x0 };
     if (titleSize !== null && size === titleSize) para.level = 0;
     else {
       const rank = headingSizes.indexOf(size);
@@ -279,6 +289,61 @@ function assemble(lines: Line[]): RawPara[] {
   });
 }
 
+/** Paragraphs straight off the pages, before any decision about structure — for tests and tools. */
+export async function readPdfRaw(pdfjs: PdfModule, data: Uint8Array): Promise<RawPara[]> {
+  const doc = await pdfjs.getDocument({ data, useSystemFonts: true, isEvalSupported: false, verbosity: 0 }).promise;
+  let lines: Line[] = [];
+  try {
+    for (let n = 1; n <= doc.numPages; n++) lines.push(...(await pageLines(doc, n)));
+  } finally {
+    await doc.destroy?.();
+  }
+  return assemble(stripFurniture(lines, doc.numPages));
+}
+
+async function pageLines(doc: PdfDocument, n: number): Promise<Line[]> {
+  const page = await doc.getPage(n);
+  const vp = page.getViewport({ scale: 1 });
+  const content = await page.getTextContent();
+  const glyphs: Glyph[] = [];
+  for (const raw of content.items) {
+    const it = raw as Partial<TextItem>;
+    if (typeof it.str !== 'string' || !it.transform) continue;
+    const h = it.height || Math.hypot(it.transform[2], it.transform[3]);
+    glyphs.push({ str: it.str, x: it.transform[4], y: it.transform[5], w: it.width ?? 0, h, font: it.fontName ?? '' });
+  }
+  return buildLines(glyphs, n, vp.width, vp.height);
+}
+
+/** The file's own bookmarks, flattened: what a PDF app shows as its table of contents. */
+async function readOutline(doc: PdfDocument): Promise<TocEntry[]> {
+  const out: TocEntry[] = [];
+  try {
+    const top = await doc.getOutline?.();
+    if (!top) return out;
+    const walk = async (items: OutlineItem[], level: number): Promise<void> => {
+      for (const it of items) {
+        if (out.length > 3000) return;
+        let page: number | undefined;
+        try {
+          let dest = it.dest;
+          if (typeof dest === 'string') dest = (await doc.getDestination?.(dest)) ?? undefined;
+          if (Array.isArray(dest) && dest[0] && doc.getPageIndex) page = (await doc.getPageIndex(dest[0])) + 1;
+        } catch {
+          page = undefined;
+        }
+        const title = (it.title ?? '').replace(/\s+/g, ' ').trim();
+        if (title) out.push({ title, level, page });
+        if (it.items?.length && level < 4) await walk(it.items, level + 1);
+      }
+    };
+    await walk(top, 1);
+  } catch {
+    return [];
+  }
+  return out;
+}
+
 export async function readPdfWith(
   pdfjs: PdfModule,
   data: Uint8Array,
@@ -287,19 +352,20 @@ export async function readPdfWith(
 ): Promise<RawDoc> {
   const doc = await pdfjs.getDocument({ data, useSystemFonts: true, isEvalSupported: false, verbosity: 0 }).promise;
   let lines: Line[] = [];
+  let outline: TocEntry[] = [];
+  let metaTitle: string | undefined;
   try {
+    outline = await readOutline(doc);
+    try {
+      const t = (await doc.getMetadata?.())?.info?.Title?.trim();
+      if (t && t.length >= 3 && t.length <= 120 && !/\.(pdf|docx?|tex|indd)$/i.test(t) && !/^(untitled|microsoft word|document\d*)/i.test(t)) metaTitle = t;
+    } catch {
+      metaTitle = undefined;
+    }
     for (let n = 1; n <= doc.numPages; n++) {
-      const page = await doc.getPage(n);
-      const vp = page.getViewport({ scale: 1 });
-      const content = await page.getTextContent();
-      const glyphs: Glyph[] = [];
-      for (const raw of content.items) {
-        const it = raw as Partial<TextItem>;
-        if (typeof it.str !== 'string' || !it.transform) continue;
-        const h = it.height || Math.hypot(it.transform[2], it.transform[3]);
-        glyphs.push({ str: it.str, x: it.transform[4], y: it.transform[5], w: it.width ?? 0, h, font: it.fontName ?? '' });
-      }
-      lines.push(...buildLines(glyphs, n, vp.width, vp.height));
+      lines.push(...(await pageLines(doc, n)));
+      // let the screen repaint between pages of a long book
+      if (n % 12 === 0) await new Promise((r) => setTimeout(r, 0));
       onProgress?.(n / doc.numPages);
     }
   } finally {
@@ -307,10 +373,11 @@ export async function readPdfWith(
   }
   const pages = doc.numPages;
   lines = stripFurniture(lines, pages);
-  const paras = assemble(lines);
+  const structured = applyBookStructure(assemble(lines), outline, pages);
+  const paras = structured.paras;
   if (paras.length === 0) {
     throw new Error('I couldn’t find any selectable text in this PDF. If it’s a scan or a photo, try a typed version.');
   }
-  const title = paras.find((p) => p.level === 0)?.text;
-  return { kind: 'pdf', fileName, title, pages, paras };
+  const title = metaTitle ?? structured.title ?? paras.find((p) => p.level === 0)?.text;
+  return { kind: 'pdf', fileName, title, pages, paras, tocVia: structured.via, skippedPages: structured.skipped };
 }

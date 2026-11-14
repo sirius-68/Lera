@@ -8,7 +8,8 @@ import { SavedScreen } from './screens/Saved';
 import { SettingsScreen } from './screens/Settings';
 import { StreakScreen } from './screens/Streak';
 import { UploadScreen } from './screens/Upload';
-import { useStore } from './store';
+import { useHydrated, useStore } from './store';
+import { Lera } from './mascot/Lera';
 import { back, Route, useNav } from './store/nav';
 import { Confirmer, Toaster } from './ui/kit';
 
@@ -48,6 +49,16 @@ export function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [overlay, stack]);
+
+  const ready = useHydrated();
+  if (!ready) {
+    // the notes are being read back from the device: a blink, on all but the largest books
+    return (
+      <div className="app">
+        <div className="boot"><Lera size={84} mood="idle" interactive={false} /></div>
+      </div>
+    );
+  }
 
   if (!onboarded) {
     return (

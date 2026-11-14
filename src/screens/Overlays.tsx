@@ -11,7 +11,8 @@ import { Lera } from '../mascot/Lera';
 import { actions, useStore } from '../store';
 import { dayOf, findTopic, statusOf } from '../store/learner';
 import { closeOverlay, go, openOverlay } from '../store/nav';
-import { Button3D, Sheet, haptic } from '../ui/kit';
+import { ChatMsg } from '../store/types';
+import { Button3D, Sheet, confirmDialog, haptic, leraReact, toast } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import { MathView, RichText } from '../ui/math';
 
@@ -157,17 +158,19 @@ interface AskProps {
   lines?: string[];
 }
 
-interface Msg {
-  role: 'user' | 'assistant';
-  text: string;
-  via?: 'ai' | 'local' | 'error';
-}
+type Msg = ChatMsg;
+const NO_MSGS: Msg[] = [];
+const mid = (): string => `m${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`;
 
 export function AskSheet({ topicId, seed, problem, lines }: AskProps) {
   const ai = useStore((s) => s.ai);
   const docs = useStore((s) => s.docs);
   const found = findTopic(docs, topicId);
-  const [msgs, setMsgs] = useState<Msg[]>([]);
+  // one continuing conversation per lesson; it is still there the next time the sheet opens
+  const thread = found ? found.topic.id : 'general';
+  const msgs = useStore((s) => s.chats[thread]) ?? NO_MSGS;
+  const setMsgs = (next: Msg[]) => actions.setChat(thread, next);
+  const [openMsg, setOpenMsg] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const list = useRef<HTMLDivElement | null>(null);
@@ -184,7 +187,7 @@ export function AskSheet({ topicId, seed, problem, lines }: AskProps) {
   const ask = async (question: string) => {
     const q = question.trim();
     if (!q || busy) return;
-    const history: Msg[] = [...msgs, { role: 'user', text: q }];
+    const history: Msg[] = [...msgs, { id: mid(), role: 'user', text: q, at: new Date().toISOString() }];
     setMsgs(history);
     setText('');
     setBusy(true);
@@ -192,14 +195,14 @@ export function AskSheet({ topicId, seed, problem, lines }: AskProps) {
     if (online) {
       try {
         const chat: ChatMessage[] = history.map((m) => ({ role: m.role, content: m.text }));
-        reply = { role: 'assistant', via: 'ai', text: await aiChat(ai, chat, { topic: found?.topic.title, problem, lines, notesExcerpt: excerpt }) };
+        reply = { id: mid(), at: new Date().toISOString(), role: 'assistant', via: 'ai', text: await aiChat(ai, chat, { topic: found?.topic.title, problem, lines, notesExcerpt: excerpt }) };
       } catch (e) {
         const local = localAnswer(q, { glossary: found?.doc.glossary, problem, lines, topicTitle: found?.topic.title });
-        reply = { role: 'assistant', via: 'error', text: `${e instanceof Error ? e.message : 'The AI model didn’t answer.'}\n\nHere’s what I can say on my own:\n\n${local}` };
+        reply = { id: mid(), at: new Date().toISOString(), role: 'assistant', via: 'error', text: `${e instanceof Error ? e.message : 'The AI model didn’t answer.'}\n\nHere’s what I can say on my own:\n\n${local}` };
       }
     } else {
       await new Promise((r) => setTimeout(r, 550));
-      reply = { role: 'assistant', via: 'local', text: localAnswer(q, { glossary: found?.doc.glossary, problem, lines, topicTitle: found?.topic.title }) };
+      reply = { id: mid(), at: new Date().toISOString(), role: 'assistant', via: 'local', text: localAnswer(q, { glossary: found?.doc.glossary, problem, lines, topicTitle: found?.topic.title }) };
     }
     setMsgs([...history, reply]);
     setBusy(false);
@@ -217,6 +220,36 @@ export function AskSheet({ topicId, seed, problem, lines }: AskProps) {
     list.current?.scrollTo({ top: list.current.scrollHeight, behavior: 'smooth' });
   }, [msgs.length, busy]);
 
+  const copyMsg = async (m: Msg) => {
+    try {
+      await navigator.clipboard.writeText(m.text.replace(/\*\*/g, '').replace(/\$/g, ''));
+      toast('Copied');
+    } catch {
+      toast('Copying isn’t allowed here.');
+    }
+    setOpenMsg(null);
+  };
+  const saveMsg = (m: Msg) => {
+    actions.save({ topicId: found?.topic.id ?? 'chat', topicTitle: found?.topic.title ?? 'Ask Lera', text: m.text.replace(/\*\*/g, '') });
+    haptic([8, 30, 8]);
+    leraReact('happy');
+    toast('Saved to your notebook');
+    setOpenMsg(null);
+  };
+  const shareMsg = async (m: Msg) => {
+    const body = m.text.replace(/\*\*/g, '').replace(/\$/g, '');
+    try {
+      if (navigator.share) await navigator.share({ text: body });
+      else await copyMsg(m);
+    } catch {
+      /* the share sheet was closed */
+    }
+    setOpenMsg(null);
+  };
+  const clearAll = async () => {
+    if (await confirmDialog('Clear this conversation?', { body: 'The messages in this chat will be removed. Anything you saved to your notebook stays.', yes: 'Clear', danger: true })) actions.clearChat(thread);
+  };
+
   const quick = problem ? ['Give me a hint', 'What should I do first?'] : found ? [`Explain “${found.topic.title}” simply`, 'What is a coefficient?', 'What are like terms?'] : ['What is a coefficient?', 'Why do signs flip?', 'How do I factorise?'];
 
   return (
@@ -227,9 +260,12 @@ export function AskSheet({ topicId, seed, problem, lines }: AskProps) {
           <div className="grow">
             <b style={{ fontSize: 17 }}>Ask Lera</b>
             <p className="faint" style={{ fontSize: 12.5 }}>
-              {online ? `Answering with ${ai.model}` : 'Built-in answers · connect an AI model in Settings for open questions'}
+              {found ? found.topic.title : 'Anything in your notes'}{msgs.length ? ` · ${msgs.length} messages kept` : ''}
             </p>
           </div>
+          {msgs.length > 0 && (
+            <button className="iconbtn" onClick={clearAll} aria-label="Clear this conversation"><Icon name="trash" size={18} /></button>
+          )}
         </div>
         <div className="ask-list" ref={list}>
           {msgs.length === 0 && !busy && (
@@ -247,10 +283,21 @@ export function AskSheet({ topicId, seed, problem, lines }: AskProps) {
             </div>
           )}
           {msgs.map((m, i) => (
-            <div key={i} className={`msg ${m.role}`}>
-              {m.text.split(/\n{2,}/).map((para, j) => (
-                <p key={j}><RichText text={para} /></p>
-              ))}
+            <div key={m.id ?? i} className={`msg-wrap ${m.role}`}>
+              <button className={`msg ${m.role}`} onClick={() => { haptic(4); setOpenMsg(openMsg === m.id ? null : m.id); }} aria-expanded={openMsg === m.id} aria-label={`${m.role === 'user' ? 'Your message' : 'Lera’s answer'}. Tap for options.`}>
+                {m.text.split(/\n{2,}/).map((para, j) => (
+                  <p key={j}><RichText text={para} /></p>
+                ))}
+              </button>
+              {openMsg === m.id && (
+                <div className="msg-tools">
+                  <button onClick={() => void copyMsg(m)}><Icon name="copy" size={15} /> Copy</button>
+                  {m.role === 'assistant' && <button onClick={() => saveMsg(m)}><Icon name="bookmark" size={15} /> Save</button>}
+                  <button onClick={() => void shareMsg(m)}><Icon name="share" size={15} /> Share</button>
+                  {m.role === 'user' && <button onClick={() => { setOpenMsg(null); void ask(m.text); }}><Icon name="refresh" size={15} /> Ask again</button>}
+                  <button onClick={() => { setMsgs(msgs.filter((x) => x.id !== m.id)); setOpenMsg(null); }}><Icon name="trash" size={15} /> Delete</button>
+                </div>
+              )}
             </div>
           ))}
           {busy && (

@@ -169,6 +169,15 @@ export function Processing({ source, onDone, onCancel }: { source: Source; onDon
             </div>
           ))}
         </div>
+        {(doc.tocVia === 'outline' || doc.tocVia === 'contents') && (
+          <p className="found">
+            <Icon name="check" size={16} stroke={3} />
+            <span>
+              Chapters and sections taken from {doc.tocVia === 'outline' ? 'the file’s own table of contents' : 'the printed contents page'}
+              {doc.skippedPages ? ` · ${doc.skippedPages} ${doc.skippedPages === 1 ? 'page' : 'pages'} of cover and front matter left out` : ''}.
+            </span>
+          </p>
+        )}
         {doc.warnings.map((w) => (
           <p key={w} className="warn">
             <Icon name="alert" size={17} /> <span>{w}</span>

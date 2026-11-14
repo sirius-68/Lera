@@ -14,6 +14,8 @@ export interface RawPara {
   /** A picture or drawing sits here in the file. */
   figure?: boolean;
   page?: number;
+  /** Left edge on the page, in points (PDF only) — tells nested contents lines apart. */
+  x?: number;
 }
 
 export interface RawDoc {
@@ -22,6 +24,9 @@ export interface RawDoc {
   title?: string;
   pages?: number;
   paras: RawPara[];
+  /** How chapter and section headings were found, and how many front/back pages were left out. */
+  tocVia?: 'outline' | 'contents' | 'numbering' | 'type';
+  skippedPages?: number;
 }
 
 export type Block =
@@ -61,6 +66,8 @@ export interface LeraDoc {
   /** How the structure was produced. */
   via: 'local' | 'ai';
   warnings: string[];
+  tocVia?: RawDoc['tocVia'];
+  skippedPages?: number;
 }
 
 export interface IngestProgress {

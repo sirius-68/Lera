@@ -29,6 +29,14 @@ const reduced = (): boolean =>
 
 const rand = (a: number, b: number): number => a + Math.random() * (b - a);
 
+/** Moods shown for a moment before she settles back to looking around. */
+const BRIEF = new Set<string>(['happy', 'proud', 'celebrate', 'wave', 'oops']);
+
+/** Let Lera, wherever she is on screen, react to something that just happened. */
+export function leraReact(mood: Mood): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('lera:react', { detail: mood }));
+}
+
 export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter = 0, onTap, className = '' }: Props) {
   const root = useRef<HTMLDivElement | null>(null);
   const [reaction, setReaction] = useState<Mood | 'dizzy' | null>(null);
@@ -37,14 +45,45 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
   const taps = useRef<number[]>([]);
   const lastActive = useRef(Date.now());
   const moodRef = useRef<string>(mood);
-  const shown = asleep ? 'sleepy' : reaction ?? mood;
+  // a smile with closed eyes is a moment, not a state: after a beat she opens her eyes and looks around again
+  const [settled, setSettled] = useState(false);
+  const shown = asleep ? 'sleepy' : reaction ?? (settled && BRIEF.has(mood) ? 'idle' : mood);
   moodRef.current = shown;
 
   // a change of mood from outside wakes her and clears any tap reaction
   useEffect(() => {
     setAsleep(false);
+    setSettled(false);
     lastActive.current = Date.now();
+    if (!BRIEF.has(mood)) return;
+    const id = setTimeout(() => setSettled(true), mood === 'celebrate' ? 3200 : 2200);
+    return () => clearTimeout(id);
   }, [mood]);
+
+  /* what happens on the screen reaches her: typing makes her curious, a save or a right answer makes her smile */
+  useEffect(() => {
+    if (!interactive) return;
+    const onReact = (e: Event) => {
+      const m = (e as CustomEvent<Mood>).detail;
+      lastActive.current = Date.now();
+      setAsleep(false);
+      setReaction(m);
+      setHop((n) => n + 1);
+    };
+    const onFocus = (e: FocusEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (!t || !/^(INPUT|TEXTAREA)$/.test(t.tagName)) return;
+      lastActive.current = Date.now();
+      setAsleep(false);
+      setReaction('curious');
+    };
+    window.addEventListener('lera:react', onReact);
+    window.addEventListener('focusin', onFocus);
+    return () => {
+      window.removeEventListener('lera:react', onReact);
+      window.removeEventListener('focusin', onFocus);
+    };
+  }, [interactive]);
 
   /* eyes: follow the pointer, otherwise look around */
   useEffect(() => {
@@ -64,6 +103,27 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
     };
     window.addEventListener('pointermove', onMove, { passive: true });
     window.addEventListener('pointerdown', onMove, { passive: true });
+    // on a phone there is no hovering pointer: follow the finger while it scrolls, and glance at what gets typed
+    const onTouch = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!t) return;
+      pointer.x = t.clientX;
+      pointer.y = t.clientY;
+      pointer.at = performance.now();
+      lastActive.current = Date.now();
+    };
+    const onKey = () => {
+      const a = document.activeElement as HTMLElement | null;
+      if (!a || a === document.body) return;
+      const r = a.getBoundingClientRect();
+      pointer.x = r.left + r.width / 2;
+      pointer.y = r.top + r.height / 2;
+      pointer.at = performance.now();
+      lastActive.current = Date.now();
+    };
+    window.addEventListener('touchmove', onTouch, { passive: true });
+    window.addEventListener('input', onKey, true);
+    window.addEventListener('click', onKey, true);
 
     const tick = (now: number) => {
       if (!alive) return;
@@ -111,6 +171,9 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
       cancelAnimationFrame(raf);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerdown', onMove);
+      window.removeEventListener('touchmove', onTouch);
+      window.removeEventListener('input', onKey, true);
+      window.removeEventListener('click', onKey, true);
     };
   }, []);
 
@@ -146,7 +209,7 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
 
   useEffect(() => {
     if (!reaction) return;
-    const id = setTimeout(() => setReaction(null), reaction === 'dizzy' ? 1900 : 1100);
+    const id = setTimeout(() => setReaction(null), reaction === 'dizzy' ? 1900 : reaction === 'curious' ? 1600 : 1300);
     return () => clearTimeout(id);
   }, [reaction, hop]);
 

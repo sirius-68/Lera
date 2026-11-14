@@ -93,6 +93,7 @@ export function HomeScreen() {
   const read = useStore((s) => s.read);
   const understood = useStore((s) => s.understood);
   const kept = useStore((s) => s.saved.length + s.notes.length + s.highlights.length);
+  const chatCount = useStore((s) => Object.values(s.chats).reduce((n, t) => n + t.length, 0));
   const lastTopicId = useStore((s) => s.lastTopicId);
   const state = { concepts, solved };
   const game = { attempts, read };
@@ -216,6 +217,11 @@ export function HomeScreen() {
               <b>{kept}</b>
               <span>Notebook</span>
             </button>
+            <button className="tile sky" onClick={() => openOverlay({ name: 'ask', topicId: last?.topic.id })}>
+              <span className="tile-ic"><Icon name="chat" size={22} /></span>
+              <b>Ask Lera</b>
+              <span>{chatCount ? `${chatCount} messages kept` : 'Any question'}</span>
+            </button>
             <button className="tile brand" onClick={() => go({ name: 'upload' })}>
               <span className="tile-ic"><Icon name="plus" size={22} /></span>
               <b>Add</b>
@@ -266,6 +272,8 @@ export function LessonsScreen() {
   const lastTopicId = useStore((s) => s.lastTopicId);
   const doc: LeraDoc | undefined = docs.find((d) => d.id === activeDocId) ?? docs[0];
   const state = { concepts, solved };
+  // a long book shows one chapter at a time; the others fold down to their banner
+  const [openUnits, setOpenUnits] = useState<Record<string, boolean>>({});
 
   if (!doc) {
     return (
@@ -285,6 +293,9 @@ export function LessonsScreen() {
   const allTopics = doc.units.flatMap((u) => u.topics);
   const hereId = allTopics.some((t) => t.id === lastTopicId) ? lastTopicId : allTopics.find((t) => topicStatus(t, state) !== 'solid')?.id ?? allTopics[0]?.id;
   let n = 0;
+  const big = doc.units.length > 3 || allTopics.length > 14;
+  const hereUnit = doc.units.find((u) => u.topics.some((t) => t.id === hereId))?.id;
+  const isOpen = (id: string): boolean => openUnits[`${doc.id}:${id}`] ?? (!big || id === hereUnit);
 
   return (
     <div className="screen" data-dir="0">
@@ -317,14 +328,16 @@ export function LessonsScreen() {
           {doc.units.map((u, ui) => {
             const um = u.topics.reduce((s, t) => s + topicMastery(t, state), 0) / Math.max(1, u.topics.length);
             return (
-              <section key={u.id} className="path-unit">
-                <div className={`unit-banner tone-${ui % 4}`}>
-                  <div className="grow">
-                    <span>Unit {ui + 1}</span>
+              <section key={u.id} className={`path-unit ${isOpen(u.id) ? 'open' : 'shut'}`}>
+                <button className={`unit-banner tone-${ui % 4}`} aria-expanded={isOpen(u.id)} onClick={() => { haptic(5); setOpenUnits({ ...openUnits, [`${doc.id}:${u.id}`]: !isOpen(u.id) }); }}>
+                  <div className="grow" style={{ textAlign: 'left' }}>
+                    <span>{big ? 'Chapter' : 'Unit'} {ui + 1} · {u.topics.length} {u.topics.length === 1 ? 'lesson' : 'lessons'}</span>
                     <b>{u.title}</b>
                   </div>
                   <Ring value={um} size={44} stroke={5} color="#fff"><span style={{ fontSize: 11.5, fontWeight: 700, color: '#fff' }}>{Math.round(um * 100)}%</span></Ring>
-                </div>
+                  <span className="unit-chev"><Icon name="down" size={18} /></span>
+                </button>
+                {isOpen(u.id) && (
                 <div className="path-stops">
                   {u.topics.map((t) => {
                     const st = topicStatus(t, state);
@@ -352,10 +365,14 @@ export function LessonsScreen() {
                     );
                   })}
                 </div>
+                )}
               </section>
             );
           })}
-          <p className="faint" style={{ fontSize: 12.5, textAlign: 'center', marginTop: 6 }}>{doc.fileName}</p>
+          <p className="faint" style={{ fontSize: 12.5, textAlign: 'center', marginTop: 6 }}>
+            {doc.fileName}
+            {doc.tocVia === 'outline' || doc.tocVia === 'contents' ? ' · chapters from the book’s own contents' : ''}
+          </p>
           <button className="linkbtn" style={{ color: 'var(--ink-3)', fontSize: 13.5, alignSelf: 'center' }} onClick={async () => { if (await confirmDialog(`Remove “${doc.title}”?`, { body: 'Its highlights and notes go too. Your practice history stays.', yes: 'Remove', danger: true })) { actions.removeDoc(doc.id); toast('Notes removed'); } }}>
             <Icon name="trash" size={15} /> Remove these notes
           </button>

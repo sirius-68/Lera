@@ -63,6 +63,15 @@ export interface SavedItem {
   pinned?: boolean;
 }
 
+/** One message in a conversation with Lera. */
+export interface ChatMsg {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  via?: 'ai' | 'local' | 'error';
+  at: string;
+}
+
 /** What Lera knows about one concept for one learner. */
 export interface ConceptState {
   id: ConceptId;
@@ -137,4 +146,6 @@ export interface AppState {
   read: Record<string, string>;
   /** conceptId → the learner said the explanation made sense (day) or didn't ('no') */
   understood: Record<string, string>;
+  /** Conversations with Lera, one thread per lesson (and 'general' for everything else). */
+  chats: Record<string, ChatMsg[]>;
 }

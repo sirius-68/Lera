@@ -104,7 +104,8 @@ export async function ingestBytes(bytes: Uint8Array, fileName: string, opts: Ing
   report('structuring', 0.5);
 
   let doc: LeraDoc;
-  if (aiReady(opts.ai)) {
+  // a whole book goes through the built-in reader: its own contents are a better guide than a model's guess, and far quicker
+  if (aiReady(opts.ai) && (raw.pages ?? 0) <= 40) {
     try {
       doc = await aiStructure(opts.ai, raw, (f) => report('structuring', 0.5 + f * 0.3), opts.signal);
     } catch (e) {
@@ -118,6 +119,8 @@ export async function ingestBytes(bytes: Uint8Array, fileName: string, opts: Ing
   }
   if (doc.units.length === 0) throw new Error('There wasn’t enough readable text in this file to build lessons from.');
   doc = namespaceDoc(doc);
+  doc.tocVia = raw.tocVia;
+  doc.skippedPages = raw.skippedPages;
   report('exercises', 0.85);
   report('path', 0.95);
   report('done', 1);

@@ -190,6 +190,8 @@ let toastMsg: { text: string; id: number } | null = null;
 const toastSubs = new Set<() => void>();
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
+export { leraReact } from '../mascot/Lera';
+
 export function toast(text: string, ms = 2400): void {
   toastMsg = { text, id: Date.now() };
   toastSubs.forEach((l) => l());

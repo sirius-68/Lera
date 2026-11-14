@@ -43,11 +43,15 @@ jobs:
           npx cap add android
           npx cap sync android
 
-      - name: Keep the system text menu out of the way
+      - name: Android behaviour (text menu, keyboard, system bars)
         run: |
           # Lera's own web view class: selection works, Android's Copy/Share menu stays empty
           pkg=android/app/src/main/java/com/sirius68/lera
           cp android-overrides/LeraWebView.java "$pkg/"
+          # MainActivity pads the page for the status bar, navigation bar and keyboard, so typing is never covered
+          cp android-overrides/MainActivity.java "$pkg/"
+          grep -q 'windowSoftInputMode' android/app/src/main/AndroidManifest.xml || sed -i 's#android:name=".MainActivity"#android:name=".MainActivity" android:windowSoftInputMode="adjustResize"#' android/app/src/main/AndroidManifest.xml
+          grep -q 'windowSoftInputMode' android/app/src/main/AndroidManifest.xml
           layout=$(find node_modules/@capacitor/android -name '*bridge_layout_main.xml' | head -n 1)
           test -n "$layout"
           mkdir -p android/app/src/main/res/layout

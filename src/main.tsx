@@ -5,5 +5,33 @@ import './styles/screens.css';
 import './styles/v2.css';
 import { App } from './App';
 
+/*
+ * The on-screen keyboard must never cover what is being typed.
+ * In the Android app the web view itself is resized (see android-overrides/MainActivity.java);
+ * in a browser the visual viewport shrinks instead, so the app's height follows it.
+ */
+const vv = window.visualViewport;
+if (vv) {
+  const fit = () => {
+    const kb = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+    document.documentElement.style.setProperty('--kb', `${Math.round(kb)}px`);
+    document.documentElement.classList.toggle('kb-open', kb > 80 || window.innerHeight < 480);
+  };
+  vv.addEventListener('resize', fit);
+  vv.addEventListener('scroll', fit);
+  fit();
+}
+// once the keyboard has finished opening, bring the field being typed into view
+const reveal = (e: Event) => {
+  const t = e.target as HTMLElement | null;
+  if (!t || !/^(INPUT|TEXTAREA)$/.test(t.tagName) || t.getAttribute('inputmode') === 'none') return;
+  [250, 600].forEach((ms) => setTimeout(() => document.activeElement === t && t.scrollIntoView({ block: 'center', behavior: 'smooth' }), ms));
+};
+window.addEventListener('focusin', reveal);
+window.addEventListener('resize', () => {
+  const a = document.activeElement as HTMLElement | null;
+  if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.getAttribute('inputmode') !== 'none') a.scrollIntoView({ block: 'center' });
+});
+
 const el = document.getElementById('root');
 if (el) createRoot(el).render(<App />);

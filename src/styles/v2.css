@@ -356,3 +356,58 @@ button, .tabbar, .topbar, .kbd, .seltool, nav { -webkit-user-select: none; user-
 .halo { position: relative; display: grid; place-items: center; border-radius: 50%; background: radial-gradient(circle, rgba(255, 255, 255, 0.96) 0 62%, rgba(255, 255, 255, 0.35) 63% 70%, transparent 71%); padding: 14px; flex-shrink: 0; }
 .halo.big { padding: 26px; animation: pop 0.6s var(--spring) both; }
 .splash-mark .halo { padding: 24px; }
+
+/* ───────── keyboard, taps, sheets ───────── */
+* { -webkit-tap-highlight-color: transparent; }
+.lera, .lera:focus { outline: none; -webkit-tap-highlight-color: transparent; }
+.app { height: calc(100% - var(--kb, 0px)); }
+.sheet { max-height: calc(100% - 12px); }
+.sheet.full { height: 92%; max-height: calc(100% - 12px); }
+.sheet-body { min-height: 0; }
+.kb-open .tabbar, .kb-open .ask-fab { display: none; }
+.kb-open .sheet.full { height: calc(100% - 8px); }
+
+/* ───────── streak header floats; the page goes under it ───────── */
+.streak-screen { position: relative; }
+.streak-hero { position: absolute; top: 0; left: 0; right: 0; z-index: 3; transition: box-shadow 0.3s; }
+.streak-main { max-height: 300px; overflow: hidden; transition: max-height 0.38s var(--ease), opacity 0.25s, padding 0.38s var(--ease), transform 0.38s var(--ease); }
+.streak-hero.compact .streak-main { max-height: 0; opacity: 0; padding-bottom: 0; transform: scale(0.9); }
+.streak-hero.compact { box-shadow: 0 5px 0 #c44f08, 0 14px 28px rgba(160, 60, 0, 0.25); }
+.streak-scroll { position: absolute; inset: 0; z-index: 1; }
+
+.boot { flex: 1; display: grid; place-items: center; animation: fade 0.4s 0.25s both; }
+
+/* ───────── lessons in parts ───────── */
+.pager { display: flex; gap: 4px; padding: 0 20px 6px; }
+.pager button { flex: 1; height: 6px; border-radius: 999px; background: var(--tint-2); transition: background 0.3s, transform 0.3s var(--spring); min-width: 4px; }
+.pager button[data-state='done'] { background: var(--brand); }
+.pager button[data-state='now'] { background: var(--brand); transform: scaleY(1.5); box-shadow: 0 0 0 3px var(--tint); }
+.reader.turn-next { animation: push-in 0.36s var(--ease) both; }
+.reader.turn-prev { animation: pop-in 0.36s var(--ease) both; }
+.page-nav { display: flex; align-items: center; gap: 10px; padding: 10px 22px 96px; }
+.page-nav .btn3d { flex: 1; max-width: none; }
+.page-back { width: 54px; height: 54px; border-radius: 50%; border: 1.5px solid var(--line-d); box-shadow: 0 3px 0 var(--line-d); display: grid; place-items: center; color: var(--ink-2); flex-shrink: 0; background: #fff; }
+.page-back:disabled { opacity: 0.35; }
+.page-back:active:not(:disabled) { transform: translateY(3px); box-shadow: none; }
+
+.unit-banner { width: 100%; text-align: left; transition: transform 0.12s, box-shadow 0.12s; }
+button.unit-banner:active { transform: translateY(3px); }
+.unit-chev { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; background: rgba(255, 255, 255, 0.2); transition: transform 0.35s var(--spring); flex-shrink: 0; }
+.path-unit.open .unit-chev { transform: rotate(180deg); }
+.path-unit.shut .unit-banner { opacity: 0.94; }
+.path { gap: 10px; }
+
+.found { display: flex; gap: 8px; align-items: flex-start; text-align: left; padding: 10px 12px; border-radius: 14px; background: var(--ok-bg); color: var(--ok-d); font-size: 13.5px; line-height: 1.45; align-self: stretch; }
+.found svg { flex-shrink: 0; margin-top: 2px; }
+
+/* ───────── selecting in a lesson ───────── */
+/* a formula is picked up whole, never glyph by glyph; labels and controls are not text to select */
+.reader .mathv { -webkit-user-select: all; user-select: all; }
+.reader .label, .reader .reveal, .reader .graph, .reader .graph-it, .reader .note-pin, .reader .rd-title, .pager, .page-nav { -webkit-user-select: none; user-select: none; }
+.reader .hl .mathv, .reader .hl { -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+.reader [data-math].hl { padding: 2px 3px; border-radius: 6px; }
+.rd-math [data-seg], .ex-math [data-seg] { display: inline-block; max-width: 100%; }
+.rd-math .mathv, .ex-math .mathv { font-size: 1em; }
+.ex-math { font-size: 18px; padding: 2px 0; overflow-x: auto; scrollbar-width: none; }
+.rd-math { overflow-x: auto; scrollbar-width: none; }
+.reader .katex { white-space: nowrap; }

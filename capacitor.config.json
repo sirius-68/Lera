@@ -3,6 +3,6 @@
   "appName": "Lera",
   "webDir": "dist",
   "android": {
-    "adjustMarginsForEdgeToEdge": "auto"
+    "adjustMarginsForEdgeToEdge": "disable"
   }
 }

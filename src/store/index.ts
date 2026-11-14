@@ -2,8 +2,9 @@ import { useSyncExternalStore } from 'react';
 import { BUILD_AI } from '../ai/config';
 import { AttemptAnalysis, ConceptId, Problem } from '../engine/types';
 import { LeraDoc } from '../ingest/types';
+import { idbAll, idbAvailable, idbClear, idbDelete, idbPut } from './docdb';
 import { AttemptMeta, dayOf, recordAttempt } from './learner';
-import { AppState, Highlight, Note, Profile, SavedItem } from './types';
+import { AppState, ChatMsg, Highlight, Note, Profile, SavedItem } from './types';
 
 /**
  * One small store for the whole app. Everything the learner does is kept on
@@ -38,6 +39,7 @@ export const emptyState = (): AppState => ({
   solved: {},
   read: {},
   understood: {},
+  chats: {},
 });
 
 function load(): AppState {
@@ -61,14 +63,53 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 /** False when the browser refused to store (private window, storage full). */
 export let persisted = true;
 
+/** True once the notes are kept in IndexedDB; from then on localStorage holds everything except them. */
+let docsInIdb = false;
+/** False until the notes have been read back at start-up. */
+let hydrated = !(typeof window !== 'undefined' && idbAvailable());
+
 function save(): void {
+  const write = (withDocs: boolean) => localStorage.setItem(KEY, JSON.stringify(withDocs ? state : { ...state, docs: [] }));
   try {
-    localStorage.setItem(KEY, JSON.stringify(state));
+    write(!docsInIdb);
     persisted = true;
   } catch {
-    persisted = false;
+    try {
+      // most likely too big with the notes included: keep the rest
+      write(false);
+      persisted = docsInIdb;
+    } catch {
+      persisted = false;
+    }
   }
 }
+
+function hydrate(): void {
+  idbAll()
+    .then(async (stored) => {
+      // notes an older version kept in localStorage move across once
+      const legacy = state.docs.filter((d) => !stored.some((x) => x.id === d.id));
+      for (const d of legacy) await idbPut(d);
+      const docs = [...legacy, ...stored].sort((a, b) => (a.addedAt < b.addedAt ? 1 : -1));
+      docsInIdb = true;
+      state = { ...state, docs, activeDocId: docs.some((d) => d.id === state.activeDocId) ? state.activeDocId : docs[0]?.id };
+    })
+    .catch(() => {
+      // no IndexedDB here (private window, old web view): notes stay in localStorage as before
+      docsInIdb = false;
+    })
+    .finally(() => {
+      hydrated = true;
+      listeners.forEach((l) => l());
+      if (docsInIdb) save();
+    });
+}
+
+const store = (work: Promise<unknown>): void => {
+  work.catch(() => {
+    persisted = false;
+  });
+};
 
 export function getState(): AppState {
   return state;
@@ -92,7 +133,13 @@ export function useStore<T>(selector: (s: AppState) => T): T {
   return useSyncExternalStore(subscribe, () => selector(state));
 }
 
+/** False for the instant at start-up before the notes have been read back. */
+export function useHydrated(): boolean {
+  return useSyncExternalStore(subscribe, () => hydrated);
+}
+
 if (typeof window !== 'undefined') {
+  if (!hydrated) hydrate();
   window.addEventListener('pagehide', () => {
     if (saveTimer) {
       clearTimeout(saveTimer);
@@ -115,6 +162,7 @@ export const actions = {
   },
 
   addDoc(doc: LeraDoc): void {
+    if (docsInIdb) store(idbPut(doc));
     setState((s) => ({
       docs: [doc, ...s.docs.filter((d) => d.id !== doc.id)],
       activeDocId: doc.id,
@@ -123,6 +171,7 @@ export const actions = {
   },
 
   removeDoc(id: string): void {
+    if (docsInIdb) store(idbDelete(id));
     setState((s) => {
       const doc = s.docs.find((d) => d.id === id);
       const topicIds = new Set(doc?.units.flatMap((u) => u.topics.map((t) => t.id)) ?? []);
@@ -181,6 +230,19 @@ export const actions = {
     setState((s) => ({ understood: { ...s.understood, [concept]: ok ? dayOf() : 'no' } }));
   },
 
+  /** Replace one conversation thread (kept to its most recent messages). */
+  setChat(thread: string, msgs: ChatMsg[]): void {
+    setState((s) => ({ chats: { ...s.chats, [thread]: msgs.slice(-80) } }));
+  },
+
+  clearChat(thread: string): void {
+    setState((s) => {
+      const chats = { ...s.chats };
+      delete chats[thread];
+      return { chats };
+    });
+  },
+
   removeSaved(id: string): void {
     setState((s) => ({ saved: s.saved.filter((x) => x.id !== id) }));
   },
@@ -199,6 +261,7 @@ export const actions = {
   },
 
   reset(): void {
+    if (docsInIdb) store(idbClear());
     state = emptyState();
     try {
       localStorage.removeItem(KEY);

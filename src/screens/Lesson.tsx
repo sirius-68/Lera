@@ -155,7 +155,7 @@ function BlockView({ block, index, ctx }: { block: Block; index: number; ctx: Re
     case 'p':
       return <p className="rd-p"><SegText text={block.text} block={index} item={0} ctx={ctx} /></p>;
     case 'math':
-      return <MathBlock text={plain(block.text)} />;
+      return <MathBlock text={plain(block.text)} index={index} ctx={ctx} />;
     case 'graph':
       return <Graph fns={block.fns} caption={block.text ? plain(block.text) : undefined} />;
     case 'list': {
@@ -175,13 +175,13 @@ function BlockView({ block, index, ctx }: { block: Block; index: number; ctx: Re
 }
 
 /** A display equation. When it defines a function of x, it can be drawn on the spot. */
-function MathBlock({ text }: { text: string }) {
+function MathBlock({ text, index, ctx }: { text: string; index: number; ctx: ReaderCtx }) {
   const [open, setOpen] = useState(false);
   const fnText = useMemo(() => functionOfLine(text), [text]);
   return (
     <>
       <div className="rd-math">
-        <MathView text={text} block />
+        <SegText text={`$${text}$`} block={index} item={0} ctx={ctx} />
         {fnText && (
           <button className="graph-it" onClick={() => { haptic(5); setOpen(!open); }} aria-expanded={open}>
             <Icon name="chart" size={15} /> {open ? 'Hide graph' : 'Graph it'}
@@ -203,7 +203,12 @@ function ExampleCard({ block, index, ctx }: { block: Extract<Block, { t: 'exampl
       <div className="col" style={{ gap: 8, marginTop: 8 }}>
         {block.lines.slice(0, shown).map((line, i) => (
           <div key={i} className="ex-line">
-            {isMathLine(plain(line)) ? <MathView text={plain(line)} block /> : <p className="rd-p" style={{ margin: 0 }}><SegText text={line} block={index} item={i} ctx={ctx} /></p>}
+            {isMathLine(plain(line)) ? (
+              // a line that is only maths is one piece: it is selected, highlighted and saved whole
+              <div className="ex-math"><SegText text={`$${plain(line)}$`} block={index} item={i} ctx={ctx} /></div>
+            ) : (
+              <p className="rd-p" style={{ margin: 0 }}><SegText text={line} block={index} item={i} ctx={ctx} /></p>
+            )}
           </div>
         ))}
       </div>
@@ -222,6 +227,53 @@ function ExampleCard({ block, index, ctx }: { block: Extract<Block, { t: 'exampl
   );
 }
 
+/* ───────────── bite-size pages ───────────── */
+
+interface Page {
+  start: number;
+  end: number;
+}
+
+const weightOf = (b: Block): number =>
+  b.t === 'p' || b.t === 'note' ? b.text.length + 40 : b.t === 'list' ? b.items.join(' ').length + 60 : b.t === 'example' ? 420 : b.t === 'graph' ? 560 : b.t === 'math' ? 150 : 50;
+
+/**
+ * A lesson is read a screenful at a time. A new page starts at every sub-heading from the notes,
+ * and a long stretch without one is cut at a sensible place — never straight after a heading,
+ * and never between a sentence ending in a colon and what it introduces.
+ */
+export function paginate(blocks: Block[]): Page[] {
+  const pages: Page[] = [];
+  let start = 0;
+  let weight = 0;
+  for (let i = 0; i < blocks.length; i++) {
+    const b = blocks[i];
+    const prev = blocks[i - 1];
+    const introduces = !!prev && (prev.t === 'h' || ((prev.t === 'p' || prev.t === 'note') && /:\s*$/.test(prev.text)));
+    const cut = i > start && ((b.t === 'h' && weight > 220) || (weight > 1250 && !introduces && b.t !== 'graph'));
+    if (cut) {
+      pages.push({ start, end: i });
+      start = i;
+      weight = 0;
+    }
+    weight += weightOf(b);
+  }
+  if (blocks.length > start || pages.length === 0) pages.push({ start, end: blocks.length });
+  // a stub at the very end reads better joined to the page before it
+  if (pages.length > 1) {
+    const last = pages[pages.length - 1];
+    const size = blocks.slice(last.start, last.end).reduce((n, b) => n + weightOf(b), 0);
+    if (size < 180 && blocks[last.start]?.t !== 'h') {
+      pages.pop();
+      pages[pages.length - 1].end = last.end;
+    }
+  }
+  return pages;
+}
+
+/** Where the reader left off in each lesson, for as long as the app stays open. */
+const lastPage = new Map<string, number>();
+
 /* ───────────── selection → offsets ───────────── */
 
 interface Picked {
@@ -236,20 +288,59 @@ interface Picked {
   hl?: Highlight;
 }
 
+/**
+ * A selection boundary → an offset in the raw text of one run.
+ *
+ * The browser may report the boundary inside a text node, inside typeset maths, or between two
+ * elements (common when a selection handle is dragged to the edge of a formula or a term). Each
+ * piece of a run knows where it starts in the raw string, so the boundary is placed by asking,
+ * piece by piece, whether it falls before, inside or after it.
+ */
 function locate(node: Node, offset: number, edge: 'start' | 'end'): { seg: HTMLElement; at: number } | null {
-  const el = node.nodeType === 3 ? node.parentElement : (node as HTMLElement);
-  if (!el) return null;
-  const seg = el.closest<HTMLElement>('[data-seg]');
+  const host = node.nodeType === 3 ? node.parentElement : (node as HTMLElement);
+  if (!host) return null;
+  let seg = host.closest<HTMLElement>('[data-seg]');
+  if (!seg && node.nodeType !== 3) {
+    // the boundary sits on a container: use the run just inside it
+    const kids = (node as HTMLElement).childNodes;
+    const near = (edge === 'start' ? kids[offset] : kids[offset - 1]) as HTMLElement | undefined;
+    const inner = near && near.nodeType === 1 ? (near.matches('[data-seg]') ? near : near.querySelector<HTMLElement>('[data-seg]')) : null;
+    if (inner) return { seg: inner, at: edge === 'start' ? 0 : Number(inner.dataset.len ?? 0) };
+  }
   if (!seg) return null;
   const len = Number(seg.dataset.len ?? 0);
-  const math = el.closest<HTMLElement>('[data-math]');
-  if (math) {
-    const o = Number(math.dataset.o ?? 0);
-    return { seg, at: edge === 'start' ? o : o + Number(math.dataset.math ?? 0) };
+  const point = document.createRange();
+  try {
+    point.setStart(node, offset);
+  } catch {
+    return { seg, at: edge === 'start' ? 0 : len };
   }
-  const piece = el.closest<HTMLElement>('[data-o]');
-  if (piece && node.nodeType === 3) return { seg, at: Math.min(len, Number(piece.dataset.o ?? 0) + offset) };
-  return { seg, at: edge === 'start' ? 0 : len };
+  point.collapse(true);
+  const pieces = [...seg.querySelectorAll<HTMLElement>('[data-o]')];
+  let at = edge === 'start' ? len : 0;
+  for (const piece of pieces) {
+    const o = Number(piece.dataset.o ?? 0);
+    const size = piece.dataset.math ? Number(piece.dataset.math) : (piece.textContent ?? '').length;
+    const whole = document.createRange();
+    whole.selectNodeContents(piece);
+    const afterStart = point.compareBoundaryPoints(Range.START_TO_START, whole) >= 0;
+    const beforeEnd = point.compareBoundaryPoints(Range.END_TO_END, whole) <= 0;
+    if (afterStart && beforeEnd) {
+      // inside this piece: exact for plain text, the whole formula for maths
+      if (piece.dataset.math) return { seg, at: edge === 'start' ? o : o + size };
+      if (node.nodeType === 3 && node.parentElement === piece) return { seg, at: Math.min(len, o + offset) };
+      return { seg, at: edge === 'start' ? o : o + size };
+    }
+    if (edge === 'start' && !afterStart) {
+      // the first piece that begins after the boundary
+      at = Math.min(at, o);
+    }
+    if (edge === 'end' && !beforeEnd) {
+      // the last piece that ends before the boundary
+      at = Math.max(at, o + size);
+    }
+  }
+  return { seg, at: Math.max(0, Math.min(len, at)) };
 }
 
 /* ───────────── the screen ───────────── */
@@ -265,6 +356,9 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
   const [term, setTerm] = useState<{ key: string; x: number; top: number } | null>(null);
   const [noteDraft, setNoteDraft] = useState<Picked | null>(null);
   const [viewNote, setViewNote] = useState<Note | null>(null);
+  const [pageNo, setPageNo] = useState(() => lastPage.get(route.topicId) ?? 0);
+  const [turn, setTurn] = useState<1 | -1>(1);
+  const scroller = useRef<HTMLDivElement | null>(null);
   const screen = useRef<HTMLDivElement | null>(null);
   const reader = useRef<HTMLDivElement | null>(null);
   const progress = useRef<HTMLElement | null>(null);
@@ -335,6 +429,23 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
   }
 
   const { topic, doc } = found;
+  const pages = paginate(topic.blocks);
+  const at = Math.min(pageNo, pages.length - 1);
+  const page = pages[at];
+  const lastOne = at === pages.length - 1;
+  const goPage = (n: number) => {
+    const next = Math.max(0, Math.min(pages.length - 1, n));
+    if (next === at) return;
+    haptic(5);
+    window.getSelection()?.removeAllRanges();
+    setPicked(null);
+    setTerm(null);
+    setTurn(next > at ? 1 : -1);
+    setPageNo(next);
+    lastPage.set(topic.id, next);
+    scroller.current?.scrollTo({ top: 0 });
+  };
+  const pageHeading = topic.blocks[page.start]?.t === 'h';
   const clearSel = () => {
     window.getSelection()?.removeAllRanges();
     setPicked(null);
@@ -402,8 +513,8 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
   const days = streak(attempts);
   const unitTitle = found.unit.title;
   const topics = doc.units.flatMap((u) => u.topics);
-  const at = topics.findIndex((t) => t.id === topic.id);
-  const nextTopic = topics[at + 1];
+  const topicAt = topics.findIndex((t) => t.id === topic.id);
+  const nextTopic = topics[topicAt + 1];
   const barLeft = (x: number) => Math.max(150, Math.min((screen.current?.clientWidth ?? 390) - 150, x));
 
   return (
@@ -416,10 +527,19 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
       <div style={{ padding: '2px 20px 10px' }}>
         <Seg options={[{ id: 'lesson', label: 'Lesson' }, { id: 'practice', label: `Practice${topic.exercises.length ? ` · ${topic.exercises.length}` : ''}` }]} value={tab} onChange={(v) => { clearSel(); setTerm(null); setTab(v); }} />
       </div>
-      <i className="read-progress" ref={progress} />
+      {tab === 'lesson' && pages.length > 1 ? (
+        <div className="pager" role="tablist" aria-label="Parts of this lesson">
+          {pages.map((_, i) => (
+            <button key={i} role="tab" aria-selected={i === at} aria-label={`Part ${i + 1} of ${pages.length}`} data-state={i < at ? 'done' : i === at ? 'now' : 'todo'} onClick={() => goPage(i)} />
+          ))}
+        </div>
+      ) : (
+        <i className="read-progress" ref={progress} />
+      )}
 
       {tab === 'lesson' ? (
         <div
+          ref={scroller}
           className="scroll"
           onScroll={(e: { currentTarget: HTMLElement }) => {
             const el = e.currentTarget;
@@ -431,24 +551,45 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
             }
           }}
         >
-          <article className="reader stagger" ref={reader} onClick={onReaderClick} onContextMenu={(e: { preventDefault(): void }) => e.preventDefault()}>
-            <span className="label">{unitTitle}</span>
-            <h1 className="rd-title">{topic.title}</h1>
-            {topic.blocks.map((b, i) => (
-              <BlockView key={i} block={b} index={i} ctx={ctx} />
+          <article key={at} className={`reader stagger ${pages.length > 1 ? (turn > 0 ? 'turn-next' : 'turn-prev') : ''}`} ref={reader} onClick={onReaderClick} onContextMenu={(e: { preventDefault(): void }) => e.preventDefault()}>
+            {at === 0 ? (
+              <>
+                <span className="label">{unitTitle}</span>
+                <h1 className="rd-title">{topic.title}</h1>
+              </>
+            ) : (
+              <span className="label">{topic.title} · part {at + 1} of {pages.length}</span>
+            )}
+            {at > 0 && !pageHeading && <div style={{ height: 8 }} />}
+            {topic.blocks.slice(page.start, page.end).map((b, k) => (
+              <BlockView key={page.start + k} block={b} index={page.start + k} ctx={ctx} />
             ))}
             {topic.blocks.length === 0 && <p className="rd-p muted">Your notes have exercises under this heading but no explanation. Head to Practice.</p>}
           </article>
-          <div className="center" style={{ gap: 8, padding: '8px 22px 96px' }}>
-            <Button3D sheen onClick={() => setTab('practice')}>
-              <Icon name="pencil" size={18} /> Practise this lesson
-            </Button3D>
-            {nextTopic && (
-              <button className="linkbtn" onClick={() => replace({ name: 'lesson', topicId: nextTopic.id })}>
-                Next: {nextTopic.title} <Icon name="chevron" size={15} />
-              </button>
-            )}
-          </div>
+          {lastOne ? (
+            <div className="center" style={{ gap: 8, padding: '8px 22px 96px' }}>
+              <Button3D sheen onClick={() => setTab('practice')}>
+                <Icon name="pencil" size={18} /> Practise this lesson
+              </Button3D>
+              {pages.length > 1 && (
+                <button className="linkbtn" onClick={() => goPage(at - 1)}>
+                  <Icon name="back" size={15} /> Previous part
+                </button>
+              )}
+              {nextTopic && (
+                <button className="linkbtn" onClick={() => replace({ name: 'lesson', topicId: nextTopic.id })}>
+                  Next: {nextTopic.title} <Icon name="chevron" size={15} />
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="page-nav">
+              <button className="page-back" onClick={() => goPage(at - 1)} disabled={at === 0} aria-label="Previous part"><Icon name="back" size={20} /></button>
+              <Button3D onClick={() => goPage(at + 1)}>
+                Continue <span style={{ opacity: 0.75, fontWeight: 500 }}>· {at + 1}/{pages.length}</span> <Icon name="arrow" size={18} />
+              </Button3D>
+            </div>
+          )}
         </div>
       ) : (
         <TopicPractice topic={topic} doc={doc} />

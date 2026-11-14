@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from 'react';
 import { Lera } from '../mascot/Lera';
 import { useStore } from '../store';
 import { badges, levelOf, longestStreak, monthGrid, totalXp, weekStrip, xpByDay } from '../store/game';
@@ -32,10 +33,18 @@ export function StreakScreen() {
   const earned = all.filter((b) => b.earned).length;
   const nextMilestone = MILESTONES.find((m) => m > days) ?? days + 50;
   const peak = Math.max(1, ...month.map((d) => d.xp));
+  // the header floats above the page: content scrolls underneath it, and it folds down to the week strip
+  const hero = useRef<HTMLDivElement | null>(null);
+  const [heroH, setHeroH] = useState(360);
+  const [compact, setCompact] = useState(false);
+  useLayoutEffect(() => {
+    if (hero.current && !compact) setHeroH(hero.current.offsetHeight);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days, doneToday]);
 
   return (
     <div className="screen streak-screen" data-dir="1">
-      <div className="streak-hero">
+      <div className={`streak-hero ${compact ? 'compact' : ''}`} ref={hero}>
         <div className="topbar" style={{ color: '#fff' }}>
           <button className="iconbtn onflame" onClick={back} aria-label="Back"><Icon name="back" /></button>
           <h1 style={{ color: '#fff' }}>Streak</h1>
@@ -61,8 +70,8 @@ export function StreakScreen() {
         </div>
       </div>
 
-      <div className="scroll">
-        <div className="stagger" style={{ padding: '16px 20px 30px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div className="scroll streak-scroll" onScroll={(e: { currentTarget: HTMLElement }) => setCompact(e.currentTarget.scrollTop > 28)}>
+        <div className="stagger" style={{ padding: `${heroH + 18}px 20px 30px`, display: 'flex', flexDirection: 'column', gap: 14 }}>
           {!doneToday && (
             <div className="center">
               <Button3D sheen onClick={() => go({ name: 'practice' })}><Icon name="flame" size={18} fill /> {days > 0 ? 'Keep my streak' : 'Start my streak'}</Button3D>

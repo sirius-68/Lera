@@ -36,6 +36,8 @@ const blockText = (b: Block | undefined, item: number): string => {
   if (!b) return '';
   if (b.t === 'list') return b.items[item] ?? '';
   if (b.t === 'example') return b.lines[item] ?? '';
+  // a formula on its own line is highlighted whole
+  if (b.t === 'math') return `$${b.text}$`;
   return b.text;
 };
 
