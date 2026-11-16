@@ -1,6 +1,7 @@
 name: Deploy the AI router
 
 # Puts backend/supabase/functions/lera-ai on your Supabase project and hands it the AI keys.
+# (--yes: the CLI asks before changing a project, and a workflow has no one to answer.)
 # The keys go from GitHub's secrets straight to Supabase's; they are never given to an app build.
 #
 # Repository secrets it uses:
@@ -74,7 +75,7 @@ jobs:
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           supabase link --project-ref "$PROJECT_REF"
-          supabase db push --remote --password "$SUPABASE_DB_PASSWORD"
+          supabase db push --remote --password "$SUPABASE_DB_PASSWORD" --yes
 
       - name: Hand the keys to Supabase
         if: env.skip != 'true'
@@ -87,14 +88,14 @@ jobs:
           args=""
           [ -n "$GEMINI_API_KEY" ] && args="$args GEMINI_API_KEY=$GEMINI_API_KEY"
           [ -n "$ANTHROPIC_API_KEY" ] && args="$args ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY"
-          supabase secrets set --project-ref "$PROJECT_REF" $args > /dev/null
+          supabase secrets set --remote="$PROJECT_REF" --yes $args > /dev/null
           echo "Keys stored on Supabase."
 
       - name: Deploy
         if: env.skip != 'true'
         working-directory: backend
         run: |
-          supabase functions deploy lera-ai --project-ref "$PROJECT_REF" --no-verify-jwt
+          supabase functions deploy lera-ai --remote="$PROJECT_REF" --no-verify-jwt --yes
           echo "### AI router is live" >> "$GITHUB_STEP_SUMMARY"
           echo "https://$PROJECT_REF.supabase.co/functions/v1/lera-ai" >> "$GITHUB_STEP_SUMMARY"
 
