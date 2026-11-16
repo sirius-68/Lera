@@ -78,6 +78,9 @@ export function namespaceDoc(doc: LeraDoc): LeraDoc {
   };
 }
 
+/** The longest file, in pages, that is handed to the AI to arrange. */
+export const AI_PAGE_LIMIT = 120;
+
 export interface IngestOptions {
   ai?: AiConfig | null;
   onProgress?: (p: IngestProgress) => void;
@@ -113,8 +116,9 @@ export async function ingestBytes(bytes: Uint8Array, fileName: string, opts: Ing
   report('structuring', 0.5);
 
   let doc: LeraDoc;
-  // a whole book goes through the built-in reader: its own contents are a better guide than a model's guess, and far quicker
-  if (aiReady(opts.ai) && (raw.pages ?? 0) <= 40) {
+  // Up to about 120 pages the AI arranges the file. A whole book goes through the built-in reader: its own contents
+  // page is a better guide than a model's guess, and it takes seconds where the AI would take many minutes.
+  if (aiReady(opts.ai) && (raw.pages ?? 0) <= AI_PAGE_LIMIT) {
     try {
       doc = await aiStructure(opts.ai, raw, (f) => report('structuring', 0.5 + f * 0.3), opts.signal);
     } catch (e) {
@@ -125,6 +129,7 @@ export async function ingestBytes(bytes: Uint8Array, fileName: string, opts: Ing
     }
   } else {
     doc = structureDoc(raw);
+    if (aiReady(opts.ai)) doc.warnings.unshift(`This file is ${raw.pages} pages, so it was arranged by Lera’s built-in reader, not the AI (which takes files up to ${AI_PAGE_LIMIT} pages). The AI still explains, checks and answers inside it.`);
   }
   if (doc.units.length === 0) throw new Error('There wasn’t enough readable text in this file to build lessons from.');
   doc = namespaceDoc(doc);

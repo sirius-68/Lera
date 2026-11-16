@@ -129,7 +129,9 @@ export async function aiStructure(
   const glossary: Record<string, string> = {};
   let title = local.title;
 
-  for (let i = 0; i < chunks.length; i++) {
+  // The pieces are read three at a time (a long file would otherwise take minutes), then put together in order.
+  // A piece that fails is asked for once more before the whole reading is given up.
+  const readChunk = async (i: number): Promise<AiDoc> => {
     const messages: ChatMessage[] = [
       { role: 'system', content: STRUCTURE_PROMPT },
       {
@@ -137,11 +139,33 @@ export async function aiStructure(
         content: `File: ${raw.fileName}${chunks.length > 1 ? ` (part ${i + 1} of ${chunks.length})` : ''}\n\n${renderParas(chunks[i])}`,
       },
     ];
-    const reply = await chat(config, messages, { task: 'structure', json: true, temperature: 0.1, signal });
-    const data = extractJson<AiDoc>(reply);
-    if (!data || !Array.isArray(data.units)) throw new Error('The AI reply was not in the expected shape.');
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const data = extractJson<AiDoc>(await chat(config, messages, { task: 'structure', json: true, temperature: 0.1, signal }));
+        if (data && Array.isArray(data.units)) return data;
+        if (attempt) throw new Error('The AI reply was not in the expected shape.');
+      } catch (e) {
+        if (attempt || (e instanceof DOMException && e.name === 'AbortError')) throw e;
+      }
+    }
+  };
+  const replies: AiDoc[] = new Array(chunks.length);
+  let next = 0;
+  let finished = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(3, chunks.length) }, async () => {
+      while (next < chunks.length) {
+        const i = next++;
+        replies[i] = await readChunk(i);
+        onProgress?.(++finished / chunks.length);
+      }
+    }),
+  );
+
+  for (let i = 0; i < chunks.length; i++) {
+    const data = replies[i];
     if (i === 0 && typeof data.title === 'string' && data.title.trim()) title = data.title.trim();
-    for (const u of data.units) {
+    for (const u of data.units ?? []) {
       const unit: Unit = { id: `u${units.length + 1}`, title: (u.title ?? '').trim() || `Unit ${units.length + 1}`, topics: [] };
       for (const t of u.topics ?? []) {
         const id = `${unit.id}t${unit.topics.length + 1}`;
@@ -164,7 +188,6 @@ export async function aiStructure(
     for (const [k, v] of Object.entries(data.glossary ?? {})) {
       if (typeof v === 'string' && k.length <= 40) glossary[k.toLowerCase()] = v;
     }
-    onProgress?.((i + 1) / chunks.length);
   }
 
   const topicCount = units.reduce((n, u) => n + u.topics.length, 0);

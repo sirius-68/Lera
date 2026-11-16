@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
-import { ChatRequest, firstJson, handle, plan, route, TASKS } from './router.ts';
+import { beforeEach, test } from 'node:test';
+import { ChatRequest, firstJson, forgetResting, handle, plan, route, TASKS } from './router.ts';
+
+beforeEach(() => forgetResting());
 
 /** A pretend provider: answers by model name, and records who was asked. */
 function fake(answers: Record<string, string | number>) {
@@ -45,6 +47,7 @@ test('a translation must come back with as many paragraphs as went in', async ()
 test('a busy model is skipped; a request the provider calls wrong is not retried', async () => {
   const busy = fake({ 'claude-sonnet-5-5': 529, 'claude-opus-5-5': 'Here is why' });
   assert.equal((await route(req('chat'), env, busy.fetcher)).reply, 'Here is why');
+  forgetResting();
   const bad = fake({ 'claude-sonnet-5-5': 400, 'claude-opus-5-5': 'never' });
   await assert.rejects(route(req('chat'), env, bad.fetcher));
   assert.deepEqual(bad.asked, ['claude-sonnet-5-5']);
@@ -122,4 +125,32 @@ test('the app’s own screens may call it from their web view; other websites ma
   assert.equal((await ask('https://lera.app.local')).headers.get('access-control-allow-origin'), 'https://lera.app.local');
   assert.equal((await ask('https://localhost')).headers.get('access-control-allow-origin'), 'https://localhost');
   assert.equal((await ask('https://someone-else.example')).headers.get('access-control-allow-origin'), null);
+});
+
+test('a model that just failed is not waited for again: the next question goes straight to one that works', async () => {
+  const f = fake({ 'claude-sonnet-5-5': 503, 'claude-opus-5-5': 429, 'claude-haiku-5-5': 'from the small one' });
+  const first = await route(req('chat'), env, f.fetcher);
+  assert.deepEqual(f.asked, ['claude-sonnet-5-5', 'claude-opus-5-5', 'claude-haiku-5-5']);
+  assert.equal(first.reply, 'from the small one');
+  f.asked.length = 0;
+  const second = await route(req('chat'), env, f.fetcher);
+  assert.deepEqual(f.asked, ['claude-haiku-5-5']);
+  assert.equal(second.reply, 'from the small one');
+});
+
+test('a model that hangs is given up on', async () => {
+  const fetcher = ((_url: string, init: RequestInit) => {
+    const model = String(JSON.parse(String(init.body)).model);
+    if (model !== 'claude-sonnet-5-5') return Promise.resolve(new Response(JSON.stringify({ content: [{ type: 'text', text: 'quick' }] }), { status: 200 }));
+    return new Promise<Response>((_res, rej) => init.signal?.addEventListener('abort', () => rej(init.signal?.reason)));
+  }) as typeof fetch;
+  const before = TASKS.chat.timeoutMs;
+  TASKS.chat.timeoutMs = 60;
+  // Node does not stay awake for a timeout signal alone; a real server always has the connection keeping it up
+  const awake = setTimeout(() => undefined, 2000);
+  const a = await route(req('chat'), env, fetcher);
+  clearTimeout(awake);
+  TASKS.chat.timeoutMs = before;
+  assert.equal(a.reply, 'quick');
+  assert.match(a.notes.join(' '), /took too long/);
 });

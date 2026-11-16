@@ -14,6 +14,8 @@ export type Tier = 'easy' | 'medium' | 'hard';
 export interface Task {
   /** The models to try, in order. The first is the usual one; the rest are where it goes when an answer fails its check. */
   ladder: Tier[];
+  /** How long one model may take before the next is asked. Default 15 seconds; reading a book gets longer. */
+  timeoutMs?: number;
   /** The most a reply may be, whatever the app asks for. Stops the router being used as a free general chatbot. */
   maxTokens: number;
   /** A reply that fails this is not passed on; the next model is asked instead. */
@@ -70,11 +72,12 @@ const lastUser = (r: ChatRequest): string => [...r.messages].reverse().find((m) 
  */
 export const TASKS: Record<string, Task> = {
   // turning a book into chapters, lessons, examples and exercises: long, messy, and it has to be right
-  structure: { ladder: ['hard'], maxTokens: 8000, check: (r) => isObject(firstJson(r)) && Array.isArray((firstJson(r) as { units?: unknown }).units) },
+  structure: { ladder: ['hard'], maxTokens: 8000, timeoutMs: 100_000, check: (r) => isObject(firstJson(r)) && Array.isArray((firstJson(r) as { units?: unknown }).units) },
   // a whole book into the app's language: careful, but not deep reasoning
   translate: {
     ladder: ['medium', 'hard'],
     maxTokens: 4000,
+    timeoutMs: 60_000,
     check: (r, req) => {
       const out = firstJson(r);
       const sent = firstJson(lastUser(req));
@@ -142,9 +145,20 @@ class Upstream extends Error {
  */
 const retryable = (status: number): boolean => status === 403 || status === 404 || status === 408 || status === 429 || status === 529 || status >= 500;
 
+/**
+ * Models that just failed are left alone for a while, so a student does not wait for the same failure on every
+ * question: out of quota or not on this plan for 15 minutes, busy or too slow for 5 minutes. Kept in memory;
+ * a fresh copy of the function simply learns it again on its first request.
+ */
+const resting = new Map<string, number>();
+export const forgetResting = (): void => resting.clear();
+const rest = (model: string, status: number, now: number): void => {
+  resting.set(model, now + (status === 429 || status === 403 || status === 404 ? 15 * 60_000 : 5 * 60_000));
+};
+
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
 
-async function callModel(model: string, req: ChatRequest, maxTokens: number, env: Env, fetcher: typeof fetch): Promise<string> {
+async function callModel(model: string, req: ChatRequest, maxTokens: number, env: Env, fetcher: typeof fetch, signal: AbortSignal): Promise<string> {
   const [provider, ...rest] = model.split('/');
   const name = rest.join('/');
   const temperature = typeof req.temperature === 'number' ? Math.max(0, Math.min(1, req.temperature)) : undefined;
@@ -155,6 +169,7 @@ async function callModel(model: string, req: ChatRequest, maxTokens: number, env
     const messages = req.messages.filter((m) => m.role !== 'system').map((m) => ({ role: m.role, content: m.content }));
     const res = await fetcher('https://api.anthropic.com/v1/messages', {
       method: 'POST',
+      signal,
       headers: { 'content-type': 'application/json', 'x-api-key': env.ANTHROPIC_API_KEY, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({ model: name, max_tokens: maxTokens, ...(system ? { system } : {}), messages, ...(temperature !== undefined ? { temperature } : {}) }),
     });
@@ -170,6 +185,7 @@ async function callModel(model: string, req: ChatRequest, maxTokens: number, env
     if (provider === 'gemini' && !key) throw new Upstream('GEMINI_API_KEY is not set on the server.', 500);
     const res = await fetcher(`${url.replace(/\/+$/, '')}/chat/completions`, {
       method: 'POST',
+      signal,
       headers: { 'content-type': 'application/json', ...(key ? { authorization: `Bearer ${key}` } : {}) },
       body: JSON.stringify({ model: name, messages: req.messages, max_tokens: maxTokens, ...(temperature !== undefined ? { temperature } : {}) }),
     });
@@ -208,21 +224,29 @@ export async function route(req: ChatRequest, env: Env, fetcher: typeof fetch = 
   // if every model on the ladder is unavailable (not merely wrong), the others are asked too, strongest first,
   // so a job still gets an answer when, say, a free plan does not include the biggest model
   const spare: Tier[] = (['hard', 'medium', 'easy'] as Tier[]).filter((t) => !ladder.includes(t));
-  for (const tier of [...ladder, ...spare]) {
+  const now = Date.now();
+  const order = [...ladder, ...spare].map((tier) => ({ tier, model: modelFor(tier, env) }));
+  // models that failed moments ago go to the back of the queue: still asked if nothing else answers
+  const awake = order.filter((o) => (resting.get(o.model) ?? 0) <= now);
+  const asleep = order.filter((o) => (resting.get(o.model) ?? 0) > now);
+  for (const o of asleep) notes.push(`${o.model}: resting after a recent failure`);
+  for (const { tier, model } of [...awake, ...asleep]) {
     if (!ladder.includes(tier) && lastReply !== null) break;
-    const model = modelFor(tier, env);
     if (tried.includes(model)) continue;
     tried.push(model);
     try {
-      const reply = await callModel(model, req, maxTokens, env, fetcher);
+      const reply = await callModel(model, req, maxTokens, env, fetcher, AbortSignal.timeout(task.timeoutMs ?? 15_000));
       lastReply = reply;
       if (reply.trim() && (!task.check || task.check(reply, req))) return { reply, model, tried, notes };
       notes.push(`${model}: ${reply.trim() ? 'failed its check' : 'empty reply'}`);
     } catch (e) {
-      lastError = e instanceof Upstream ? e : new Upstream(String(e), 502);
-      notes.push(`${model}: ${lastError.status} ${lastError.message.replace(/^[^:]*:\s*\d+\s*/, '').replace(/\s+/g, ' ').slice(0, 140)}`);
+      const name = (e as { name?: string } | null)?.name;
+      const timedOut = name === 'TimeoutError' || name === 'AbortError';
+      lastError = e instanceof Upstream ? e : new Upstream(timedOut ? `${model}: took too long` : String(e), timedOut ? 504 : 502);
+      notes.push(`${model}: ${lastError.status} ${lastError.message.replace(/^[^:]*:\s*\d*\s*/, '').replace(/\s+/g, ' ').slice(0, 140)}`);
       // a request the provider calls wrong would be wrong everywhere: stop there
       if (!retryable(lastError.status)) throw lastError;
+      rest(model, lastError.status, now);
     }
   }
   // every model was asked: the last real answer is better than nothing, and the app checks it again itself
