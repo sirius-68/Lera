@@ -105,7 +105,7 @@ export interface Env {
   LERA_MODEL_HARD?: string;
   OPENAI_BASE_URL?: string;
   OPENAI_API_KEY?: string;
-  /** Web addresses allowed to call the router from a browser. The phone apps are not browsers and are not affected. */
+  /** More web addresses allowed to call the router from a browser (a web version of Lera). The apps are always allowed. */
   LERA_ALLOWED_ORIGINS?: string;
 }
 
@@ -225,10 +225,16 @@ export async function route(req: ChatRequest, env: Env, fetcher: typeof fetch = 
   throw lastError ?? new Upstream('No model gave an answer.', 502);
 }
 
+/**
+ * Where Lera's own screens run, so their calls are always let through: the native app's web view
+ * (apps/mobile/host/Island.tsx) and the older Capacitor app on Android and iPhone.
+ */
+const APP_ORIGINS = ['https://lera.app.local', 'https://localhost', 'capacitor://localhost'];
+
 /** The whole HTTP side: takes the app's request (OpenAI chat format plus `lera`), answers in the same format. */
 export async function handle(request: Request, env: Env, opts: { fetcher?: typeof fetch; allow?: (device: string) => Promise<boolean> } = {}): Promise<Response> {
   const origin = request.headers.get('origin');
-  const allowed = (env.LERA_ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+  const allowed = [...APP_ORIGINS, ...(env.LERA_ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean)];
   const cors: Record<string, string> =
     origin && (allowed.includes('*') || allowed.includes(origin))
       ? { 'access-control-allow-origin': origin, 'access-control-allow-headers': 'content-type, x-lera-device, authorization, apikey', 'access-control-allow-methods': 'POST, OPTIONS', vary: 'origin' }

@@ -62,7 +62,7 @@ Set any of these with `supabase secrets set NAME=value`:
 | `LERA_MODEL_HARD` | The strongest model | `anthropic/claude-opus-5-5`, or `gemini/gemini-pro-latest` |
 | `OPENAI_BASE_URL`, `OPENAI_API_KEY` | Another company's OpenAI-compatible service. Then a tier can be `openai/<their model name>` | not set |
 | `LERA_DAILY_LIMIT` | AI calls one phone may make in a day; `0` switches it off | `200` |
-| `LERA_ALLOWED_ORIGINS` | Web addresses allowed to call it from a browser, comma separated. The phone apps don't need this | none |
+| `LERA_ALLOWED_ORIGINS` | More web addresses allowed to call it from a browser, comma separated (a web version of Lera). The apps' own screens are always allowed | none |
 
 Models change; when a newer one comes out, change the secret. Nothing in the app needs rebuilding.
 

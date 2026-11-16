@@ -115,3 +115,11 @@ test('when the strongest model is not on this plan, the next one down answers in
   assert.deepEqual(seen, ['gemini-pro-latest', 'gemini-flash-latest']);
   assert.equal(a.model, 'gemini/gemini-flash-latest');
 });
+
+test('the app’s own screens may call it from their web view; other websites may not', async () => {
+  const f = fake({ 'claude-sonnet-5-5': 'ok' });
+  const ask = (origin: string) => handle(new Request('https://x', { method: 'OPTIONS', headers: { origin } }), env, { fetcher: f.fetcher });
+  assert.equal((await ask('https://lera.app.local')).headers.get('access-control-allow-origin'), 'https://lera.app.local');
+  assert.equal((await ask('https://localhost')).headers.get('access-control-allow-origin'), 'https://localhost');
+  assert.equal((await ask('https://someone-else.example')).headers.get('access-control-allow-origin'), null);
+});
