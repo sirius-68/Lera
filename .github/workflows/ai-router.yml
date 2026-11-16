@@ -56,10 +56,14 @@ jobs:
         if: env.skip != 'true'
         run: npx --yes tsx --test "backend/**/*.test.ts"
 
-      - uses: supabase/setup-cli@v1
+      # the Supabase CLI from npm: its own installer looks up the latest release through GitHub's API,
+      # which shared runners often hit the rate limit on
+      - name: Install the Supabase CLI
         if: env.skip != 'true'
-        with:
-          version: latest
+        run: |
+          npm install --no-audit --no-fund --prefix "$RUNNER_TEMP/sb" supabase@latest
+          echo "$RUNNER_TEMP/sb/node_modules/.bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/sb/node_modules/.bin/supabase" --version
 
       - name: Daily-limit table
         if: env.skip != 'true' && env.HAS_DB_PASSWORD == 'true'
