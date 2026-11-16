@@ -108,3 +108,10 @@ jobs:
             -d '{"messages":[{"role":"user","content":"Reply with the single word: ready"}],"lera":{"task":"simplify"}}' \
             | tee /tmp/answer.json | head -c 400; echo
           grep -q '"choices"' /tmp/answer.json || { echo "::error::The router is deployed but did not answer. Check the function's logs on Supabase."; exit 1; }
+
+      - name: Time one request of each kind
+        if: env.skip != 'true'
+        env:
+          LERA_AI_URL: https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co/functions/v1/lera-ai
+        run: node backend/probe.mjs
+
