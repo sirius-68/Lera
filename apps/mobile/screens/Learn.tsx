@@ -58,7 +58,7 @@ function Glow() {
 function Stop({ t, sway, here, seen, m, st, solvedN }: { t: Topic; sway: number; here: boolean; seen: boolean; m: number; st: keyof typeof STATUS_LABEL; solvedN: number }) {
   const look = st === 'solid' ? FACE.solid : st === 'gap' ? FACE.gap : seen || st === 'shaky' || here ? FACE.on : FACE.idle;
   const down = useSharedValue(0);
-  const face = useAnimatedStyle(() => ({ transform: [{ translateY: down.value * 4 }], boxShadow: `0px ${5 - down.value * 4}px 0px ${look.edge}` }));
+  const face = useAnimatedStyle(() => ({ transform: [{ translateY: down.value * 4 }] }));
   return (
     <Pressable
       accessibilityRole="button"
@@ -75,11 +75,14 @@ function Stop({ t, sway, here, seen, m, st, solvedN }: { t: Topic; sway: number;
           <Circle cx={40} cy={40} r={36} fill="none" stroke={C.line} strokeWidth={6} />
           {m > 0 && <Circle cx={40} cy={40} r={36} fill="none" stroke={st === 'solid' ? C.ok : C.gold} strokeWidth={6} strokeLinecap="round" strokeDasharray={`${226 * m} 226`} />}
         </Svg>
-        <Animated.View style={[{ borderRadius: 29, marginBottom: 5 }, face]}>
+        <View style={{ marginBottom: 5 }}>
+          <View style={{ position: 'absolute', left: 0, right: 0, top: 5, bottom: -5, borderRadius: 29, backgroundColor: look.edge }} />
+          <Animated.View style={[{ borderRadius: 29 }, face]}>
           <LinearGradient colors={look.face} style={{ width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' }}>
             <Icon name={st === 'solid' ? 'check' : st === 'gap' ? 'target' : t.exercises.length ? 'pencil' : 'book'} size={st === 'solid' ? 28 : 25} stroke={st === 'solid' ? 3.2 : 2} color="#fff" />
           </LinearGradient>
-        </Animated.View>
+          </Animated.View>
+        </View>
       </View>
       <View style={{ alignItems: 'center' }}>
         <T w={700} s={14.5} lh={18} center>{t.title}</T>

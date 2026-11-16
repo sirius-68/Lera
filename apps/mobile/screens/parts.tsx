@@ -80,7 +80,7 @@ export function WeakCard({ w }: { w: Weakness }) {
         <View style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: k.icBg, alignItems: 'center', justifyContent: 'center' }}><Icon name={k.icon} size={18} color={k.ic} /></View>
         <View style={{ flex: 1 }}>
           <T w={700} s={15.5} lh={20}>{w.title}</T>
-          <Rich text={w.detail} s={14} lh={21} c={C.ink2} style={{ marginTop: 3 }} />
+          <Rich text={w.detail} s={14} lh={21} c={C.ink2} bold={C.ink2} style={{ marginTop: 3 }} />
           {w.topic && w.action.type !== 'lesson' && (
             <View style={[row(5), { marginTop: 6 }]}><Icon name="book" size={13} color={C.ink2} /><T w={600} s={12.5} c={C.ink2} style={{ flex: 1 }}>Taught in: {w.topic.title}</T></View>
           )}

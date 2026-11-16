@@ -90,10 +90,15 @@ export function Bar({ value, tone = '', height }: { value: number; tone?: string
   );
 }
 
+/** The hard edge under a raised thing: its own layer, a few pixels lower, which the face sinks onto. */
+const Edge = ({ color, depth, radius }: { color: string; depth: number; radius: number }) => (
+  <View style={{ position: 'absolute', left: 0, right: 0, top: depth, bottom: -depth, borderRadius: radius, backgroundColor: color }} />
+);
+
 /** Something that sits on a hard edge and sinks onto it when pressed: cards, tiles, banners. */
 export function Raised({ children, onPress, style, edge = C.line, depth = 3, radius = 22, haptic = 0, label, disabled }: { children: ReactNode; onPress?: () => void; style?: StyleProp<ViewStyle>; edge?: string; depth?: number; radius?: number; haptic?: number; label?: string; disabled?: boolean }) {
   const down = useSharedValue(0);
-  const face = useAnimatedStyle(() => ({ transform: [{ translateY: down.value * depth }], boxShadow: `0px ${depth * (1 - down.value)}px 0px ${edge}` }));
+  const face = useAnimatedStyle(() => ({ transform: [{ translateY: down.value * depth }] }));
   return (
     <Pressable
       accessibilityRole="button"
@@ -107,6 +112,7 @@ export function Raised({ children, onPress, style, edge = C.line, depth = 3, rad
       }}
       style={{ marginBottom: depth }}
     >
+      <Edge color={edge} depth={depth} radius={radius} />
       <Animated.View style={[{ borderRadius: radius }, style, face]}>{children}</Animated.View>
     </Pressable>
   );
@@ -124,7 +130,7 @@ const FACES = {
 export function Button3D({ children, onPress, variant = 'primary', small, disabled, style, icon }: { children: ReactNode; onPress?: () => void; variant?: 'primary' | 'dark' | 'secondary' | 'ok'; small?: boolean; disabled?: boolean; style?: StyleProp<ViewStyle>; icon?: string }) {
   const look = FACES[disabled ? 'off' : variant];
   const down = useSharedValue(0);
-  const face = useAnimatedStyle(() => ({ transform: [{ translateY: down.value * 3 }], boxShadow: `0px ${4 - down.value * 3}px 0px ${look.edge}` }));
+  const face = useAnimatedStyle(() => ({ transform: [{ translateY: down.value * 3 }] }));
   return (
     <Pressable
       accessibilityRole="button"
@@ -137,6 +143,7 @@ export function Button3D({ children, onPress, variant = 'primary', small, disabl
       }}
       style={[{ marginBottom: 4, alignSelf: small ? 'auto' : 'stretch', maxWidth: small ? undefined : 340, width: small ? undefined : '100%' }, style]}
     >
+      <Edge color={look.edge} depth={4} radius={999} />
       <Animated.View style={[{ borderRadius: 999 }, face]}>
         <LinearGradient colors={look.face} style={{ minHeight: small ? 42 : 54, paddingVertical: small ? 9 : 14, paddingHorizontal: small ? 18 : 22, borderRadius: 999, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderWidth: variant === 'secondary' && !disabled ? 1.5 : 0, borderColor: C.lineD }}>
           {icon && <Icon name={icon} size={small ? 17 : 18} color={look.text} />}
@@ -159,7 +166,12 @@ export function Seg<V extends string>({ options, value, onChange }: { options: {
   const thumb = useAnimatedStyle(() => ({ transform: [{ translateX: x.value * cell }] }));
   return (
     <View onLayout={(e) => setW(e.nativeEvent.layout.width)} style={{ flexDirection: 'row', padding: 4, borderRadius: 999, backgroundColor: C.tint }}>
-      {cell > 0 && <Animated.View style={[{ position: 'absolute', top: 4, bottom: 4, left: 4, width: cell, borderRadius: 999, backgroundColor: C.brand, boxShadow: `0px 2px 0px ${C.brandD}` }, thumb]} />}
+      {cell > 0 && (
+        <Animated.View style={[{ position: 'absolute', top: 4, bottom: 4, left: 4, width: cell }, thumb]}>
+          <View style={{ position: 'absolute', left: 0, right: 0, top: 2, bottom: -2, borderRadius: 999, backgroundColor: C.brandD }} />
+          <View style={{ flex: 1, borderRadius: 999, backgroundColor: C.brand }} />
+        </Animated.View>
+      )}
       {options.map((o) => (
         <Pressable key={o.id} accessibilityRole="tab" accessibilityState={{ selected: o.id === value }} onPress={() => { if (o.id !== value) buzz(5); onChange(o.id); }} style={{ flex: 1, paddingVertical: 9, paddingHorizontal: 6, alignItems: 'center' }}>
           <T w={600} s={15} c={o.id === value ? '#fff' : C.ink2} numberOfLines={1}>{o.label}</T>

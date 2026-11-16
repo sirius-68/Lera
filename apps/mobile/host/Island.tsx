@@ -20,6 +20,8 @@ export function Island() {
   const ref = useRef<WebView<object>>(null);
   const [backup, setBackup] = useState<string | undefined | null>(null);
   const first = useRef(insets);
+  const latest = useRef(insets);
+  latest.current = insets;
 
   useEffect(() => {
     readBackup().then((b) => setBackup(b));
@@ -49,7 +51,10 @@ export function Island() {
       containerStyle={styles.web}
       onMessage={(e) => {
         try {
-          handle(JSON.parse(e.nativeEvent.data) as Msg);
+          const m = JSON.parse(e.nativeEvent.data) as Msg;
+          handle(m);
+          // the page may have loaded before the phone reported its safe areas: tell it again once it is listening
+          if (m.t === 'ready') send({ t: 'insets', insets: { top: latest.current.top, bottom: latest.current.bottom } });
         } catch {
           /* not one of ours */
         }
@@ -75,6 +80,8 @@ export function Island() {
       contentInsetAdjustmentBehavior="never"
       keyboardDisplayRequiresUserAction={false}
       hideKeyboardAccessoryView
+      // the reader has its own toolbar for selected text; the system's would sit on top of it
+      menuItems={[]}
       allowsInlineMediaPlayback
       showsVerticalScrollIndicator={false}
       showsHorizontalScrollIndicator={false}

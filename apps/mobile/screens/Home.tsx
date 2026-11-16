@@ -80,9 +80,12 @@ export function HomeScreen() {
       <TopBar title={profile.name || 'Welcome'} small={hello()}>
         <Tap onPress={() => go({ name: 'streak' })} label={`${days}-day streak`} scale={0.92}>
           {doneToday ? (
-            <LinearGradient colors={['#ffb347', C.flame]} style={[row(5), { paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999, boxShadow: `0px 2px 0px ${C.flameD}` }]}>
-              <Icon name="flame" size={17} fill color="#fff" /><T w={700} s={14.5} c="#fff">{days}</T>
-            </LinearGradient>
+            <View style={{ marginBottom: 2 }}>
+              <View style={{ position: 'absolute', left: 0, right: 0, top: 2, bottom: -2, borderRadius: 999, backgroundColor: C.flameD }} />
+              <LinearGradient colors={['#ffb347', C.flame]} style={[row(5), { paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999 }]}>
+                <Icon name="flame" size={17} fill color="#fff" /><T w={700} s={14.5} c="#fff">{days}</T>
+              </LinearGradient>
+            </View>
           ) : (
             <View style={[row(5), { paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999, backgroundColor: '#fff3df' }]}>
               <Icon name="flame" size={17} fill color="#d97a00" /><T w={700} s={14.5} c="#d97a00">{days}</T>
@@ -93,7 +96,9 @@ export function HomeScreen() {
       </TopBar>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingTop: 4, paddingHorizontal: 18, paddingBottom: 26, gap: 14 }}>
         <Rise i={i++}>
-          <LinearGradient colors={['#8f88ff', C.brand, '#4b43c9']} locations={[0, 0.48, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 26, padding: 16, overflow: 'hidden', boxShadow: `0px 5px 0px ${C.brandDD}`, marginBottom: 5 }}>
+          <View style={{ marginBottom: 5 }}>
+          <View style={{ position: 'absolute', left: 0, right: 0, top: 5, bottom: -5, borderRadius: 26, backgroundColor: C.brandDD }} />
+          <LinearGradient colors={['#8f88ff', C.brand, '#4b43c9']} locations={[0, 0.48, 1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 26, padding: 16, overflow: 'hidden' }}>
             <View style={{ position: 'absolute', width: 190, height: 190, borderRadius: 95, right: -60, top: -70, backgroundColor: 'rgba(255,255,255,0.08)' }} />
             <View style={{ position: 'absolute', width: 120, height: 120, borderRadius: 60, right: 40, bottom: -70, backgroundColor: 'rgba(255,255,255,0.08)' }} />
             <View style={row(12)}>
@@ -128,6 +133,7 @@ export function HomeScreen() {
               <T w={700} s={16} c={C.brandD}>{docs.length === 0 ? 'Upload your notes' : due.length > 0 ? `Review ${due.length} due ${due.length === 1 ? 'idea' : 'ideas'}` : attempts.length ? 'Continue practising' : 'Start practising'}</T>
             </Raised>
           </LinearGradient>
+          </View>
         </Rise>
 
         {docs.length > 0 && (

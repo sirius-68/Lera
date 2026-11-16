@@ -1,7 +1,7 @@
 import { createElement, memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import Animated, { cancelAnimation, Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
-import Svg, { Circle, Ellipse, G, Line, Path, Polygon, Polyline, Rect, Text as SvgText } from 'react-native-svg';
+import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
+import Svg, { Circle, Ellipse, Line, Path, Polygon, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 import { buzz } from '../host/phone';
 import data from './moods.json';
 
@@ -19,7 +19,6 @@ export type Mood = keyof (typeof data)['moods'];
 type Shape = [part: 's' | 'b' | 'e' | 'f', type: string, attrs: Record<string, string | number>];
 const MOODS = (data as unknown as { moods: Record<string, Shape[]> }).moods;
 const TAGS: Record<string, unknown> = { path: Path, rect: Rect, circle: Circle, ellipse: Ellipse, line: Line, polygon: Polygon, polyline: Polyline, text: SvgText };
-const AnimatedG = Animated.createAnimatedComponent(G);
 
 const draw = (shapes: Shape[], from: number) =>
   shapes.map(([, type, a], i) => {
@@ -123,7 +122,7 @@ export const Lera = memo(function Lera({ size = 96, mood = 'idle', interactive =
     ],
   }));
   const fxStyle = useAnimatedStyle(() => ({ opacity: 0.75 + drift.value * 0.25, transform: [{ translateY: -drift.value * 0.035 * size }] }));
-  const eyes = useAnimatedProps(() => ({ transform: [{ translateY: 40.5 * (1 - lid.value) }, { scaleY: lid.value }] }));
+  const eyes = useAnimatedStyle(() => ({ transform: [{ scaleY: lid.value }] }));
 
   // shapes in drawing order, with the eyes gathered so they can blink together
   const layers = useMemo(() => {
@@ -142,17 +141,20 @@ export const Lera = memo(function Lera({ size = 96, mood = 'idle', interactive =
 
   const h = size * 1.16;
   const box = { position: 'absolute' as const, left: 0, top: 0, width: size, height: h };
-  let n = 0;
   const art = (
     <View style={{ width: size, height: h }} accessibilityRole={interactive ? 'button' : 'image'} accessibilityLabel={shown === 'sleepy' ? 'Lera, asleep. Tap to wake her.' : 'Lera'}>
       <Svg viewBox={data.viewBox} width={size} height={h} style={box}>{draw(layers.shadow, 0)}</Svg>
       <Animated.View style={[box, { transformOrigin: '50% 90%' }, bodyStyle]}>
-        <Svg viewBox={data.viewBox} width={size} height={h}>
-          {layers.body.map((group, gi) => {
-            const from = (n += 100);
-            return group.eye ? <AnimatedG key={`e${gi}`} animatedProps={eyes}>{draw(group.items, from)}</AnimatedG> : <G key={`b${gi}`}>{draw(group.items, from)}</G>;
-          })}
-        </Svg>
+        {layers.body.map((group, gi) =>
+          group.eye ? (
+            // the eyes close about their own middle line (40.5 in the drawing, 56.5% of the way down the box)
+            <Animated.View key={`e${gi}`} style={[box, { transformOrigin: '50% 56.5%' }, eyes]}>
+              <Svg viewBox={data.viewBox} width={size} height={h}>{draw(group.items, gi * 100)}</Svg>
+            </Animated.View>
+          ) : (
+            <Svg key={`b${gi}`} viewBox={data.viewBox} width={size} height={h} style={box}>{draw(group.items, gi * 100)}</Svg>
+          ),
+        )}
       </Animated.View>
       {layers.fx.length > 0 && (
         <Animated.View style={[box, fxStyle]} pointerEvents="none">
