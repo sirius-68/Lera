@@ -19,7 +19,8 @@ for (const [task, max, messages] of jobs) {
     let d = {};
     try { d = JSON.parse(text); } catch {}
     const reply = d.choices?.[0]?.message?.content ?? '';
-    console.log(`${task.padEnd(10)} ${String(Date.now() - t0).padStart(6)} ms  http ${res.status}  cors=${res.headers.get('access-control-allow-origin') ?? 'none'}  tried=${(d.tried ?? []).join(' > ')}  reply=${reply.length} chars  ${reply ? JSON.stringify(reply.slice(0, 90)) : text.slice(0, 200)}`);
+    console.log(`${task.padEnd(10)} ${String(Date.now() - t0).padStart(6)} ms  http ${res.status}  cors=${res.headers.get('access-control-allow-origin') ?? 'none'}  tried=${(d.tried ?? []).join(' > ')}  reply=${reply.length} chars  ${reply ? JSON.stringify(reply.slice(0, 60)) : text.slice(0, 200)}`);
+    for (const n of d.notes ?? []) console.log(`    passed over  ${n}`);
   } catch (e) {
     console.log(`${task.padEnd(10)} ${String(Date.now() - t0).padStart(6)} ms  FAILED ${e.message}`);
   }

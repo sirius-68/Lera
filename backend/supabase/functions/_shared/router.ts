@@ -186,6 +186,8 @@ export interface Answer {
   /** Which model's answer was used, and how many were tried before it. Logged, and sent back for testing. */
   model: string;
   tried: string[];
+  /** Why each model that did not answer was passed over: "busy 429", "empty", "failed its check". No keys, no content. */
+  notes: string[];
 }
 
 /** Run one request up the ladder until an answer passes its check. */
@@ -199,6 +201,7 @@ export async function route(req: ChatRequest, env: Env, fetcher: typeof fetch = 
   const maxTokens = Math.min(task.maxTokens, req.max_tokens && req.max_tokens > 0 ? req.max_tokens : task.maxTokens);
 
   const tried: string[] = [];
+  const notes: string[] = [];
   let lastReply: string | null = null;
   let lastError: Upstream | null = null;
   const ladder = plan(task, req.lera?.level);
@@ -213,15 +216,17 @@ export async function route(req: ChatRequest, env: Env, fetcher: typeof fetch = 
     try {
       const reply = await callModel(model, req, maxTokens, env, fetcher);
       lastReply = reply;
-      if (reply.trim() && (!task.check || task.check(reply, req))) return { reply, model, tried };
+      if (reply.trim() && (!task.check || task.check(reply, req))) return { reply, model, tried, notes };
+      notes.push(`${model}: ${reply.trim() ? 'failed its check' : 'empty reply'}`);
     } catch (e) {
       lastError = e instanceof Upstream ? e : new Upstream(String(e), 502);
+      notes.push(`${model}: ${lastError.status} ${lastError.message.replace(/^[^:]*:\s*\d+\s*/, '').replace(/\s+/g, ' ').slice(0, 140)}`);
       // a request the provider calls wrong would be wrong everywhere: stop there
       if (!retryable(lastError.status)) throw lastError;
     }
   }
   // every model was asked: the last real answer is better than nothing, and the app checks it again itself
-  if (lastReply !== null && lastReply.trim()) return { reply: lastReply, model: tried[tried.length - 1], tried };
+  if (lastReply !== null && lastReply.trim()) return { reply: lastReply, model: tried[tried.length - 1], tried, notes };
   throw lastError ?? new Upstream('No model gave an answer.', 502);
 }
 
@@ -255,7 +260,7 @@ export async function handle(request: Request, env: Env, opts: { fetcher?: typeo
   }
   try {
     const answer = await route(body, env, opts.fetcher);
-    return json(200, { model: answer.model, tried: answer.tried, choices: [{ index: 0, message: { role: 'assistant', content: answer.reply }, finish_reason: 'stop' }] });
+    return json(200, { model: answer.model, tried: answer.tried, notes: answer.notes, choices: [{ index: 0, message: { role: 'assistant', content: answer.reply }, finish_reason: 'stop' }] });
   } catch (e) {
     const status = e instanceof Upstream ? e.status : 500;
     // provider details stay in the server log; the app gets a plain message
