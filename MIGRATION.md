@@ -1,5 +1,10 @@
 # Lera: moving to native Android and iOS
 
+> **Where this stands (branch `native`, `apps/mobile`):** the native app is complete in the sense of rule 1,
+> nothing is lost. The tabs, navigation, Lera, widgets (Android), reminders and haptics are native. The
+> lesson reader, practice, import, Ask Lera, notebook, settings, streak, onboarding and sign-in still run
+> from the existing screens inside the app, and are moved to native one at a time. See `apps/mobile/README.md`.
+
 A plan for rebuilding Lera as a native app for Android and iPhone without losing anything it does today.
 Written for the agent doing the work (Claude Fable 5.2), and for Ekole to check progress against.
 

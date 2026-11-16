@@ -70,7 +70,7 @@ jobs:
   # Does the iPhone app compile? Built for the simulator, unsigned: it proves the native side builds,
   # it is not something to install. A real iPhone build needs an Apple Developer account.
   ios:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 60
     continue-on-error: true
     steps:
@@ -93,5 +93,5 @@ jobs:
       - name: Compile for the simulator
         working-directory: apps/mobile/ios
         run: |
-          set -o pipefail
-          xcodebuild -workspace *.xcworkspace -scheme "$(ls -d *.xcodeproj | head -1 | sed 's/.xcodeproj//')" -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build | tail -40
+          xcodebuild -workspace *.xcworkspace -scheme "$(ls -d *.xcodeproj | head -1 | sed 's/.xcodeproj//')" -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build > /tmp/xcode.log 2>&1 || { grep -E "error:|error |BUILD FAILED" /tmp/xcode.log | head -40; exit 1; }
+          tail -3 /tmp/xcode.log

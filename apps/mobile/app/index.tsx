@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppState as Phone, BackHandler, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { Easing, FadeIn, FadeInDown, FadeOut, FadeOutDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,7 +12,7 @@ import { LessonsScreen } from '../screens/Learn';
 import { PracticeScreen } from '../screens/Practice';
 import { ProgressScreen } from '../screens/Progress';
 import { TabBar } from '../screens/TabBar';
-import { EASE, T } from '../ui/kit';
+import { Button3D, EASE, T } from '../ui/kit';
 import { C } from '../ui/theme';
 
 const SCREENS = { home: HomeScreen, lessons: LessonsScreen, practice: PracticeScreen, progress: ProgressScreen } as const;
@@ -41,6 +41,16 @@ export default function Shell() {
   const toast = useShell((s) => s.toast);
   const locked = useApp(gated);
   const covering = ready && (locked || deep);
+
+  // if the screens have not come up after a while, say so and offer to start them again
+  const [attempt, setAttempt] = useState(0);
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    setSlow(false);
+    if (ready) return;
+    const id = setTimeout(() => setSlow(true), 12000);
+    return () => clearTimeout(id);
+  }, [ready, attempt]);
 
   // 0 = the web screens are on screen, 1 = off to the right
   const off = useSharedValue(1);
@@ -100,11 +110,17 @@ export default function Shell() {
         </Animated.View>
       )}
       <Animated.View style={[StyleSheet.absoluteFill, islandStyle]} pointerEvents={covering ? 'auto' : 'none'}>
-        <Island />
+        <Island key={attempt} />
       </Animated.View>
       {!ready && (
         <Animated.View exiting={FadeOut.duration(260)} style={[StyleSheet.absoluteFill, styles.boot]}>
-          <Lera size={84} mood="idle" interactive={false} />
+          <Lera size={84} mood={slow ? 'confused' : 'idle'} interactive={false} />
+          {slow && (
+            <Animated.View entering={FadeIn} style={{ alignItems: 'center', gap: 12, marginTop: 18, paddingHorizontal: 30 }}>
+              <T c={C.ink2} center>This is taking longer than it should.</T>
+              <Button3D small onPress={() => setAttempt((n) => n + 1)}>Try again</Button3D>
+            </Animated.View>
+          )}
         </Animated.View>
       )}
       {toast && (
