@@ -1,0 +1,103 @@
+name: Deploy the AI router
+
+# Puts backend/supabase/functions/lera-ai on your Supabase project and hands it the AI keys.
+# The keys go from GitHub's secrets straight to Supabase's; they are never given to an app build.
+#
+# Repository secrets it uses:
+#   SUPABASE_ACCESS_TOKEN   from supabase.com, Account, Access Tokens
+#   SUPABASE_PROJECT_REF    the id in your project's address: https://<this>.supabase.co
+#   GEMINI_API_KEY          and/or ANTHROPIC_API_KEY
+#   SUPABASE_DB_PASSWORD    optional: with it, the daily-limit table is created too
+on:
+  push:
+    branches: [native, main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/ai-router.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ai-router
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      # secrets can't be tested in a step's `if`, so whether this one is there is worked out here
+      HAS_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD != '' }}
+    steps:
+      - name: Check the secrets are there
+        env:
+          HAS_GEMINI: ${{ secrets.GEMINI_API_KEY != '' }}
+          HAS_CLAUDE: ${{ secrets.ANTHROPIC_API_KEY != '' }}
+        run: |
+          missing=""
+          [ -n "$SUPABASE_ACCESS_TOKEN" ] || missing="$missing SUPABASE_ACCESS_TOKEN"
+          [ -n "$PROJECT_REF" ] || missing="$missing SUPABASE_PROJECT_REF"
+          [ "$HAS_GEMINI" = "true" ] || [ "$HAS_CLAUDE" = "true" ] || missing="$missing GEMINI_API_KEY-or-ANTHROPIC_API_KEY"
+          if [ -n "$missing" ]; then
+            echo "::warning::Not deployed. Add these repository secrets:$missing"
+            echo "skip=true" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/checkout@v4
+        if: env.skip != 'true'
+
+      - uses: actions/setup-node@v4
+        if: env.skip != 'true'
+        with:
+          node-version: 22
+
+      - name: Router tests
+        if: env.skip != 'true'
+        run: npx --yes tsx --test "backend/**/*.test.ts"
+
+      - uses: supabase/setup-cli@v1
+        if: env.skip != 'true'
+        with:
+          version: latest
+
+      - name: Daily-limit table
+        if: env.skip != 'true' && env.HAS_DB_PASSWORD == 'true'
+        working-directory: backend
+        env:
+          DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          supabase link --project-ref "$PROJECT_REF" --password "$DB_PASSWORD"
+          supabase db push --password "$DB_PASSWORD"
+
+      - name: Hand the keys to Supabase
+        if: env.skip != 'true'
+        working-directory: backend
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          set -e
+          args=""
+          [ -n "$GEMINI_API_KEY" ] && args="$args GEMINI_API_KEY=$GEMINI_API_KEY"
+          [ -n "$ANTHROPIC_API_KEY" ] && args="$args ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY"
+          supabase secrets set --project-ref "$PROJECT_REF" $args > /dev/null
+          echo "Keys stored on Supabase."
+
+      - name: Deploy
+        if: env.skip != 'true'
+        working-directory: backend
+        run: |
+          supabase functions deploy lera-ai --project-ref "$PROJECT_REF" --no-verify-jwt
+          echo "### AI router is live" >> "$GITHUB_STEP_SUMMARY"
+          echo "https://$PROJECT_REF.supabase.co/functions/v1/lera-ai" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Ask it one question
+        if: env.skip != 'true'
+        run: |
+          sleep 5
+          curl -sS -X POST "https://$PROJECT_REF.supabase.co/functions/v1/lera-ai" \
+            -H 'content-type: application/json' -H 'x-lera-device: deploy-check' \
+            -d '{"messages":[{"role":"user","content":"Reply with the single word: ready"}],"lera":{"task":"simplify"}}' \
+            | tee /tmp/answer.json | head -c 400; echo
+          grep -q '"choices"' /tmp/answer.json || { echo "::error::The router is deployed but did not answer. Check the function's logs on Supabase."; exit 1; }

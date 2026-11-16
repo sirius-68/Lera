@@ -94,9 +94,11 @@ export const TASKS: Record<string, Task> = {
 export interface Env {
   /** The Claude key, from the Claude Console. */
   ANTHROPIC_API_KEY?: string;
+  /** The Gemini key, from Google AI Studio. */
+  GEMINI_API_KEY?: string;
   /**
-   * Which model is each tier. "anthropic/<model>" or "openai/<model>". The second goes to any
-   * OpenAI-compatible service set below, so a tier can be another company's model.
+   * Which model is each tier: "anthropic/<model>", "gemini/<model>", or "openai/<model>" for any
+   * OpenAI-compatible service set below. Tiers can be different companies' models.
    */
   LERA_MODEL_EASY?: string;
   LERA_MODEL_MEDIUM?: string;
@@ -107,14 +109,16 @@ export interface Env {
   LERA_ALLOWED_ORIGINS?: string;
 }
 
-const DEFAULT_MODELS: Record<Tier, string> = {
-  easy: 'anthropic/claude-haiku-5-5',
-  medium: 'anthropic/claude-sonnet-5-5',
-  hard: 'anthropic/claude-opus-5-5',
+/** The models used when no tier is set, for whichever key the server has (Claude first if both). */
+const DEFAULT_MODELS: Record<'anthropic' | 'gemini', Record<Tier, string>> = {
+  anthropic: { easy: 'anthropic/claude-haiku-5-5', medium: 'anthropic/claude-sonnet-5-5', hard: 'anthropic/claude-opus-5-5' },
+  // the "-latest" names follow Google's newest model of each size, so this does not go stale
+  gemini: { easy: 'gemini/gemini-flash-lite-latest', medium: 'gemini/gemini-flash-latest', hard: 'gemini/gemini-pro-latest' },
 };
 
 export const modelFor = (tier: Tier, env: Env): string =>
-  (tier === 'easy' ? env.LERA_MODEL_EASY : tier === 'medium' ? env.LERA_MODEL_MEDIUM : env.LERA_MODEL_HARD) || DEFAULT_MODELS[tier];
+  (tier === 'easy' ? env.LERA_MODEL_EASY : tier === 'medium' ? env.LERA_MODEL_MEDIUM : env.LERA_MODEL_HARD) ||
+  DEFAULT_MODELS[env.ANTHROPIC_API_KEY || !env.GEMINI_API_KEY ? 'anthropic' : 'gemini'][tier];
 
 /** The models to try for a request, cheapest first, starting higher when the app says it is already hard. */
 export function plan(task: Task, level = 0): Tier[] {
@@ -132,8 +136,13 @@ class Upstream extends Error {
   }
 }
 
-/** Errors worth trying another model for: busy, overloaded, rate-limited, or down. A bad request is not one of them. */
-const retryable = (status: number): boolean => status === 408 || status === 429 || status === 529 || status >= 500;
+/**
+ * Errors worth trying another model for: busy, overloaded, rate-limited, down, or a model this key may not
+ * use (a free plan often leaves out the biggest model). A badly formed request is not one of them.
+ */
+const retryable = (status: number): boolean => status === 403 || status === 404 || status === 408 || status === 429 || status === 529 || status >= 500;
+
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
 
 async function callModel(model: string, req: ChatRequest, maxTokens: number, env: Env, fetcher: typeof fetch): Promise<string> {
   const [provider, ...rest] = model.split('/');
@@ -154,11 +163,14 @@ async function callModel(model: string, req: ChatRequest, maxTokens: number, env
     return (data.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join('');
   }
 
-  if (provider === 'openai') {
-    if (!env.OPENAI_BASE_URL) throw new Upstream('OPENAI_BASE_URL is not set on the server.', 500);
-    const res = await fetcher(`${env.OPENAI_BASE_URL.replace(/\/+$/, '')}/chat/completions`, {
+  if (provider === 'openai' || provider === 'gemini') {
+    const url = provider === 'gemini' ? GEMINI_URL : env.OPENAI_BASE_URL;
+    const key = provider === 'gemini' ? env.GEMINI_API_KEY : env.OPENAI_API_KEY;
+    if (!url) throw new Upstream('OPENAI_BASE_URL is not set on the server.', 500);
+    if (provider === 'gemini' && !key) throw new Upstream('GEMINI_API_KEY is not set on the server.', 500);
+    const res = await fetcher(`${url.replace(/\/+$/, '')}/chat/completions`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json', ...(env.OPENAI_API_KEY ? { authorization: `Bearer ${env.OPENAI_API_KEY}` } : {}) },
+      headers: { 'content-type': 'application/json', ...(key ? { authorization: `Bearer ${key}` } : {}) },
       body: JSON.stringify({ model: name, messages: req.messages, max_tokens: maxTokens, ...(temperature !== undefined ? { temperature } : {}) }),
     });
     if (!res.ok) throw new Upstream(`${model}: ${res.status} ${(await res.text().catch(() => '')).slice(0, 200)}`, res.status);
@@ -166,7 +178,7 @@ async function callModel(model: string, req: ChatRequest, maxTokens: number, env
     return data.choices?.[0]?.message?.content ?? '';
   }
 
-  throw new Upstream(`Unknown provider in "${model}". Use anthropic/<model> or openai/<model>.`, 500);
+  throw new Upstream(`Unknown provider in "${model}". Use anthropic/<model>, gemini/<model> or openai/<model>.`, 500);
 }
 
 export interface Answer {
@@ -189,8 +201,14 @@ export async function route(req: ChatRequest, env: Env, fetcher: typeof fetch = 
   const tried: string[] = [];
   let lastReply: string | null = null;
   let lastError: Upstream | null = null;
-  for (const tier of plan(task, req.lera?.level)) {
+  const ladder = plan(task, req.lera?.level);
+  // if every model on the ladder is unavailable (not merely wrong), the others are asked too, strongest first,
+  // so a job still gets an answer when, say, a free plan does not include the biggest model
+  const spare: Tier[] = (['hard', 'medium', 'easy'] as Tier[]).filter((t) => !ladder.includes(t));
+  for (const tier of [...ladder, ...spare]) {
+    if (!ladder.includes(tier) && lastReply !== null) break;
     const model = modelFor(tier, env);
+    if (tried.includes(model)) continue;
     tried.push(model);
     try {
       const reply = await callModel(model, req, maxTokens, env, fetcher);

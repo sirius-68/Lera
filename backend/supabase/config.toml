@@ -1,0 +1,6 @@
+# Only what the AI router needs. The project itself is chosen with --project-ref when deploying.
+project_id = "lera"
+
+[functions.lera-ai]
+# the phone apps call it without a Supabase sign-in; it protects itself (daily limit, reply ceilings, known jobs only)
+verify_jwt = false

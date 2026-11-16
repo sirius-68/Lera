@@ -92,3 +92,26 @@ test('JSON is found inside a chatty reply', () => {
   assert.deepEqual(firstJson('Sure! ```json\n["a", "b"]\n```'), ['a', 'b']);
   assert.equal(firstJson('none here'), undefined);
 });
+
+test('with only a Gemini key, every tier is a Gemini model, sent to Google’s address', async () => {
+  const seen: string[] = [];
+  const fetcher = (async (url: string, init: RequestInit) => {
+    seen.push(`${url} ${JSON.parse(String(init.body)).model} ${(init.headers as Record<string, string>).authorization}`);
+    return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] }), { status: 200 });
+  }) as typeof fetch;
+  await route(req('simplify'), { GEMINI_API_KEY: 'g-key' }, fetcher);
+  assert.deepEqual(seen, ['https://generativelanguage.googleapis.com/v1beta/openai/chat/completions gemini-flash-lite-latest Bearer g-key']);
+});
+
+test('when the strongest model is not on this plan, the next one down answers instead of nothing', async () => {
+  const seen: string[] = [];
+  const fetcher = (async (_url: string, init: RequestInit) => {
+    const model = String(JSON.parse(String(init.body)).model);
+    seen.push(model);
+    if (model === 'gemini-pro-latest') return new Response('not on the free plan', { status: 429 });
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"correct":true,"feedback":""}' } }] }), { status: 200 });
+  }) as typeof fetch;
+  const a = await route(req('checkOpen'), { GEMINI_API_KEY: 'g' }, fetcher);
+  assert.deepEqual(seen, ['gemini-pro-latest', 'gemini-flash-latest']);
+  assert.equal(a.model, 'gemini/gemini-flash-latest');
+});

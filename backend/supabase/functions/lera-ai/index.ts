@@ -1,11 +1,12 @@
 // Lera's AI router as a Supabase Edge Function. All the logic is in ../_shared/router.ts.
-//   supabase secrets set ANTHROPIC_API_KEY=...
+//   supabase secrets set GEMINI_API_KEY=...   (or ANTHROPIC_API_KEY=..., or both)
+//   Deployed by .github/workflows/ai-router.yml; by hand:
 //   supabase functions deploy lera-ai --no-verify-jwt
 import { Env, handle } from '../_shared/router.ts';
 
 declare const Deno: { env: { get(name: string): string | undefined }; serve(fn: (req: Request) => Response | Promise<Response>): void };
 
-const KEYS: (keyof Env)[] = ['ANTHROPIC_API_KEY', 'LERA_MODEL_EASY', 'LERA_MODEL_MEDIUM', 'LERA_MODEL_HARD', 'OPENAI_BASE_URL', 'OPENAI_API_KEY', 'LERA_ALLOWED_ORIGINS'];
+const KEYS: (keyof Env)[] = ['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'LERA_MODEL_EASY', 'LERA_MODEL_MEDIUM', 'LERA_MODEL_HARD', 'OPENAI_BASE_URL', 'OPENAI_API_KEY', 'LERA_ALLOWED_ORIGINS'];
 const env: Env = Object.fromEntries(KEYS.map((k) => [k, Deno.env.get(k)]));
 
 /** Calls a phone may make in a day. Set LERA_DAILY_LIMIT=0 to switch the limit off. */

@@ -12,7 +12,8 @@ jobs:
       # Optional AI backend, baked in at build time (see src/ai/config.ts).
       # Add these under Settings → Secrets and variables → Actions. Leave them unset to build without AI.
       # the address of Lera's AI router (backend/). No AI key is ever given to the build.
-      LERA_AI_URL: ${{ secrets.LERA_AI_URL }}
+      # set by hand, or worked out from the Supabase project the router is deployed to (ai-router.yml)
+      LERA_AI_URL: ${{ secrets.LERA_AI_URL || (secrets.SUPABASE_PROJECT_REF != '' && format('https://{0}.supabase.co/functions/v1/lera-ai', secrets.SUPABASE_PROJECT_REF)) || '' }}
     steps:
       - uses: actions/checkout@v5
 

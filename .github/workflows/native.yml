@@ -40,7 +40,8 @@ jobs:
         working-directory: apps/mobile
         env:
           # the address of Lera's AI router (backend/). No AI key is ever given to the build.
-          LERA_AI_URL: ${{ secrets.LERA_AI_URL }}
+          # set by hand, or worked out from the Supabase project the router is deployed to (ai-router.yml)
+          LERA_AI_URL: ${{ secrets.LERA_AI_URL || (secrets.SUPABASE_PROJECT_REF != '' && format('https://{0}.supabase.co/functions/v1/lera-ai', secrets.SUPABASE_PROJECT_REF)) || '' }}
           LERA_AUTH_URL: ${{ secrets.LERA_AUTH_URL }}
         run: npm run prepare-native
 
