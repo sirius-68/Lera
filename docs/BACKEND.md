@@ -8,7 +8,7 @@ Build settings that switch these on:
 
 | Setting | What it does |
 |---|---|
-| `LERA_AI_BASE_URL`, `LERA_AI_MODEL`, `LERA_AI_KEY` | An OpenAI-compatible chat endpoint for the tutor (`src/ai/`) |
+| `LERA_AI_URL` | The address of Lera's AI router (`backend/`), which holds the keys and picks a model per job. See `backend/README.md` |
 | `LERA_AUTH_URL` | Profiles on a server instead of on the phone (section 4) |
 
 ---

@@ -347,7 +347,7 @@ Every line must work in the new app. Tick it only after trying it on both phones
 - An **Apple Developer account** ($99 a year) for iPhone builds, TestFlight and the App Store.
 - An **iPhone** to test on (or TestFlight on one).
 - A **real textbook PDF** for import testing.
-- Later: an **email service or backend** so reset codes are actually emailed, and the AI settings (`LERA_AI_BASE_URL`, `LERA_AI_MODEL`, `LERA_AI_KEY`) as build secrets.
+- Later: an **email service or backend** so reset codes are actually emailed, and the AI router deployed (`backend/README.md`), with its address as the `LERA_AI_URL` build secret.
 
 ---
 

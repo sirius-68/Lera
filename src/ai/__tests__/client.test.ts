@@ -41,7 +41,7 @@ const says = (content: string) => ({ status: 200, json: { choices: [{ message: {
 test('chat sends an OpenAI-style request and returns the reply text', async () => {
   seen.length = 0;
   reply = () => says('hello');
-  assert.equal(await chat(cfg(), [{ role: 'user', content: 'hi' }], { maxTokens: 20 }), 'hello');
+  assert.equal(await chat(cfg(), [{ role: 'user', content: 'hi' }], { task: 'chat', maxTokens: 20 }), 'hello');
   assert.equal(seen[0].path, '/v1/chat/completions');
   assert.equal(seen[0].auth, 'Bearer sk-test');
   assert.equal(seen[0].body.model, 'test-model');
@@ -51,16 +51,28 @@ test('chat sends an OpenAI-style request and returns the reply text', async () =
 test('a model that rejects JSON mode is retried without it', async () => {
   seen.length = 0;
   reply = (body) => (body.response_format ? { status: 400, json: { error: 'json mode unsupported' } } : says('{"ok":true}'));
-  assert.equal(await chat(cfg(), [{ role: 'user', content: 'x' }], { json: true }), '{"ok":true}');
+  assert.equal(await chat(cfg(), [{ role: 'user', content: 'x' }], { task: 'diagnose', json: true }), '{"ok":true}');
   assert.equal(seen.length, 2);
 });
 
 test('errors are turned into sentences a student can act on', async () => {
   reply = () => ({ status: 401, json: {} });
-  await assert.rejects(chat(cfg(), [{ role: 'user', content: 'x' }]), (e: unknown) => e instanceof AiError && e.status === 401 && /key was rejected/.test(e.message));
+  const job = { task: 'chat' } as const;
+  await assert.rejects(chat(cfg(), [{ role: 'user', content: 'x' }], job), (e: unknown) => e instanceof AiError && e.status === 401 && /turned the request away/.test(e.message));
   reply = () => ({ status: 429, json: {} });
-  await assert.rejects(chat(cfg(), [{ role: 'user', content: 'x' }]), /free limit/);
-  await assert.rejects(chat({ ...cfg(), baseUrl: 'http://127.0.0.1:9/v1' }, [{ role: 'user', content: 'x' }]), /Couldn’t reach/);
+  await assert.rejects(chat(cfg(), [{ role: 'user', content: 'x' }], job), /Today’s limit/);
+  await assert.rejects(chat({ ...cfg(), baseUrl: 'http://127.0.0.1:9/v1' }, [{ role: 'user', content: 'x' }], job), /Couldn’t reach/);
+});
+
+test('through Lera’s router: one address, the job named, no key sent, the phone’s id for the daily limit', async () => {
+  seen.length = 0;
+  reply = () => says('routed');
+  const router: AiConfig = { provider: 'lera', baseUrl: `${url.replace(/\/+$/, '')}/lera-ai`, model: 'auto', apiKey: '' };
+  assert.equal(await chat(router, [{ role: 'user', content: 'x' }], { task: 'translate', json: true }), 'routed');
+  assert.equal(seen[0].path, '/v1/lera-ai');
+  assert.equal(seen[0].auth, undefined);
+  assert.deepEqual(seen[0].body.lera, { task: 'translate', level: 0 });
+  assert.equal(seen[0].body.response_format, undefined);
 });
 
 test('JSON is recovered from a chatty reply', () => {
@@ -86,8 +98,8 @@ test('when the model returns rubbish, notes are still organised by the built-in 
 
 test('readiness needs an address, a model and (usually) a key', () => {
   assert.equal(aiReady(NO_AI), false);
-  assert.equal(aiReady({ provider: 'gemini', baseUrl: 'https://x', model: 'm', apiKey: '' }), false);
-  assert.equal(aiReady({ provider: 'ollama', baseUrl: 'http://localhost:11434/v1', model: 'm', apiKey: '' }), true);
+  assert.equal(aiReady({ provider: 'custom', baseUrl: 'https://x', model: '', apiKey: '' }), false);
+  assert.equal(aiReady({ provider: 'lera', baseUrl: 'https://x/lera-ai', model: 'auto', apiKey: '' }), true);
 });
 
 test('without a model, Lera still answers from the concept library', () => {

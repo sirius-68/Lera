@@ -137,7 +137,7 @@ export async function aiStructure(
         content: `File: ${raw.fileName}${chunks.length > 1 ? ` (part ${i + 1} of ${chunks.length})` : ''}\n\n${renderParas(chunks[i])}`,
       },
     ];
-    const reply = await chat(config, messages, { json: true, temperature: 0.1, signal });
+    const reply = await chat(config, messages, { task: 'structure', json: true, temperature: 0.1, signal });
     const data = extractJson<AiDoc>(reply);
     if (!data || !Array.isArray(data.units)) throw new Error('The AI reply was not in the expected shape.');
     if (i === 0 && typeof data.title === 'string' && data.title.trim()) title = data.title.trim();
@@ -228,7 +228,9 @@ Answer in at most 80 words. If the student asks for the answer to the problem th
 The algebra checker's verdict in the context below is always right; never contradict it.
 
 ${describe(ctx)}`;
-  return chat(config, [{ role: 'system', content: system }, ...history.slice(-8)], { temperature: 0.4, maxTokens: 320, signal });
+  // still asking after three questions: the router starts one model higher
+  const asked = history.filter((m) => m.role === 'user').length;
+  return chat(config, [{ role: 'system', content: system }, ...history.slice(-8)], { task: 'chat', level: asked >= 3 ? 1 : 0, temperature: 0.4, maxTokens: 320, signal });
 }
 
 /** A second opinion in words for a step the rule-based diagnosis could not name. */
@@ -245,7 +247,7 @@ Return ONLY JSON: {"title": string (max 9 words, states the rule), "message": st
       },
       { role: 'user', content: `Problem: ${problem.prompt} ${problem.given}\nLine above: ${prevLine}\nStudent's line: ${wrongLine}` },
     ],
-    { json: true, temperature: 0.1, maxTokens: 220, signal },
+    { task: 'diagnose', json: true, temperature: 0.1, maxTokens: 220, signal },
   );
   const data = extractJson<{ title?: string; message?: string; concept?: string }>(reply);
   if (!data?.title || !data.message) return null;
@@ -266,7 +268,7 @@ Return ONLY JSON: {"correct": boolean, "feedback": string (max 60 words; if wron
       },
       { role: 'user', content: `Problem: ${problem.prompt}\n\nWorking:\n${working.map((l, i) => `${i + 1}. ${l}`).join('\n')}` },
     ],
-    { json: true, temperature: 0.1, maxTokens: 260, signal },
+    { task: 'checkOpen', json: true, temperature: 0.1, maxTokens: 260, signal },
   );
   const data = extractJson<{ correct?: boolean; feedback?: string }>(reply);
   if (!data || typeof data.correct !== 'boolean') return null;
@@ -298,7 +300,7 @@ Idea: ${c.title}, ${c.short}`,
         content: `${input.problem ? `Problem: ${input.problem.prompt} ${input.problem.given}\n` : ''}${input.line ? `My line: ${input.line}\n` : ''}What the checker said: ${plain(input.title)} ${plain(input.message)}\nA plain version I was also shown: ${input.plain}`,
       },
     ],
-    { temperature: 0.4, maxTokens: 260, signal },
+    { task: 'simplify', temperature: 0.4, maxTokens: 260, signal },
   );
 }
 
@@ -331,7 +333,7 @@ Rules:
         },
         { role: 'user', content: JSON.stringify(batch) },
       ],
-      { json: true, temperature: 0, maxTokens: 3200, signal },
+      { task: 'translate', json: true, temperature: 0, maxTokens: 3200, signal },
     );
     const data = extractJson<string[]>(reply);
     // a batch that comes back the wrong shape is kept in the original language rather than guessed at

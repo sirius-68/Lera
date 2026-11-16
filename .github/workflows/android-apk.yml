@@ -11,9 +11,8 @@ jobs:
     env:
       # Optional AI backend, baked in at build time (see src/ai/config.ts).
       # Add these under Settings → Secrets and variables → Actions. Leave them unset to build without AI.
-      LERA_AI_BASE_URL: ${{ secrets.LERA_AI_BASE_URL }}
-      LERA_AI_MODEL: ${{ secrets.LERA_AI_MODEL }}
-      LERA_AI_KEY: ${{ secrets.LERA_AI_KEY }}
+      # the address of Lera's AI router (backend/). No AI key is ever given to the build.
+      LERA_AI_URL: ${{ secrets.LERA_AI_URL }}
     steps:
       - uses: actions/checkout@v5
 

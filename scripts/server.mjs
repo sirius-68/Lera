@@ -1,9 +1,9 @@
 // A small static server for Lera.
 //   node scripts/server.mjs dist            serve a built folder on http://localhost:4173
 //
-// Optional AI proxy, so the key never reaches the browser:
-//   put LERA_AI_BASE_URL and LERA_AI_KEY in a .env file, then in the app choose
-//   Settings → AI → "Other", address /api/ai, and leave the key empty.
+// Lera's AI router on your own computer, so you can try the AI without deploying anything:
+//   put ANTHROPIC_API_KEY=... in a .env file, then build with LERA_AI_URL=/api/ai
+//   (LERA_AI_URL=/api/ai npm run preview). The key stays in .env; the page never sees it.
 import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { existsSync, readFileSync } from 'node:fs';
@@ -29,28 +29,26 @@ function loadEnv() {
   }
 }
 
-async function proxyAi(req, res, rest) {
-  const base = process.env.LERA_AI_BASE_URL;
-  const key = process.env.LERA_AI_KEY;
-  if (!base) {
-    res.writeHead(501, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'AI proxy is not configured. Set LERA_AI_BASE_URL (and LERA_AI_KEY) in .env.' }));
-    return;
-  }
+/** /api/ai: the same router as backend/supabase/functions/lera-ai, run here with the keys from .env. */
+async function routeAi(req, res) {
   const chunks = [];
   for await (const c of req) chunks.push(c);
+  let router;
   try {
-    const upstream = await fetch(base.replace(/\/+$/, '') + rest, {
-      method: req.method,
-      headers: { 'Content-Type': 'application/json', ...(key ? { Authorization: `Bearer ${key}` } : {}) },
-      body: req.method === 'GET' || req.method === 'HEAD' ? undefined : Buffer.concat(chunks),
-    });
-    res.writeHead(upstream.status, { 'Content-Type': upstream.headers.get('content-type') ?? 'application/json' });
-    res.end(Buffer.from(await upstream.arrayBuffer()));
+    router = await import('../backend/supabase/functions/_shared/router.ts');
   } catch (e) {
-    res.writeHead(502, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: `AI proxy could not reach the provider: ${e.message}` }));
+    res.writeHead(501, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: { message: `The AI router could not be loaded (needs Node 22.18 or newer): ${e.message}` } }));
+    return;
   }
+  const request = new Request('http://localhost/api/ai', {
+    method: req.method,
+    headers: Object.fromEntries(Object.entries(req.headers).filter(([, v]) => typeof v === 'string')),
+    body: req.method === 'POST' ? Buffer.concat(chunks) : undefined,
+  });
+  const answer = await router.handle(request, process.env);
+  res.writeHead(answer.status, Object.fromEntries(answer.headers.entries()));
+  res.end(Buffer.from(await answer.arrayBuffer()));
 }
 
 /** @param {{dir: string, port?: number, live?: boolean}} o */
@@ -60,7 +58,7 @@ export function serve({ dir, port = 4173, live = false }) {
   const clients = new Set();
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
-    if (url.pathname.startsWith('/api/ai/')) return proxyAi(req, res, url.pathname.slice('/api/ai'.length) + url.search);
+    if (url.pathname === '/api/ai') return routeAi(req, res);
     if (live && url.pathname === '/__live') {
       res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive' });
       res.write('retry: 500\n\n');

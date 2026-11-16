@@ -63,15 +63,13 @@ When the notes say something like "the graph of y = x² − 4 is a parabola", or
 
 Everything above works with no AI. A model adds: tidier lessons from messy files, open questions in **Ask Lera**, marking of word problems, and a simpler re-explanation when a student says one didn't make sense. It is never the judge: every exercise it extracts is re-parsed by the engine, every block it returns goes through the same finishing pass as the built-in reader, and it is told which idea it is talking about and to stay inside it.
 
-There is no key screen in the app. Set these when building (in GitHub Actions: repository secrets with the same names):
+There is no key screen in the app, and no key is ever built into it: anything inside an app can be copied out. The app talks to **Lera's AI router** (`backend/`), which holds the keys, picks a model for each job (small for wording, strongest for reading a book) and moves up a model when an answer fails its check. Set one value when building (in GitHub Actions: a repository secret of the same name):
 
 ```bash
-LERA_AI_BASE_URL=https://your-proxy.example.com/v1   # any OpenAI-compatible endpoint
-LERA_AI_MODEL=model-name
-LERA_AI_KEY=                                         # leave empty if the proxy holds the key
+LERA_AI_URL=https://<project>.supabase.co/functions/v1/lera-ai
 ```
 
-Anything built into an app can be extracted from it, so for a public release point `LERA_AI_BASE_URL` at your own server and keep the provider key there. `scripts/server.mjs` includes a small proxy (`/api/ai`) that does this.
+How to set the router up, and which model does which job: `backend/README.md`.
 
 ## Android
 

@@ -22,20 +22,38 @@ function headers(c: AiConfig): Record<string, string> {
 const base = (c: AiConfig): string => c.baseUrl.replace(/\/+$/, '');
 
 function friendly(status: number, body: string): string {
-  if (status === 401 || status === 403) return 'The AI key was rejected. Check it in Settings.';
-  if (status === 404) return 'That model name wasn’t found. Load the model list in Settings and pick one.';
-  if (status === 429) return 'The free limit for this AI key has been reached for now. Lera will carry on without it.';
+  if (status === 401 || status === 403) return 'The AI service turned the request away. Lera will carry on without it.';
+  if (status === 404) return 'The AI service wasn’t found at the address this app was built with.';
+  if (status === 429) return 'Today’s limit for Lera’s AI has been reached. Lera will carry on without it.';
   if (status >= 500) return 'The AI service is having trouble. Lera will carry on without it.';
   const detail = body.slice(0, 160).replace(/\s+/g, ' ');
   return `The AI service refused the request (${status}). ${detail}`;
+}
+
+/** The jobs Lera's AI router knows (backend/supabase/functions/_shared/router.ts). It picks the model for each. */
+export type AiTask = 'structure' | 'translate' | 'chat' | 'checkOpen' | 'diagnose' | 'simplify';
+
+/** A random id this phone keeps, so the router can hold each phone to a daily limit. It says nothing about the person. */
+function deviceId(): string {
+  try {
+    let id = localStorage.getItem('lera.device');
+    if (!id) {
+      id = `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+      localStorage.setItem('lera.device', id);
+    }
+    return id;
+  } catch {
+    return 'unknown';
+  }
 }
 
 /** One chat completion. Returns the reply text. */
 export async function chat(
   config: AiConfig,
   messages: ChatMessage[],
-  opts: { json?: boolean; temperature?: number; maxTokens?: number; signal?: AbortSignal } = {},
+  opts: { task: AiTask; level?: number; json?: boolean; temperature?: number; maxTokens?: number; signal?: AbortSignal },
 ): Promise<string> {
+  const router = config.provider === 'lera';
   const send = async (withJsonMode: boolean): Promise<Response> => {
     const body: Record<string, unknown> = {
       model: config.model,
@@ -44,9 +62,11 @@ export async function chat(
     };
     if (opts.maxTokens) body.max_tokens = opts.maxTokens;
     if (withJsonMode) body.response_format = { type: 'json_object' };
-    return fetch(`${base(config)}/chat/completions`, {
+    // the router chooses the model from the job; a plain endpoint gets an ordinary chat request
+    if (router) body.lera = { task: opts.task, level: opts.level ?? 0 };
+    return fetch(router ? base(config) : `${base(config)}/chat/completions`, {
       method: 'POST',
-      headers: headers(config),
+      headers: router ? { 'Content-Type': 'application/json', 'X-Lera-Device': deviceId() } : headers(config),
       body: JSON.stringify(body),
       signal: opts.signal,
     });
@@ -54,12 +74,12 @@ export async function chat(
 
   let res: Response;
   try {
-    res = await send(!!opts.json);
+    res = await send(!!opts.json && !router);
     // some models reject JSON mode; the prompt asks for JSON anyway, so retry without the flag
     if (res.status === 400 && opts.json) res = await send(false);
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') throw e;
-    throw new AiError('Couldn’t reach the AI service. Check the connection, or the address in Settings.');
+    throw new AiError('Couldn’t reach the AI service. Check the connection.');
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');

@@ -39,9 +39,8 @@ jobs:
       - name: Build the web screens the app carries, and copy the widgets in
         working-directory: apps/mobile
         env:
-          LERA_AI_BASE_URL: ${{ secrets.LERA_AI_BASE_URL }}
-          LERA_AI_MODEL: ${{ secrets.LERA_AI_MODEL }}
-          LERA_AI_KEY: ${{ secrets.LERA_AI_KEY }}
+          # the address of Lera's AI router (backend/). No AI key is ever given to the build.
+          LERA_AI_URL: ${{ secrets.LERA_AI_URL }}
           LERA_AUTH_URL: ${{ secrets.LERA_AUTH_URL }}
         run: npm run prepare-native
 

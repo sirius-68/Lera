@@ -36,14 +36,13 @@ export function options({ dev = false, outdir, singleFile = false } = {}) {
     define: {
       'process.env.NODE_ENV': dev ? '"development"' : '"production"',
       __SINGLE_FILE__: String(singleFile),
-      // the AI backend is chosen at build time (see src/ai/config.ts); empty values mean "no AI"
+      // the AI router is chosen at build time (see src/ai/config.ts); no key is ever built in
       __LERA_AUTH_URL__: JSON.stringify(process.env.LERA_AUTH_URL ?? ''),
       __LERA_AI__: JSON.stringify({
+        url: process.env.LERA_AI_URL ?? '',
         baseUrl: process.env.LERA_AI_BASE_URL ?? '',
         model: process.env.LERA_AI_MODEL ?? '',
-        key: process.env.LERA_AI_KEY ?? '',
-      }),
-    },
+      }),    },
     loader: {
       '.png': loader, '.jpg': loader, '.svg': loader, '.woff2': loader, '.woff': loader, '.ttf': loader, '.docx': loader,
     },
