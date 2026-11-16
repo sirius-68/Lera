@@ -4,3 +4,8 @@ dist*
 android
 ios
 expo-env.d.ts
+web/island.js
+# copied from android-overrides/ by scripts/sync-widgets.mjs
+modules/lera-widgets/android/src/main/res
+modules/lera-widgets/android/src/main/java/expo/modules/lerawidgets/StreakWidget.java
+modules/lera-widgets/android/src/main/java/expo/modules/lerawidgets/StreakWidgetWide.java

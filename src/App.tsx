@@ -13,8 +13,13 @@ import { useHydrated, useStore } from './store';
 import { Lera } from './mascot/Lera';
 import { back, Route, useNav } from './store/nav';
 import { Confirmer, Toaster } from './ui/kit';
+import { inHost } from './host';
+
+const TAB_ROUTES = ['home', 'lessons', 'practice', 'progress'];
 
 function Screen({ route, dir }: { route: Route; dir: number }) {
+  // inside the native app the four tabs are drawn natively; nothing of them is drawn here
+  if (inHost && TAB_ROUTES.includes(route.name)) return null;
   switch (route.name) {
     case 'home':
       return <HomeScreen />;
@@ -51,6 +56,12 @@ export function App() {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [overlay, stack]);
+
+  // over a native tab only a sheet (Ask Lera, a review) is drawn, so the page itself must be see-through
+  const clear = inHost && onboarded && !lockedOut && TAB_ROUTES.includes(stack[stack.length - 1].name);
+  useEffect(() => {
+    document.documentElement.classList.toggle('host-clear', clear);
+  }, [clear]);
 
   const ready = useHydrated();
   if (!ready) {

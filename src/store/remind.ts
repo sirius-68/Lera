@@ -7,6 +7,8 @@
  * schedule a notification for a time when it is closed.
  */
 
+import { ask, inHost, post } from '../host';
+
 export const STUDY_TIMES: Record<string, { label: string; hour: number; minute: number }> = {
   morning: { label: 'Morning · 8:00', hour: 8, minute: 0 },
   afternoon: { label: 'Afternoon · 14:30', hour: 14, minute: 30 },
@@ -29,6 +31,18 @@ function bridge(): Bridge | null {
 /** Ask for permission and, in the app, schedule the daily reminder. Resolves to whether reminders are on. */
 export async function enableReminders(studyTime?: string, name?: string): Promise<boolean> {
   const cap = bridge();
+  if (inHost) {
+    // the native app schedules the daily notification itself
+    const at = STUDY_TIMES[studyTime ?? 'evening'] ?? STUDY_TIMES.evening;
+    const res = await ask({
+      t: 'remind',
+      hour: at.hour,
+      minute: at.minute,
+      title: name ? `${name}, two minutes of maths?` : 'Two minutes of maths?',
+      body: 'One checked problem keeps your streak alive, and brings back an idea before it fades.',
+    });
+    return res?.ok === true;
+  }
   try {
     if (cap) {
       const res = (await cap.nativePromise!('LocalNotifications', 'requestPermissions', {})) as { display?: string } | undefined;
@@ -55,6 +69,10 @@ export async function enableReminders(studyTime?: string, name?: string): Promis
 }
 
 export async function disableReminders(): Promise<void> {
+  if (inHost) {
+    post({ t: 'remind-off' });
+    return;
+  }
   try {
     await bridge()?.nativePromise!('LocalNotifications', 'cancel', { notifications: [{ id: REMINDER_ID }] });
   } catch {

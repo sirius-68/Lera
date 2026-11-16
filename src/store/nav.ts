@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react';
 import { ConceptId, Problem } from '../engine/types';
+import { inHost, onHost, post } from '../host';
 
 /** Where the learner is. Screens are a stack so "back" always means what it looks like. */
 export type Route =
@@ -28,6 +29,8 @@ interface NavState {
 const TABS = ['home', 'lessons', 'practice', 'progress'];
 
 let nav: NavState = { stack: [{ name: 'home' }], dir: 0, overlay: null };
+/** What is on screen. The same as `nav`, except for the moment the native app is sliding these screens away. */
+let view: NavState = nav;
 const listeners = new Set<() => void>();
 
 /*
@@ -57,8 +60,26 @@ function syncHistory(): void {
   }
 }
 
+/** Inside the native app the four tabs are native; these screens only show for what sits on top of them. */
+const deep = (n: NavState): boolean => n.stack.length > 1 || n.overlay !== null;
+let leaveTimer: ReturnType<typeof setTimeout> | undefined;
+
 const emit = () => {
   syncHistory();
+  clearTimeout(leaveTimer);
+  if (inHost) {
+    const top = nav.stack[nav.stack.length - 1];
+    post({ t: 'nav', deep: deep(nav), depth: nav.stack.length, top: top.name, overlay: nav.overlay?.name ?? null, tab: nav.stack[0].name });
+    if (deep(view) && !deep(nav)) {
+      // keep the screen drawn while the native app slides it away, then let go of it
+      leaveTimer = setTimeout(() => {
+        view = nav;
+        listeners.forEach((l) => l());
+      }, 280);
+      return;
+    }
+  }
+  view = nav;
   listeners.forEach((l) => l());
 };
 
@@ -111,6 +132,25 @@ if (canHistory) {
   });
 }
 
+if (inHost) {
+  onHost((m) => {
+    const base = { name: (m.base as Route['name']) ?? nav.stack[0].name } as Route;
+    if (m.t === 'go') {
+      nav = { stack: [base, m.route as Route], dir: 0, overlay: null };
+      emit();
+    } else if (m.t === 'overlay') {
+      nav = { stack: [base], dir: 0, overlay: m.overlay as Overlay };
+      emit();
+    } else if (m.t === 'back') {
+      // the phone's back button, pressed while one of these screens is showing
+      if (!nav.overlay && guard && guard()) return;
+      back();
+    } else if (m.t === 'reset') {
+      resetNav();
+    }
+  });
+}
+
 export const resetNav = (): void => {
   nav = { stack: [{ name: 'home' }], dir: 0, overlay: null };
   emit();
@@ -129,6 +169,6 @@ const subscribe = (l: () => void) => {
 };
 
 export function useNav(): NavState & { route: Route } {
-  const s = useSyncExternalStore(subscribe, () => nav);
+  const s = useSyncExternalStore(subscribe, () => view);
   return { ...s, route: s.stack[s.stack.length - 1] };
 }

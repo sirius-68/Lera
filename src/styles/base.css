@@ -632,3 +632,7 @@ p {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* inside the native app: over a native tab only a sheet is drawn, the page itself is see-through */
+.host-clear, .host-clear body, .host-clear #root, .host-clear .app { background: transparent !important; }
+.in-host .app { max-width: none; }

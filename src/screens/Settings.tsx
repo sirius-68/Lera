@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { inHost, post } from '../host';
 import { SUBJECT_LABEL } from '../engine/concepts-calc';
 import { Subject } from '../engine/types';
 import { actions, getState, useStore } from '../store';
@@ -20,6 +21,11 @@ export function SettingsScreen() {
     const { ai: _omit, ...rest } = getState();
     void _omit;
     const json = JSON.stringify(rest, null, 2);
+    if (inHost) {
+      // inside the native app the phone's share sheet takes the file
+      post({ t: 'share', title: `lera-progress-${new Date().toISOString().slice(0, 10)}.json`, text: json });
+      return;
+    }
     try {
       const a = document.createElement('a');
       a.href = URL.createObjectURL(new Blob([json], { type: 'application/json' }));

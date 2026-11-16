@@ -36,9 +36,18 @@ jobs:
         working-directory: apps/mobile
         run: npm ci
 
+      - name: Build the web screens the app carries, and copy the widgets in
+        working-directory: apps/mobile
+        env:
+          LERA_AI_BASE_URL: ${{ secrets.LERA_AI_BASE_URL }}
+          LERA_AI_MODEL: ${{ secrets.LERA_AI_MODEL }}
+          LERA_AI_KEY: ${{ secrets.LERA_AI_KEY }}
+          LERA_AUTH_URL: ${{ secrets.LERA_AUTH_URL }}
+        run: npm run prepare-native
+
       - name: Typecheck
         working-directory: apps/mobile
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: iOS bundle compiles
         working-directory: apps/mobile
@@ -57,3 +66,32 @@ jobs:
           name: lera-native-preview-apk
           path: apps/mobile/android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
+
+  # Does the iPhone app compile? Built for the simulator, unsigned: it proves the native side builds,
+  # it is not something to install. A real iPhone build needs an Apple Developer account.
+  ios:
+    runs-on: macos-15
+    timeout-minutes: 60
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - run: npm install --no-audit --no-fund
+      - name: Install the app
+        working-directory: apps/mobile
+        run: npm ci
+      - name: Build the web screens the app carries
+        working-directory: apps/mobile
+        run: node scripts/build-island.mjs
+      - name: Generate the iOS project
+        working-directory: apps/mobile
+        run: npx expo prebuild --platform ios
+      - name: Compile for the simulator
+        working-directory: apps/mobile/ios
+        run: |
+          set -o pipefail
+          xcodebuild -workspace *.xcworkspace -scheme "$(ls -d *.xcodeproj | head -1 | sed 's/.xcodeproj//')" -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build | tail -40

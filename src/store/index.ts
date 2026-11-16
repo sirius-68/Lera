@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react';
 import { BUILD_AI } from '../ai/config';
 import { AttemptAnalysis, ConceptId, Problem } from '../engine/types';
 import { LeraDoc } from '../ingest/types';
+import { hostConfig } from '../host';
 import { idbAll, idbAvailable, idbClear, idbDelete, idbPut } from './docdb';
 import { withEvent } from './insights';
 import { AttemptMeta, dayOf, recordAttempt } from './learner';
@@ -46,7 +47,8 @@ export const emptyState = (): AppState => ({
 
 function load(): AppState {
   try {
-    const raw = localStorage.getItem(KEY);
+    // inside the native app, the copy it kept is used if this page's own storage came back empty
+    const raw = localStorage.getItem(KEY) ?? hostConfig?.backup ?? null;
     if (!raw) return emptyState();
     const data = JSON.parse(raw) as Partial<AppState>;
     if (data.version !== 1) return emptyState();
@@ -137,6 +139,8 @@ function subscribe(l: () => void) {
 export function useStore<T>(selector: (s: AppState) => T): T {
   return useSyncExternalStore(subscribe, () => selector(state));
 }
+
+export const isHydrated = (): boolean => hydrated;
 
 /** False for the instant at start-up before the notes have been read back. */
 export function useHydrated(): boolean {

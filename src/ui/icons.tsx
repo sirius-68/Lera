@@ -1,5 +1,5 @@
 /** One icon set, drawn on a 24-unit grid with a 2-unit round stroke. */
-const PATHS: Record<string, string> = {
+export const PATHS: Record<string, string> = {
   home: 'M4 11.2 12 4l8 7.2V19a1.5 1.5 0 0 1-1.5 1.5H15v-5.5H9v5.5H5.5A1.5 1.5 0 0 1 4 19z',
   book: 'M5 5.5A2.5 2.5 0 0 1 7.5 3H19v15H7.5A2.5 2.5 0 0 0 5 20.5zM5 20.5A2.5 2.5 0 0 0 7.5 21H19M9 7.5h6',
   pencil: 'M4 20l1-4.5L16.5 4a2.1 2.1 0 0 1 3 3L8 18.5zM14.5 6l3 3',

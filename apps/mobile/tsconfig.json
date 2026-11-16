@@ -9,12 +9,18 @@
       "@/*": [
         "./*"
       ]
-    }
+    },
+    "resolveJsonModule": true
   },
   "include": [
     "**/*.ts",
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "scripts",
+    "node_modules",
+    "web/island.js"
   ]
 }
