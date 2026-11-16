@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { setLang } from './i18n';
 import { HomeScreen, LessonsScreen, PracticeScreen, ProgressScreen } from './screens/Main';
 import { LessonScreen } from './screens/Lesson';
 import { AuthGate } from './screens/Auth';
@@ -14,6 +15,7 @@ import { Lera } from './mascot/Lera';
 import { back, Route, useNav } from './store/nav';
 import { Confirmer, Toaster } from './ui/kit';
 import { inHost } from './host';
+import { TermPop } from './ui/terms';
 
 const TAB_ROUTES = ['home', 'lessons', 'practice', 'progress'];
 
@@ -45,6 +47,9 @@ function Screen({ route, dir }: { route: Route; dir: number }) {
 }
 
 export function App() {
+  // the language is set before anything below is drawn; changing it redraws the whole app in the new one
+  const lang = useStore((s) => s.profile.language);
+  setLang(lang);
   const onboarded = useStore((s) => s.profile.onboarded);
   const lockedOut = useStore((s) => !!s.profile.email && s.profile.signedIn === false);
   const { stack, dir, overlay } = useNav();
@@ -93,7 +98,7 @@ export function App() {
   }
 
   return (
-    <div className="app">
+    <div className="app" key={lang}>
       {/* every screen in the stack stays mounted, so a practice session survives a detour into a review */}
       {stack.map((route, i) => {
         const top = i === stack.length - 1;
@@ -106,6 +111,7 @@ export function App() {
       })}
       {overlay?.name === 'review' && <ReviewSheet key={overlay.concept} concept={overlay.concept} />}
       {overlay?.name === 'ask' && <AskSheet topicId={overlay.topicId} seed={overlay.seed} problem={overlay.problem} lines={overlay.lines} />}
+      <TermPop />
       <Confirmer />
       <Toaster />
     </div>

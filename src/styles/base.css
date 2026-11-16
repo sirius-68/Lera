@@ -130,9 +130,6 @@ p {
 .scroll::-webkit-scrollbar {
   display: none;
 }
-.pad {
-  padding: 0 20px;
-}
 .topbar {
   display: flex;
   align-items: center;

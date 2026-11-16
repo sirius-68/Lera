@@ -2,6 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChangeEvent, DragEvent } from 'react';
 import sampleUrl from '../../samples/algebra-essentials.docx';
 import uploadImg from '../assets/illustrations/upload.jpg';
+import { aiReady } from '../ai/providers';
+import { aiTranslate } from '../ai/tasks';
+import { getLang, Lang, langName, t } from '../i18n';
+import { detectLang } from '../i18n/detect';
 import { ingestBytes } from '../ingest';
 import { IngestProgress, LeraDoc } from '../ingest/types';
 import { Lera } from '../mascot/Lera';
@@ -99,17 +103,44 @@ export function Processing({ source, onDone, onCancel }: { source: Source; onDon
   const [progress, setProgress] = useState(0.03);
   const [error, setError] = useState<string | null>(null);
   const [doc, setDoc] = useState<LeraDoc | null>(null);
+  // a file in another language: the person is asked before anything is translated
+  const [ask, setAsk] = useState<{ from: Lang | 'other'; answer: (yes: boolean) => void } | null>(null);
+  const [translating, setTranslating] = useState<number | null>(null);
+  const nameOf = (l: Lang | 'other'): string => (l === 'other' ? t('another language') : t(langName(l)));
 
   useEffect(() => {
     let alive = true;
     const ctl = new AbortController();
     let reached = 0;
+    let note: string | null = null;
     (async () => {
       try {
         const bytes = await source.bytes();
         const work = ingestBytes(bytes, source.name, {
           ai: getState().ai,
           signal: ctl.signal,
+          translate: async (paras) => {
+            const from = detectLang(paras.filter((x) => !x.math).map((x) => x.text).join(' '));
+            const to = getLang();
+            if (from === to || !alive) return null;
+            const yes = await new Promise<boolean>((answer) => setAsk({ from, answer }));
+            if (!alive) return null;
+            setAsk(null);
+            if (!yes) return null;
+            const ai = getState().ai;
+            if (!aiReady(ai)) {
+              note = t('Translation needs the AI service, which is not connected in this build. The file was kept in {from}.', { from: nameOf(from) });
+              return null;
+            }
+            setTranslating(0);
+            // lines that are only a formula are not sent: there is nothing in them to translate, and nothing to get wrong
+            const words = paras.map((x, i) => ({ x, i })).filter(({ x }) => !x.math);
+            const texts = await aiTranslate(ai, words.map(({ x }) => x.text), langName(to), (f) => alive && setTranslating(f), ctl.signal);
+            if (alive) setTranslating(null);
+            const out = [...paras];
+            words.forEach(({ x, i }, k) => (out[i] = { ...x, text: texts[k] ?? x.text }));
+            return out;
+          },
           onProgress: (p) => {
             reached = Math.max(reached, ORDER.indexOf(p.stage));
             if (alive) setProgress((old) => Math.max(old, p.progress * 0.9));
@@ -117,6 +148,7 @@ export function Processing({ source, onDone, onCancel }: { source: Source; onDon
         });
         // the built-in reader is quick; let each stage be seen before it ticks off
         const result = await work;
+        if (note) result.warnings.unshift(note);
         for (let i = 0; i < STAGES.length; i++) {
           if (!alive) return;
           setStage(i);
@@ -137,6 +169,31 @@ export function Processing({ source, onDone, onCancel }: { source: Source; onDon
       ctl.abort();
     };
   }, [source]);
+
+  if (ask) {
+    const from = nameOf(ask.from);
+    const to = t(langName(getLang()));
+    return (
+      <div className="center stagger" style={{ gap: 14, padding: '0 26px' }}>
+        <Lera size={96} mood="curious" />
+        <h2 style={{ fontSize: 22, fontWeight: 700, lineHeight: 1.25 }}>{t('Translate it to {to} first?', { to })}</h2>
+        <p className="muted" style={{ lineHeight: 1.5 }}>{t('This file is in {from}. Your app is in {to}.', { from, to })}</p>
+        <p className="muted" style={{ lineHeight: 1.5, fontSize: 14 }}>{t('Lera translates the words and keeps every formula, number and exercise exactly as written.')}</p>
+        <Button3D onClick={() => ask.answer(true)}>{t('Translate to {to}', { to })}</Button3D>
+        <Button3D variant="secondary" onClick={() => ask.answer(false)}>{t('Keep it in {from}', { from })}</Button3D>
+      </div>
+    );
+  }
+
+  if (translating !== null) {
+    return (
+      <div className="center" style={{ gap: 18, padding: '0 28px' }}>
+        <Lera size={96} mood="reading" />
+        <h2 style={{ fontSize: 21, fontWeight: 700 }}>{t('Translating…')}</h2>
+        <div style={{ alignSelf: 'stretch' }}><Bar value={Math.max(0.04, translating)} label={t('Translating…')} /></div>
+      </div>
+    );
+  }
 
   if (error) {
     return (

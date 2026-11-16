@@ -42,8 +42,6 @@ export const PATHS: Record<string, string> = {
   dots: 'M5.500 12h.1M12 12h.1M18.500 12h.1',
 };
 
-export type IconName = keyof typeof PATHS;
-
 export function Icon({ name, size = 22, stroke = 2, fill }: { name: string; size?: number; stroke?: number; fill?: boolean }) {
   return (
     <svg

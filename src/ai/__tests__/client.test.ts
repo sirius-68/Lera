@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import http from 'node:http';
 import { after, before, test } from 'node:test';
-import { AiError, chat, extractJson, listModels } from '../client';
+import { AiError, chat, extractJson } from '../client';
 import { localAnswer } from '../offline';
 import { AiConfig, aiReady, NO_AI } from '../providers';
 import { aiCheckOpen, aiStructure } from '../tasks';
@@ -61,13 +61,6 @@ test('errors are turned into sentences a student can act on', async () => {
   reply = () => ({ status: 429, json: {} });
   await assert.rejects(chat(cfg(), [{ role: 'user', content: 'x' }]), /free limit/);
   await assert.rejects(chat({ ...cfg(), baseUrl: 'http://127.0.0.1:9/v1' }, [{ role: 'user', content: 'x' }]), /Couldn’t reach/);
-});
-
-test('model lists are read in both common shapes', async () => {
-  reply = () => ({ status: 200, json: { data: [{ id: 'b-model' }, { id: 'a-model:free' }] } });
-  assert.deepEqual(await listModels(cfg()), ['a-model:free', 'b-model']);
-  reply = () => ({ status: 200, json: { models: [{ name: 'models/gemini-x' }] } });
-  assert.deepEqual(await listModels(cfg()), ['gemini-x']);
 });
 
 test('JSON is recovered from a chatty reply', () => {

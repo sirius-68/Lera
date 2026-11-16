@@ -1,4 +1,4 @@
-import { createElement, memo, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, createElement, memo, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, { cancelAnimation, Easing, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, Ellipse, Line, Path, Polygon, Polyline, Rect, Text as SvgText } from 'react-native-svg';
@@ -19,6 +19,47 @@ export type Mood = keyof (typeof data)['moods'];
 type Shape = [part: 's' | 'b' | 'e' | 'f', type: string, attrs: Record<string, string | number>];
 const MOODS = (data as unknown as { moods: Record<string, Shape[]> }).moods;
 const TAGS: Record<string, unknown> = { path: Path, rect: Rect, circle: Circle, ellipse: Ellipse, line: Line, polygon: Polygon, polyline: Polyline, text: SvgText };
+
+/** False where Lera is mounted but cannot be seen (a tab that is not showing): she stops moving until she can. Set by ui/kit's Keep. */
+export const LeraAwake = createContext(true);
+
+/** What she dreams of while asleep: the same five as the web mascot, in the same colours and places. */
+const DREAMS = [
+  { t: 'x²', x: 50, y: 8, c: '#8f88ff' },
+  { t: 'π', x: 58, y: -1, c: '#ffb020' },
+  { t: '∫', x: 64, y: -9, c: '#3ecf8e' },
+  { t: '√x', x: 54, y: 2, c: '#ff7aa8' },
+  { t: '∞', x: 62, y: -5, c: '#8f88ff' },
+] as const;
+
+/** One formula drifting up out of her head and fading, over and over, each a beat after the last. */
+function Dream({ i, size }: { i: number; size: number }) {
+  const d = DREAMS[i];
+  const p = useSharedValue(0);
+  useEffect(() => {
+    p.value = withDelay(i * 1300, withRepeat(withTiming(1, { duration: 6500, easing: Easing.linear }), -1));
+    return () => cancelAnimation(p);
+  }, [p, i]);
+  const style = useAnimatedStyle(() => {
+    const v = p.value;
+    const opacity = v < 0.12 ? v / 0.12 : v < 0.5 ? 1 : v < 0.75 ? 1 - (v - 0.5) / 0.25 : 0;
+    const rise = Math.min(1, v / 0.75);
+    return {
+      opacity,
+      transform: [
+        { translateX: (-0.07 + rise * 0.16) * size },
+        { translateY: (0.12 - rise * 0.34) * size },
+        { scale: 0.5 + Math.min(1, v / 0.3) * 0.5 },
+        { rotate: `${-12 + rise * 22}deg` },
+      ],
+    };
+  });
+  return (
+    <Animated.Text style={[{ position: 'absolute', left: ((d.x + 12) / 86) * size - size * 0.08, top: ((d.y + 16) / 100) * size * 1.16 - size * 0.12, fontSize: Math.max(9, size * 0.17), fontWeight: '700', color: d.c }, style]}>
+      {d.t}
+    </Animated.Text>
+  );
+}
 
 const draw = (shapes: Shape[], from: number) =>
   shapes.map(([, type, a], i) => {
@@ -56,27 +97,34 @@ export const Lera = memo(function Lera({ size = 96, mood = 'idle', interactive =
   const bounce = useSharedValue(0);
   const shake = useSharedValue(0);
   const drift = useSharedValue(0);
+  // asleep she leans a little and breathes slower and deeper
+  const deep = useSharedValue(0);
+  const awake = useContext(LeraAwake);
 
   useEffect(() => {
+    if (!awake) return;
+    breath.value = 0;
     breath.value = withRepeat(withTiming(1, { duration: shown === 'sleepy' ? 2600 : 1900, easing: Easing.inOut(Easing.quad) }), -1, true);
     drift.value = withRepeat(withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.sin) }), -1, true);
     const shut = (ms: number) => withDelay(ms, withSequence(withTiming(0.08, { duration: 70 }), withTiming(1, { duration: 100 })));
     lid.value = 1;
     lid.value = withRepeat(withSequence(shut(2700), shut(3400), shut(180)), -1);
+    deep.value = withTiming(shown === 'sleepy' ? 1 : 0, { duration: 500 });
     return () => {
       cancelAnimation(breath);
       cancelAnimation(lid);
       cancelAnimation(drift);
     };
-  }, [breath, lid, drift, shown]);
+  }, [breath, lid, drift, deep, shown, awake]);
 
   // each mood carries itself differently: the glad ones bounce, the startled ones shudder
   useEffect(() => {
     cancelAnimation(bounce);
     cancelAnimation(shake);
+    if (!awake) return;
     bounce.value = BOUNCY.has(shown) ? withRepeat(withSequence(withTiming(1, { duration: 260, easing: Easing.out(Easing.quad) }), withTiming(0, { duration: 300, easing: Easing.in(Easing.quad) }), withTiming(0, { duration: 520 })), -1) : withTiming(0, { duration: 200 });
     shake.value = SHAKY.has(shown) ? withSequence(withRepeat(withSequence(withTiming(1, { duration: 55 }), withTiming(-1, { duration: 55 })), 5, true), withTiming(0, { duration: 80 })) : withTiming(0, { duration: 120 });
-  }, [shown, bounce, shake]);
+  }, [shown, bounce, shake, awake]);
 
   // a change of mood from outside wakes her
   useEffect(() => {
@@ -117,8 +165,9 @@ export const Lera = memo(function Lera({ size = 96, mood = 'idle', interactive =
     transform: [
       { translateY: -(hop.value * 0.14 + bounce.value * 0.07) * size },
       { translateX: shake.value * 0.025 * size },
-      { scaleX: 1 - breath.value * 0.012 + hop.value * 0.03 },
-      { scaleY: 1 + breath.value * 0.022 - hop.value * 0.03 },
+      { rotate: `${deep.value * 4}deg` },
+      { scaleX: 1 - breath.value * (0.012 + deep.value * 0.02) + hop.value * 0.03 },
+      { scaleY: 1 + breath.value * (0.022 + deep.value * 0.035) - hop.value * 0.03 },
     ],
   }));
   const fxStyle = useAnimatedStyle(() => ({ opacity: 0.75 + drift.value * 0.25, transform: [{ translateY: -drift.value * 0.035 * size }] }));
@@ -127,7 +176,8 @@ export const Lera = memo(function Lera({ size = 96, mood = 'idle', interactive =
   // shapes in drawing order, with the eyes gathered so they can blink together
   const layers = useMemo(() => {
     const shadow = shapes.filter((s) => s[0] === 's');
-    const fx = shapes.filter((s) => s[0] === 'f');
+    // asleep, what floats around her is drawn live (see Dream), not from the still copy
+    const fx = shown === 'sleepy' ? [] : shapes.filter((s) => s[0] === 'f');
     const body: { eye: boolean; items: Shape[] }[] = [];
     for (const s of shapes) {
       if (s[0] !== 'b' && s[0] !== 'e') continue;
@@ -137,7 +187,7 @@ export const Lera = memo(function Lera({ size = 96, mood = 'idle', interactive =
       else body.push({ eye, items: [s] });
     }
     return { shadow, fx, body };
-  }, [shapes]);
+  }, [shapes, shown]);
 
   const h = size * 1.16;
   const box = { position: 'absolute' as const, left: 0, top: 0, width: size, height: h };
@@ -156,6 +206,7 @@ export const Lera = memo(function Lera({ size = 96, mood = 'idle', interactive =
           ),
         )}
       </Animated.View>
+      {shown === 'sleepy' && awake && DREAMS.map((_, i) => <Dream key={i} i={i} size={size} />)}
       {layers.fx.length > 0 && (
         <Animated.View style={[box, fxStyle]} pointerEvents="none">
           <Svg viewBox={data.viewBox} width={size} height={h}>{draw(layers.fx, 5000)}</Svg>

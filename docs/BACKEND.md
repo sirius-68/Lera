@@ -174,6 +174,52 @@ Exactly the shape of `LeraDoc` in `src/ingest/types.ts`:
 
 ---
 
+### 2.7 Every kind of thing in a book, and where it goes
+
+The model must put each paragraph of a chapter into exactly one of these. Nothing is dropped except the items marked "left out".
+
+| What it is | How to recognise it | Where it goes in `LeraDoc` |
+|---|---|---|
+| Chapter | In the contents, or a large numbered heading ("Chapter 3", "3 Exponents") | a `unit` |
+| Heading (section) | Numbered one level down ("3.2"), or a clearly larger line | a `topic` (one lesson) |
+| Subheading | Bold or slightly larger line inside a section | `{ t: 'h' }` inside the lesson; starts a new lesson only if the lesson is already long (2.5) |
+| Reference text | Ordinary explanation | `{ t: 'p' }`, with maths marked inline as `$...$` |
+| Definition, theorem, rule, tip, warning | A labelled box or a line starting "Definition", "Theorem", "Note", "Remember" | `{ t: 'note', label, text }` with the book's own label |
+| Formula | A displayed line that is only maths and is being stated, not solved | `{ t: 'math', text, caption? }` |
+| Equation being worked | Several displayed lines that follow from each other | one `{ t: 'math', text, steps: [...] }`, steps in order |
+| Example | "Example 3", "Worked example", a question followed by its solution | `{ t: 'example', title, lines }`: line 1 is the question as asked, then one line per step, each with its reason if the book gives one |
+| Exercise | Under "Exercises", "Practice", "Problems", "Try it", or numbered questions with no solution after them | a `Problem` in `topic.exercises`, **in the order printed**, with the book's own numbering kept in `prompt` |
+| Answer key | "Answers", "Solutions to exercises", usually at the end | not a lesson: match each answer to its exercise by number and store it on that problem |
+| Graph | A figure of a function, with its caption | `{ t: 'graph', text: caption, fns: [the functions it shows] }`. If the function cannot be read from the text around it, keep the caption as a `note` and say a figure was here |
+| Table | Rows and columns of values | `{ t: 'list' }` with one row per item, or a `note` if it is a table of rules |
+| Front and back matter, page furniture | Cover, copyright, preface, index, running heads, page numbers | left out |
+
+Two rules the app depends on:
+
+- **Order is the book's order.** Units, lessons, blocks and exercises come back in the order they are printed. Practice shows a lesson's exercises top to bottom; nothing is sorted by difficulty or shuffled.
+- **Examples can be practised.** The app puts "Try it myself" and "Explain it" under every example. For that, line 1 of an example must be the complete question on its own ("Solve 3x + 4 = 19", not "Solve the following"), with any shared instruction written into it.
+
+### 2.8 A book in another language
+
+The app has a language (English, French or Russian; `profile.language`, sent with every request as `lang`). When a file is in a different language:
+
+1. The app notices (it compares the file's words with the app's language) and **asks the person first**: "This file is in Russian. Your app is in English. Translate it to English first?" Nothing is translated without a yes.
+2. On yes, the paragraphs go to the server for translation **before** structuring, so headings such as "Глава 3" or "Exercices" are found by the same rules as English ones. Lines that are only a formula are not sent.
+3. Translation rules, in the order they matter:
+   - Faithful, complete, in the same order. No summarising, no added explanation, nothing dropped.
+   - Formulas, numbers, variable names, units and anything between `$` signs come back exactly as sent.
+   - Numbering and labels stay in place ("1.", "(a)", "3.4").
+   - Textbook labels use the standard word in the target language (Chapter, Section, Example, Exercise, Solution, Definition, Theorem).
+   - Mathematical terms use the standard term in the target language. Where there is no settled one, keep the original in brackets after the translation.
+   - One string in, one string out, same count. A batch that comes back the wrong length is rejected and the original kept.
+4. If the answer is no, or the AI is not connected, the file is kept in its own language and the person is told.
+
+The call in the app is `aiTranslate` in `src/ai/tasks.ts`; the question is asked in `src/screens/Upload.tsx`.
+
+### 2.9 The app's language in every answer
+
+Every tutor prompt ends with the app's language ("Write everything the student will read in French. Leave formulas, numbers and maths notation exactly as they are."). A backend that builds its own prompts must do the same from `lang`, including for hints, diagnoses, simplified explanations and chat. Notation is never localised: `sin`, `ln`, `dx` and decimal points stay as the book has them.
+
 ## 3. Tutor calls (already in the app)
 
 `src/ai/tasks.ts` sends OpenAI-style chat requests: `aiChat`, `aiExplain`, `aiDiagnose`, `aiSimplify`,

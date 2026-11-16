@@ -1,16 +1,22 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { ReactNode, useEffect, useRef, useState } from 'react';
+import { getLang, t } from '@core/i18n';
+import { ReactNode, startTransition, useContext, useEffect, useRef, useState } from 'react';
 import { Pressable, StyleProp, StyleSheet, Text, TextProps, TextStyle, View, ViewStyle } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { PATHS } from '@core/ui/icons';
 import { buzz } from '../host/phone';
+import { LeraAwake } from '../mascot/Lera';
 import { C, FONT, SPRING, Weight } from './theme';
 
 /* The native versions of the pieces in src/ui/kit.tsx, sized and coloured from the same stylesheet. */
 
 export function T({ w = 400, s = 15, c = C.ink, lh, center, style, ...rest }: TextProps & { w?: Weight; s?: number; c?: string; lh?: number; center?: boolean }) {
-  return <Text {...rest} style={[{ fontFamily: FONT[w], fontSize: s, color: c, lineHeight: lh ?? Math.round(s * 1.3), textAlign: center ? 'center' : undefined }, style]} />;
+  // a plain line of text is shown in the app's language; anything else (a title from the notes, a number) passes through untouched
+  const { children, ...props } = rest;
+  // DM Sans has no Cyrillic letters, so Russian is set in the phone's own typeface rather than a mix of two
+  const face = getLang() === 'ru' ? { fontWeight: String(w) as '400' } : { fontFamily: FONT[w] };
+  return <Text {...props} style={[face, { fontSize: s, color: c, lineHeight: lh ?? Math.round(s * 1.3), textAlign: center ? 'center' : undefined }, style]}>{typeof children === 'string' ? t(children) : children}</Text>;
 }
 
 export const Label = ({ children, color = C.ink3 }: { children: ReactNode; color?: string }) => (
@@ -42,14 +48,14 @@ export const prettyMath = (t: string): string => {
 
 /** `**bold**` and `$maths$` inside a sentence. */
 export function Rich({ text, s = 15, c = C.ink, lh, bold = C.ink, w = 400, style }: { text: string; s?: number; c?: string; lh?: number; bold?: string; w?: Weight; style?: StyleProp<TextStyle> }) {
-  const parts = text.split(/(\*\*[^*]+\*\*|\$[^$]+\$)/g).filter(Boolean);
+  const parts = t(text).split(/(\*\*[^*]+\*\*|\$[^$]+\$)/g).filter(Boolean);
   return (
     <T s={s} c={c} lh={lh} w={w} style={style}>
       {parts.map((p, i) =>
         p.startsWith('**') ? (
-          <Text key={i} style={{ fontFamily: FONT[700], color: bold }}>{p.slice(2, -2)}</Text>
+          <Text key={i} style={getLang() === 'ru' ? { fontWeight: '700', color: bold } : { fontFamily: FONT[700], color: bold }}>{p.slice(2, -2)}</Text>
         ) : p.startsWith('$') ? (
-          <Text key={i} style={{ fontFamily: FONT[600] }}>{prettyMath(p.slice(1, -1))}</Text>
+          <Text key={i} style={getLang() === 'ru' ? { fontWeight: '600' } : { fontFamily: FONT[600] }}>{prettyMath(p.slice(1, -1))}</Text>
         ) : (
           p
         ),
@@ -154,13 +160,15 @@ export function Button3D({ children, onPress, variant = 'primary', small, disabl
   );
 }
 
-/** The sliding choice between two or three things. */
+/** The sliding choice between two or three things. The thumb moves at once; what it switches follows. */
 export function Seg<V extends string>({ options, value, onChange }: { options: { id: V; label: string }[]; value: V; onChange: (v: V) => void }) {
   const [w, setW] = useState(0);
   const at = Math.max(0, options.findIndex((o) => o.id === value));
+  const [lit, setLit] = useState(at);
   const x = useSharedValue(at);
   useEffect(() => {
     x.value = withSpring(at, SPRING);
+    setLit(at);
   }, [at, x]);
   const cell = w > 0 ? (w - 8) / options.length : 0;
   const thumb = useAnimatedStyle(() => ({ transform: [{ translateX: x.value * cell }] }));
@@ -172,12 +180,45 @@ export function Seg<V extends string>({ options, value, onChange }: { options: {
           <View style={{ flex: 1, borderRadius: 999, backgroundColor: C.brand }} />
         </Animated.View>
       )}
-      {options.map((o) => (
-        <Pressable key={o.id} accessibilityRole="tab" accessibilityState={{ selected: o.id === value }} onPress={() => { if (o.id !== value) buzz(5); onChange(o.id); }} style={{ flex: 1, paddingVertical: 9, paddingHorizontal: 6, alignItems: 'center' }}>
-          <T w={600} s={15} c={o.id === value ? '#fff' : C.ink2} numberOfLines={1}>{o.label}</T>
+      {options.map((o, i) => (
+        <Pressable
+          key={o.id}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: o.id === value }}
+          onPressIn={() => {
+            if (i === lit) return;
+            x.value = withSpring(i, SPRING);
+            setLit(i);
+            buzz(5);
+          }}
+          onPress={() => startTransition(() => onChange(o.id))}
+          style={{ flex: 1, paddingVertical: 9, paddingHorizontal: 6, alignItems: 'center' }}
+        >
+          <T w={600} s={15} c={i === lit ? '#fff' : C.ink2} numberOfLines={1}>{o.label}</T>
         </Pressable>
       ))}
     </View>
+  );
+}
+
+/** False inside anything that is mounted but not on screen; Lera and other endless motion rest while it is false. */
+export const OnScreen = LeraAwake;
+
+/** Keeps something mounted once it has been shown, and simply hides it afterwards, so coming back to it costs nothing. */
+export function Keep({ on, children, style }: { on: boolean; children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const outer = useContext(OnScreen);
+  const seen = useRef(on);
+  if (on) seen.current = true;
+  const o = useSharedValue(on ? 1 : 0);
+  useEffect(() => {
+    o.value = on ? withTiming(1, { duration: 200 }) : 0;
+  }, [on, o]);
+  const fade = useAnimatedStyle(() => ({ opacity: o.value }));
+  if (!seen.current) return null;
+  return (
+    <Animated.View pointerEvents={on ? 'auto' : 'none'} style={[style, on ? null : { display: 'none' }, fade]}>
+      <OnScreen.Provider value={on && outer}>{children}</OnScreen.Provider>
+    </Animated.View>
   );
 }
 

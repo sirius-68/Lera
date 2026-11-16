@@ -1,4 +1,5 @@
 import { CONCEPTS } from '../engine/concepts';
+import { getLang, langName } from '../i18n';
 import { ConceptId, Diagnosis, Problem } from '../engine/types';
 import { enrichBlocks } from '../ingest/calc';
 import { buildProblem, plain, structureDoc } from '../ingest/structure';
@@ -207,6 +208,9 @@ export interface TutorContext {
   learner?: string;
 }
 
+/** Lera's voice, plus the language the student reads the app in. */
+const voice = (): string => (getLang() === 'en' ? VOICE : `${VOICE}\nWrite everything the student will read in ${langName()}. Leave formulas, numbers and maths notation exactly as they are.`);
+
 function describe(ctx: TutorContext): string {
   const parts: string[] = [];
   if (ctx.topic) parts.push(`Topic: ${ctx.topic}`);
@@ -219,7 +223,7 @@ function describe(ctx: TutorContext): string {
 }
 
 export async function aiChat(config: AiConfig, history: ChatMessage[], ctx: TutorContext, signal?: AbortSignal): Promise<string> {
-  const system = `${VOICE}
+  const system = `${voice()}
 Answer in at most 80 words. If the student asks for the answer to the problem they are solving, give the next idea or a question that leads to it, not the answer.
 The algebra checker's verdict in the context below is always right; never contradict it.
 
@@ -235,7 +239,7 @@ export async function aiDiagnose(config: AiConfig, problem: Problem, prevLine: s
     [
       {
         role: 'system',
-        content: `${VOICE}
+        content: `${voice()}
 A checker has already proved that the student's line does not follow from the line above it. Say what most likely went wrong.
 Return ONLY JSON: {"title": string (max 9 words, states the rule), "message": string (max 40 words, names the exact place), "concept": one of [${ids}]}`,
       },
@@ -256,7 +260,7 @@ export async function aiCheckOpen(config: AiConfig, problem: Problem, working: s
     [
       {
         role: 'system',
-        content: `${VOICE}
+        content: `${voice()}
 Check a student's working for a problem from their notes. Be strict about the maths and kind in tone.
 Return ONLY JSON: {"correct": boolean, "feedback": string (max 60 words; if wrong, name the first line that goes wrong and why, without giving the final answer)}`,
       },
@@ -284,7 +288,7 @@ export async function aiSimplify(
     [
       {
         role: 'system',
-        content: `${VOICE}
+        content: `${voice()}
 The student read the explanation below and said it did not make sense. Explain the SAME point again for a complete beginner:
 one everyday picture or one tiny number example, at most 70 words, no new rules, no other topics, and do not give the final answer to their problem.
 Idea: ${c.title}, ${c.short}`,
@@ -296,4 +300,44 @@ Idea: ${c.title}, ${c.short}`,
     ],
     { temperature: 0.4, maxTokens: 260, signal },
   );
+}
+
+/**
+ * A document in another language, put into the app's language before it is arranged into lessons.
+ * Only the words are translated. Formulas, numbers, variable names and exercise numbering come back exactly
+ * as they went in, and the paragraphs stay in the same order, so the structure found afterwards is the book's own.
+ */
+export async function aiTranslate(config: AiConfig, paras: string[], to: string, onProgress?: (f: number) => void, signal?: AbortSignal): Promise<string[]> {
+  const out: string[] = [];
+  const size = 2400;
+  for (let i = 0; i < paras.length; ) {
+    let j = i;
+    let chars = 0;
+    while (j < paras.length && (j === i || chars + paras[j].length <= size)) chars += paras[j++].length;
+    const batch = paras.slice(i, j);
+    const reply = await chat(
+      config,
+      [
+        {
+          role: 'system',
+          content: `You translate a mathematics textbook into ${to} for a student.
+Return ONLY a JSON array of strings: one translated string per input string, same count, same order.
+Rules:
+- Translate the words faithfully. Do not summarise, add, drop or reorder anything.
+- Formulas, numbers, variables, units and anything between $ signs stay EXACTLY as written.
+- Keep numbering and labels in place ("1.", "(a)", "Example 2", "3.4").
+- Use the standard ${to} words for textbook labels: Chapter, Section, Example, Exercise, Solution, Definition, Theorem.
+- Use the standard ${to} mathematical terms. If a term has no settled translation, keep the original in brackets after yours.`,
+        },
+        { role: 'user', content: JSON.stringify(batch) },
+      ],
+      { json: true, temperature: 0, maxTokens: 3200, signal },
+    );
+    const data = extractJson<string[]>(reply);
+    // a batch that comes back the wrong shape is kept in the original language rather than guessed at
+    out.push(...(Array.isArray(data) && data.length === batch.length && data.every((x) => typeof x === 'string') ? data : batch));
+    i = j;
+    onProgress?.(i / paras.length);
+  }
+  return out;
 }

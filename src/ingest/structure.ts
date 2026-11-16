@@ -286,7 +286,8 @@ function splitParts(text: string): { lead?: string; parts: string[] } {
   return { parts: [text] };
 }
 
-function parseExercises(text: string, inherited: string | undefined, topicId: string): { problems: Problem[]; instruction?: string } {
+/** The problems in a line of text: "Solve 3x + 2 = 11", or several parts (a) (b) (c) under one instruction. */
+export function parseExercises(text: string, inherited: string | undefined, topicId: string): { problems: Problem[]; instruction?: string } {
   const { lead, parts } = splitParts(text);
   const instruction = lead && VERB.test(lead.replace(NUMBERING, '').replace(EXERCISE_LEAD, '')) ? lead.replace(NUMBERING, '').replace(EXERCISE_LEAD, '') : inherited;
   const problems: Problem[] = [];

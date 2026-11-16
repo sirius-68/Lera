@@ -272,6 +272,11 @@ export function hintLadder(problem: Problem, rawLines: string[]): HintLadder | n
   return { nudge: NUDGE[step.tag], method: step.why, line: step.line, tag: step.tag, concept: TAG_CONCEPT[step.tag] };
 }
 
+/** The idea each step of a clean path leans on, so a solution can say not only what was done but which rule allows it. */
+export function stepConcepts(problem: Problem, steps: SolutionStep[]): (ConceptId | undefined)[] {
+  return steps.map((s) => (s.tag === 'calc' ? problem.concepts[0] : TAG_CONCEPT[s.tag]));
+}
+
 /** The clean path for a problem, for the "your route vs a clean route" comparison. */
 export function cleanPath(problem: Problem): SolutionStep[] {
   if (isCalc(problem.kind)) return calcPath(problem);

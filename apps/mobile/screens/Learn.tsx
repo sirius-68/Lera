@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { t as tr, tn } from '@core/i18n';
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, View } from 'react-native';
 import Animated, { Easing, FadeIn, useAnimatedStyle, useSharedValue, withRepeat, withSpring, withTiming } from 'react-native-reanimated';
@@ -55,17 +56,17 @@ function Glow() {
   return <Animated.View style={[{ position: 'absolute', left: -7, top: -7, right: -7, bottom: -7, borderRadius: 60, borderWidth: 3, borderColor: C.tint2 }, style]} />;
 }
 
-function Stop({ t, sway, here, seen, m, st, solvedN }: { t: Topic; sway: number; here: boolean; seen: boolean; m: number; st: keyof typeof STATUS_LABEL; solvedN: number }) {
+function Stop({ t: topic, sway, here, seen, m, st, solvedN }: { t: Topic; sway: number; here: boolean; seen: boolean; m: number; st: keyof typeof STATUS_LABEL; solvedN: number }) {
   const look = st === 'solid' ? FACE.solid : st === 'gap' ? FACE.gap : seen || st === 'shaky' || here ? FACE.on : FACE.idle;
   const down = useSharedValue(0);
   const face = useAnimatedStyle(() => ({ transform: [{ translateY: down.value * 4 }] }));
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${t.title}: ${STATUS_LABEL[st]}`}
+      accessibilityLabel={`${topic.title}: ${tr(STATUS_LABEL[st])}`}
       onPressIn={() => (down.value = withTiming(1, { duration: 70 }))}
       onPressOut={() => (down.value = withTiming(0, { duration: 140 }))}
-      onPress={() => { buzz(6); go({ name: 'lesson', topicId: t.id }); }}
+      onPress={() => { buzz(6); go({ name: 'lesson', topicId: topic.id }); }}
       style={{ width: 190, alignItems: 'center', gap: 6, paddingTop: 4, paddingBottom: 10, marginTop: here ? 26 : 0, transform: [{ translateX: sway }] }}
     >
       {here && <Flag text={st === 'new' && !seen ? 'Start' : 'Continue'} />}
@@ -79,14 +80,14 @@ function Stop({ t, sway, here, seen, m, st, solvedN }: { t: Topic; sway: number;
           <View style={{ position: 'absolute', left: 0, right: 0, top: 5, bottom: -5, borderRadius: 29, backgroundColor: look.edge }} />
           <Animated.View style={[{ borderRadius: 29 }, face]}>
           <LinearGradient colors={look.face} style={{ width: 58, height: 58, borderRadius: 29, alignItems: 'center', justifyContent: 'center' }}>
-            <Icon name={st === 'solid' ? 'check' : st === 'gap' ? 'target' : t.exercises.length ? 'pencil' : 'book'} size={st === 'solid' ? 28 : 25} stroke={st === 'solid' ? 3.2 : 2} color="#fff" />
+            <Icon name={st === 'solid' ? 'check' : st === 'gap' ? 'target' : topic.exercises.length ? 'pencil' : 'book'} size={st === 'solid' ? 28 : 25} stroke={st === 'solid' ? 3.2 : 2} color="#fff" />
           </LinearGradient>
           </Animated.View>
         </View>
       </View>
       <View style={{ alignItems: 'center' }}>
-        <T w={700} s={14.5} lh={18} center>{t.title}</T>
-        <T s={12.5} c={C.ink2} center>{t.exercises.length ? `${solvedN}/${t.exercises.length} solved` : 'Reading'}{st === 'gap' ? ' · gap' : ''}</T>
+        <T w={700} s={14.5} lh={18} center>{topic.title}</T>
+        <T s={12.5} c={C.ink2} center>{topic.exercises.length ? tr('{a}/{b} solved', { a: solvedN, b: topic.exercises.length }) : tr('Reading')}{st === 'gap' ? ` · ${tr('gap')}` : ''}</T>
       </View>
     </Pressable>
   );
@@ -139,9 +140,9 @@ export function LessonsScreen() {
   const isOpen = (id: string): boolean => openUnits[`${doc.id}:${id}`] ?? (!big || id === hereUnit);
 
   const remove = () =>
-    Alert.alert(`Remove “${doc.title}”?`, 'Its highlights and notes go too. Your practice history stays.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Remove', style: 'destructive', onPress: () => { act('removeDoc', doc.id); toast('Notes removed'); } },
+    Alert.alert(tr('Remove “{title}”?', { title: doc.title }), tr('Its highlights and notes go too. Your practice history stays.'), [
+      { text: tr('Cancel'), style: 'cancel' },
+      { text: tr('Remove'), style: 'destructive', onPress: () => { act('removeDoc', doc.id); toast(tr('Notes removed')); } },
     ]);
 
   return (
@@ -184,7 +185,7 @@ export function LessonsScreen() {
               <Raised onPress={() => { buzz(5); setOpenUnits({ ...openUnits, [`${doc.id}:${u.id}`]: !open }); }} edge={tone.edge} depth={4} radius={20} style={{ opacity: open ? 1 : 0.94 }}>
                 <LinearGradient colors={tone.face} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={[row(12), { paddingVertical: 14, paddingHorizontal: 16, borderRadius: 20 }]}>
                   <View style={{ flex: 1 }}>
-                    <T w={700} s={11.5} c="rgba(255,255,255,0.85)" style={{ letterSpacing: 1.1, textTransform: 'uppercase' }}>{big ? 'Chapter' : 'Unit'} {ui + 1} · {u.topics.length} {u.topics.length === 1 ? 'lesson' : 'lessons'}</T>
+                    <T w={700} s={11.5} c="rgba(255,255,255,0.85)" style={{ letterSpacing: 1.1, textTransform: 'uppercase' }}>{tr(big ? 'Chapter' : 'Unit')} {ui + 1} · {tn(u.topics.length, '{n} lesson', '{n} lessons')}</T>
                     <T w={700} s={17.5} lh={22} c="#fff" style={{ marginTop: 1 }}>{u.title}</T>
                   </View>
                   <Ring value={um} size={44} stroke={5} color="#fff" track="rgba(255,255,255,0.3)"><T w={700} s={11.5} c="#fff">{Math.round(um * 100)}%</T></Ring>
@@ -203,7 +204,7 @@ export function LessonsScreen() {
         })}
         <T s={12.5} c={C.ink3} center style={{ marginTop: 6 }}>
           {doc.fileName}
-          {doc.tocVia === 'outline' || doc.tocVia === 'contents' ? ' · chapters from the book’s own contents' : ''}
+          {doc.tocVia === 'outline' || doc.tocVia === 'contents' ? ` · ${tr('chapters from the book’s own contents')}` : ''}
         </T>
         <Pressable onPress={remove} style={[row(6), { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 12 }]}>
           <Icon name="trash" size={15} color={C.ink3} /><T w={600} s={13.5} c={C.ink3}>Remove these notes</T>

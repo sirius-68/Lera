@@ -74,24 +74,6 @@ export async function chat(
   throw new AiError('The AI service replied with nothing usable.');
 }
 
-/** Models the key can use, straight from the provider. */
-export async function listModels(config: AiConfig): Promise<string[]> {
-  let res: Response;
-  try {
-    res = await fetch(`${base(config)}/models`, { headers: headers(config) });
-  } catch {
-    throw new AiError('Couldn’t reach the AI service. Check the connection, or the address in Settings.');
-  }
-  if (!res.ok) throw new AiError(friendly(res.status, await res.text().catch(() => '')), res.status);
-  const data = (await res.json()) as { data?: { id?: string; name?: string }[]; models?: { name?: string }[] };
-  const list: { id?: string; name?: string }[] = data.data ?? data.models ?? [];
-  const ids = list
-    .map((m): string => m.id || m.name || '')
-    .filter(Boolean)
-    .map((id) => id.replace(/^models\//, ''));
-  return [...new Set(ids)].sort();
-}
-
 /** Pull the first JSON object out of a reply, even when it arrives wrapped in prose or a code fence. */
 export function extractJson<T = unknown>(reply: string): T | null {
   const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(reply);

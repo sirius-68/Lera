@@ -1,5 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { t, tn } from '@core/i18n';
 import { Platform, Pressable, ScrollView, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withDelay, withSpring } from 'react-native-reanimated';
 import { CONCEPTS } from '@core/engine/concepts';
@@ -11,7 +12,7 @@ import { weaknesses } from '@core/store/weakness';
 import { go, openOverlay, useApp } from '../host/link';
 import { Lera } from '../mascot/Lera';
 import { Bar, Button3D, Chip, CountUp, Dot, Icon, Label, prettyMath, Raised, Rich, row, T } from '../ui/kit';
-import { C, FONT, SPRING } from '../ui/theme';
+import { C, SPRING } from '../ui/theme';
 import { Card, IconBtn, Rise, RowBtn, TopBar, WeakCard } from './parts';
 
 const MATH_FONT = Platform.select({ ios: 'Times New Roman', default: 'serif' });
@@ -45,13 +46,12 @@ function Signature({ attempts }: { attempts: AttemptRecord[] }) {
   );
 }
 
-const Fact = ({ icon, children }: { icon: string; children: ReactNode }) => (
+const Fact = ({ icon, text }: { icon: string; text: string }) => (
   <View style={[row(10), { alignItems: 'flex-start' }]}>
     <View style={{ marginTop: 3 }}><Icon name={icon} size={16} color={C.brand} /></View>
-    <T s={14.5} lh={21} style={{ flex: 1 }}>{children}</T>
+    <Rich text={text} s={14.5} lh={21} style={{ flex: 1 }} />
   </View>
 );
-const B = ({ children }: { children: ReactNode }) => <T w={700} s={14.5} lh={21}>{children}</T>;
 
 const INSIGHT = { gap: [C.gapBg, C.gap, 'target'], slip: [C.slipBg, C.slip, 'eye'], strategy: [C.tint, C.brand, 'swap'], ok: [C.okBg, C.ok, 'sparkle'] } as const;
 
@@ -100,15 +100,31 @@ export function ProgressScreen() {
             <Rise i={i++}>
               <Card style={{ gap: 10 }}>
                 <Label>How you learn</Label>
-                {model.habits.usualTime && <Fact icon="clock">You mostly practise in the <B>{model.habits.usualTime}</B>{model.habits.usualHour !== null ? `, around ${model.habits.usualHour}:00` : ''}.</Fact>}
-                {model.skill.pace !== null && <Fact icon="bolt">About <B>{model.skill.pace < 90 ? `${Math.round(model.skill.pace)} seconds` : `${Math.round(model.skill.pace / 60)} minutes`}</B> a problem, <B>{Math.round(model.skill.cleanRate * 100)}%</B> clean lately{model.skill.trend > 0.05 ? ', and improving' : model.skill.trend < -0.05 ? ', a little down' : ''}.</Fact>}
-                {model.style.mistakes !== 'few' && (
-                  <Fact icon="target">
-                    {model.style.mistakes === 'careless' ? <>Your mistakes are mostly <B>slips</B>: you know the rule and lose a sign or a number. One more check per line fixes most of them.</> : model.style.mistakes === 'conceptual' ? <>Your mistakes are mostly <B>gaps</B>: a rule that isn’t there yet. Reviews matter more than extra problems.</> : <>A mix of <B>slips and gaps</B>. I’ll keep bringing the gaps back.</>}
-                  </Fact>
+                {model.habits.usualTime && <Fact icon="clock" text={t('You mostly practise in the **{time}**{hour}.', { time: t(model.habits.usualTime), hour: model.habits.usualHour !== null ? t(', around {h}:00', { h: model.habits.usualHour }) : '' })} />}
+                {model.skill.pace !== null && (
+                  <Fact
+                    icon="bolt"
+                    text={t('About **{pace}** a problem, **{clean}%** clean lately{trend}.', {
+                      pace: model.skill.pace < 90 ? tn(Math.round(model.skill.pace), '{n} second', '{n} seconds') : tn(Math.round(model.skill.pace / 60), '{n} minute', '{n} minutes'),
+                      clean: Math.round(model.skill.cleanRate * 100),
+                      trend: model.skill.trend > 0.05 ? t(', and improving') : model.skill.trend < -0.05 ? t(', a little down') : '',
+                    })}
+                  />
                 )}
-                {model.topErrors[0] && <Fact icon="refresh">Most repeated: <B>{model.topErrors[0].title}</B> ({model.topErrors[0].count} times).</Fact>}
-                {model.style.hintReliance > 0.4 && <Fact icon="bulb">You take a hint on <B>{Math.round(model.style.hintReliance * 100)}%</B> of problems. Try the first line alone before asking.</Fact>}
+                {model.style.mistakes !== 'few' && (
+                  <Fact
+                    icon="target"
+                    text={
+                      model.style.mistakes === 'careless'
+                        ? 'Your mistakes are mostly **slips**: you know the rule and lose a sign or a number. One more check per line fixes most of them.'
+                        : model.style.mistakes === 'conceptual'
+                          ? 'Your mistakes are mostly **gaps**: a rule that isn’t there yet. Reviews matter more than extra problems.'
+                          : 'A mix of **slips and gaps**. I’ll keep bringing the gaps back.'
+                    }
+                  />
+                )}
+                {model.topErrors[0] && <Fact icon="refresh" text={tn(model.topErrors[0].count, 'Most repeated: **{title}** ({n} time).', 'Most repeated: **{title}** ({n} times).', { title: model.topErrors[0].title })} />}
+                {model.style.hintReliance > 0.4 && <Fact icon="bulb" text={t('You take a hint on **{p}%** of problems. Try the first line alone before asking.', { p: Math.round(model.style.hintReliance * 100) })} />}
                 <T s={12.5} c={C.ink3}>Worked out on this phone from your own working.</T>
               </Card>
             </Rise>
@@ -123,7 +139,7 @@ export function ProgressScreen() {
                   <View style={{ height: 8, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.25)', marginTop: 6, marginBottom: 5, overflow: 'hidden' }}>
                     <View style={{ height: 8, minWidth: 6, borderRadius: 999, backgroundColor: '#fff', width: `${(lv.into / lv.need) * 100}%` }} />
                   </View>
-                  <View style={row(4)}><CountUp to={xp} s={12.5} c="#fff" /><T s={12.5} c="#fff">XP · {lv.need - lv.into} to level {lv.level + 1}</T></View>
+                  <View style={row(4)}><CountUp to={xp} s={12.5} c="#fff" /><T s={12.5} c="#fff">{t('XP · {n} to level {level}', { n: lv.need - lv.into, level: lv.level + 1 })}</T></View>
                 </View>
                 <Icon name="chevron" size={18} color="#fff" />
               </LinearGradient>
@@ -142,13 +158,13 @@ export function ProgressScreen() {
           {weak.length > 0 && (
             <Rise i={i++} style={{ gap: 10 }}>
               <View style={[row(), { justifyContent: 'space-between' }]}>
-                <Label>Weak spots · {weak.length}</Label>
+                <Label>{`${t('Weak spots')} · ${weak.length}`}</Label>
                 <T s={12.5} c={C.ink3}>most useful first</T>
               </View>
               {(allWeak ? weak : weak.slice(0, 3)).map((w) => <WeakCard key={w.id} w={w} />)}
               {weak.length > 3 && (
                 <Pressable onPress={() => setAllWeak(!allWeak)} style={{ alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 12 }}>
-                  <T w={600} c={C.brand}>{allWeak ? 'Show fewer' : `Show all ${weak.length}`}</T>
+                  <T w={600} c={C.brand}>{allWeak ? 'Show fewer' : t('Show all {n}', { n: weak.length })}</T>
                 </Pressable>
               )}
             </Rise>
@@ -159,8 +175,8 @@ export function ProgressScreen() {
               <View style={[row(), { justifyContent: 'space-between' }]}>
                 <Label>Your error signature</Label>
                 <View style={row(10)}>
-                  <View style={row(4)}><View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: C.gap }} /><T s={12.5}>Gaps {gaps}</T></View>
-                  <View style={row(4)}><View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: '#f0b63e' }} /><T s={12.5}>Slips {slips}</T></View>
+                  <View style={row(4)}><View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: C.gap }} /><T s={12.5}>{`${t('Gaps')} ${gaps}`}</T></View>
+                  <View style={row(4)}><View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: '#f0b63e' }} /><T s={12.5}>{`${t('Slips')} ${slips}`}</T></View>
                 </View>
               </View>
               <Signature attempts={attempts} />
@@ -196,7 +212,7 @@ export function ProgressScreen() {
                         <T w={700} s={14.5} style={{ marginBottom: 6 }}>{CONCEPTS[c.id].title}</T>
                         <Bar value={confidence(c)} tone={`thin ${st === 'solid' ? 'ok' : ''}`} />
                       </View>
-                      <T s={12.5} c={C.ink3} style={{ minWidth: 64, textAlign: 'right' }}>{c.gaps ? `${c.gaps} gap${c.gaps > 1 ? 's' : ''}` : c.slips ? `${c.slips} slip${c.slips > 1 ? 's' : ''}` : `${c.clean} clean`}</T>
+                      <T s={12.5} c={C.ink3} style={{ minWidth: 64, textAlign: 'right' }}>{c.gaps ? tn(c.gaps, '{n} gap', '{n} gaps') : c.slips ? tn(c.slips, '{n} slip', '{n} slips') : t('{n} clean', { n: c.clean })}</T>
                     </RowBtn>
                   );
                 })}
@@ -251,7 +267,7 @@ export function ProgressScreen() {
                     })}
                     {a.marks.map((m, k) => (
                       <View key={`m${k}`} style={[row(6), { alignItems: 'flex-start', paddingTop: 4, paddingLeft: 30 }]}>
-                        <Chip tone={m.severity === 'gap' ? 'gap' : 'slip'}>Line {m.line + 1}</Chip>
+                        <Chip tone={m.severity === 'gap' ? 'gap' : 'slip'}>{t('Line {n}', { n: m.line + 1 })}</Chip>
                         <Rich text={m.title} s={13.5} c={C.ink2} style={{ flex: 1, marginTop: 4 }} />
                       </View>
                     ))}
@@ -265,4 +281,3 @@ export function ProgressScreen() {
     </View>
   );
 }
-void FONT;

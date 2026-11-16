@@ -61,11 +61,6 @@ export const fEq = (a: Frac, b: Frac): boolean => a.n === b.n && a.d === b.d;
 export const fIsZero = (a: Frac): boolean => a.n === 0n;
 export const fIsInt = (a: Frac): boolean => a.d === 1n;
 export const fSign = (a: Frac): number => (a.n > 0n ? 1 : a.n < 0n ? -1 : 0);
-export const fCmp = (a: Frac, b: Frac): number => {
-  const l = a.n * b.d;
-  const r = b.n * a.d;
-  return l < r ? -1 : l > r ? 1 : 0;
-};
 export const fNum = (a: Frac): number => Number(a.n) / Number(a.d);
 
 export function fPow(a: Frac, e: number): Frac {

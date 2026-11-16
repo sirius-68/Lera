@@ -1,21 +1,23 @@
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useRef, useState } from 'react';
+import { setLang } from '@core/i18n';
+import { memo, useEffect, useRef, useState } from 'react';
 import { AppState as Phone, BackHandler, StyleSheet, useWindowDimensions, View } from 'react-native';
-import Animated, { Easing, FadeIn, FadeInDown, FadeOut, FadeOutDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, FadeInDown, FadeOutDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Island } from '../host/Island';
-import { act, gated, getApp, getShell, send, setTab, useApp, useShell } from '../host/link';
+import { act, gated, getApp, getShell, send, setTab, Tab, TABS, useApp, useShell } from '../host/link';
 import { pushWidget, takeAction } from '../host/widget';
-import { Lera } from '../mascot/Lera';
+import { Boot } from '../screens/Boot';
 import { HomeScreen } from '../screens/Home';
 import { LessonsScreen } from '../screens/Learn';
 import { PracticeScreen } from '../screens/Practice';
 import { ProgressScreen } from '../screens/Progress';
 import { TabBar } from '../screens/TabBar';
-import { Button3D, EASE, T } from '../ui/kit';
+import { EASE, Keep, OnScreen, T } from '../ui/kit';
 import { C } from '../ui/theme';
 
-const SCREENS = { home: HomeScreen, lessons: LessonsScreen, practice: PracticeScreen, progress: ProgressScreen } as const;
+// memo: a tab is only redrawn when something it shows changes, not when another tab is picked
+const SCREENS = { home: memo(HomeScreen), lessons: memo(LessonsScreen), practice: memo(PracticeScreen), progress: memo(ProgressScreen) } as const;
 
 /** A tap on the home-screen widget's card opens Practice. */
 function followWidget(): void {
@@ -40,6 +42,9 @@ export default function Shell() {
   const sheet = useShell((s) => s.sheet);
   const toast = useShell((s) => s.toast);
   const locked = useApp(gated);
+  // the tabs are drawn in the app's language; changing it in Settings redraws them
+  const lang = useApp((s) => s.profile.language);
+  setLang(lang);
   const covering = ready && (locked || deep);
 
   // if the screens have not come up after a while, say so and offer to start them again
@@ -97,32 +102,46 @@ export default function Shell() {
     return () => sub.remove();
   }, [ready]);
 
-  const Screen = SCREENS[tab];
+  // the start-up screen stays for at least a moment (so it never flashes), then lifts away
+  const [held, setHeld] = useState(true);
+  const [booted, setBooted] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setHeld(false), 900);
+    return () => clearTimeout(id);
+  }, []);
+  // the tabs are given a moment to be built underneath before the start-up screen lifts, so it never lifts onto nothing
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!ready) return;
+    const id = setTimeout(() => setSettled(true), 90);
+    return () => clearTimeout(id);
+  }, [ready]);
+  const leaving = ready && settled && !held;
+
   return (
     <View style={styles.fill}>
       <StatusBar style={!covering && tab === 'lessons' ? 'light' : 'dark'} />
       {ready && !locked && (
-        <Animated.View style={[styles.fill, sheet ? undefined : tabsStyle]}>
-          <Animated.View key={tab} entering={FadeIn.duration(240)} style={styles.fill}>
-            <Screen />
+        <Animated.View key={lang} style={styles.fill}>
+          <Animated.View style={[styles.fill, sheet ? undefined : tabsStyle]}>
+            {/* each tab is built the first time it is opened and kept, so switching back is instant */}
+            <View style={styles.fill}>
+              {/* while a web screen covers the tabs, Lera and the other endless motion underneath rest */}
+              <OnScreen.Provider value={!covering || sheet}>
+              {TABS.map((t: Tab) => {
+                const Screen = SCREENS[t];
+                return <Keep key={t} on={tab === t} style={StyleSheet.absoluteFill}><Screen /></Keep>;
+              })}
+              </OnScreen.Provider>
+            </View>
+            <TabBar />
           </Animated.View>
-          <TabBar />
         </Animated.View>
       )}
       <Animated.View style={[StyleSheet.absoluteFill, islandStyle]} pointerEvents={covering ? 'auto' : 'none'}>
         <Island key={attempt} />
       </Animated.View>
-      {!ready && (
-        <Animated.View exiting={FadeOut.duration(260)} style={[StyleSheet.absoluteFill, styles.boot]}>
-          <Lera size={84} mood={slow ? 'confused' : 'idle'} interactive={false} />
-          {slow && (
-            <Animated.View entering={FadeIn} style={{ alignItems: 'center', gap: 12, marginTop: 18, paddingHorizontal: 30 }}>
-              <T c={C.ink2} center>This is taking longer than it should.</T>
-              <Button3D small onPress={() => setAttempt((n) => n + 1)}>Try again</Button3D>
-            </Animated.View>
-          )}
-        </Animated.View>
-      )}
+      {!booted && <Boot leaving={leaving} slow={slow} onRetry={() => setAttempt((n) => n + 1)} onGone={() => setBooted(true)} />}
       {toast && (
         <Animated.View key={toast.id} entering={FadeInDown.springify().damping(14)} exiting={FadeOutDown.duration(200)} pointerEvents="none" style={[styles.toast, { bottom: 96 + insets.bottom }]}>
           <T w={500} s={14} c="#fff" center>{toast.text}</T>
@@ -134,6 +153,5 @@ export default function Shell() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1, backgroundColor: '#fff' },
-  boot: { backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
   toast: { position: 'absolute', alignSelf: 'center', maxWidth: '86%', paddingVertical: 11, paddingHorizontal: 16, borderRadius: 14, backgroundColor: C.ink, boxShadow: '0px 10px 30px rgba(20,18,46,0.3)' },
 });

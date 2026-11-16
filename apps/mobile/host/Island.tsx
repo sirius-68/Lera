@@ -1,3 +1,4 @@
+import { getLocales } from 'expo-localization';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Linking, Platform, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -28,7 +29,7 @@ export function Island() {
   }, []);
 
   const html = useMemo(
-    () => (backup === null ? null : compose(island, { platform: Platform.OS, insets: { top: first.current.top, bottom: first.current.bottom }, canPin: canPin(), backup })),
+    () => (backup === null ? null : compose(island, { platform: Platform.OS, lang: getLocales()[0]?.languageTag, insets: { top: first.current.top, bottom: first.current.bottom }, canPin: canPin(), backup })),
     [backup],
   );
 

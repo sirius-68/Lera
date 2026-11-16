@@ -1,4 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { t, tn } from '@core/i18n';
 import { useMemo } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { CONCEPTS } from '@core/engine/concepts';
@@ -14,7 +15,7 @@ import { Card, IconBtn, Rise, TopBar, WeakCard } from './parts';
 
 const hello = (): string => {
   const h = new Date().getHours();
-  return h < 5 ? 'Still up' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  return t(h < 5 ? 'Still up' : h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening');
 };
 
 export function HomeScreen() {
@@ -52,18 +53,18 @@ export function HomeScreen() {
     line = 'Goal reached. Anything more today is a bonus.';
     mood = 'cool';
   } else if (!doneToday && days > 0 && new Date().getHours() >= 19) {
-    line = `Your **${days}-day streak** ends tonight. One problem saves it.`;
+    line = t('Your **{n}-day streak** ends tonight. One problem saves it.', { n: days });
     mood = 'sad';
   } else if (due.length > 0) {
-    line = `**${CONCEPTS[due[0].concept].title}** is ready to come back${due.length > 1 ? `, and ${due.length - 1} more` : ''}.`;
+    line = t(due.length > 1 ? '**{idea}** is ready to come back, and {n} more.' : '**{idea}** is ready to come back.', { idea: t(CONCEPTS[due[0].concept].title), n: due.length - 1 });
     mood = 'determined';
   } else if (doneToday) {
-    line = `${goal - xpToday} XP to today’s goal. One or two more problems.`;
+    line = t('{n} XP to today’s goal. One or two more problems.', { n: goal - xpToday });
     mood = days >= 3 ? 'fired' : 'happy';
   } else if (attempts.length === 0) {
     line = 'Your notes are ready. Read a lesson, then show me your working.';
   } else {
-    line = days > 1 ? `Day ${days}. Shall we keep it going?` : 'Ready when you are.';
+    line = days > 1 ? t('Day {n}. Shall we keep it going?', { n: days }) : 'Ready when you are.';
     mood = days >= 3 ? 'fired' : 'idle';
   }
 
@@ -77,7 +78,7 @@ export function HomeScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#fff' }}>
-      <TopBar title={profile.name || 'Welcome'} small={hello()}>
+      <TopBar title={profile.name || t('Welcome')} small={hello()}>
         <Tap onPress={() => go({ name: 'streak' })} label={`${days}-day streak`} scale={0.92}>
           {doneToday ? (
             <View style={{ marginBottom: 2 }}>
@@ -115,7 +116,7 @@ export function HomeScreen() {
               <Ring value={Math.min(1, xpToday / goal)} size={62} stroke={7} color="#fff" track="rgba(255,255,255,0.25)"><T w={700} s={15} c="#fff">{xpToday}</T></Ring>
               <View style={{ flex: 1 }}>
                 <T w={700} s={15.5} c="#fff">{xpToday >= goal ? 'Daily goal done' : 'Today’s goal'}</T>
-                <T s={12.5} c="rgba(255,255,255,0.85)">{xpToday} / {goal} XP · Level {lv.level} {lv.title}</T>
+                <T s={12.5} c="rgba(255,255,255,0.85)">{t('{a} / {b} XP · Level {level} {title}', { a: xpToday, b: goal, level: lv.level, title: t(lv.title) })}</T>
                 <View style={{ flexDirection: 'row', gap: 4, marginTop: 7, maxWidth: 190 }}>
                   {week.map((d) => (
                     <View key={d.day} style={{ flex: 1, alignItems: 'center', gap: 2 }}>
@@ -130,7 +131,7 @@ export function HomeScreen() {
             </View>
             <Raised onPress={start} haptic={8} edge="rgba(20,14,90,0.35)" depth={4} radius={999} style={[row(8), { justifyContent: 'center', minHeight: 50, backgroundColor: '#fff', marginTop: 12 }]}>
               <Icon name={docs.length === 0 ? 'upload' : 'play'} size={17} fill={docs.length > 0} color={C.brandD} />
-              <T w={700} s={16} c={C.brandD}>{docs.length === 0 ? 'Upload your notes' : due.length > 0 ? `Review ${due.length} due ${due.length === 1 ? 'idea' : 'ideas'}` : attempts.length ? 'Continue practising' : 'Start practising'}</T>
+              <T w={700} s={16} c={C.brandD}>{docs.length === 0 ? 'Upload your notes' : due.length > 0 ? tn(due.length, 'Review {n} due idea', 'Review {n} due ideas') : attempts.length ? 'Continue practising' : 'Start practising'}</T>
             </Raised>
           </LinearGradient>
           </View>
@@ -180,7 +181,7 @@ export function HomeScreen() {
                 <Ring value={lastMastery} size={58}>{`${Math.round(lastMastery * 100)}%`}</Ring>
                 <View style={{ flex: 1 }}>
                   <T w={700} s={17} lh={21}>{last.topic.title}</T>
-                  <T s={13.5} c={C.ink2} style={{ marginTop: 2 }}>{last.unit.title} · {last.topic.exercises.length ? `${last.topic.exercises.length} ${last.topic.exercises.length === 1 ? 'exercise' : 'exercises'}` : 'reading'}</T>
+                  <T s={13.5} c={C.ink2} style={{ marginTop: 2 }}>{last.unit.title} · {last.topic.exercises.length ? tn(last.topic.exercises.length, '{n} exercise', '{n} exercises') : t('reading')}</T>
                 </View>
               </View>
               <View style={[row(10), { marginTop: 14 }]}>
@@ -194,11 +195,11 @@ export function HomeScreen() {
         <Rise i={i++} style={{ gap: 10 }}>
           {[
             [
-              { key: 'streak', icon: 'flame', fill: true, bg: C.flameBg, fg: C.flame, title: `${days} day${days === 1 ? '' : 's'}`, sub: 'Streak & badges', run: () => go({ name: 'streak' }) },
+              { key: 'streak', icon: 'flame', fill: true, bg: C.flameBg, fg: C.flame, title: tn(days, '{n} day', '{n} days'), sub: 'Streak & badges', run: () => go({ name: 'streak' }) },
               { key: 'saved', icon: 'bookmark', fill: true, bg: C.goldBg, fg: '#c98f00', title: String(kept), sub: 'Notebook', run: () => go({ name: 'saved' }) },
             ],
             [
-              { key: 'ask', icon: 'chat', fill: false, bg: C.infoBg, fg: C.info, title: 'Ask Lera', sub: chatCount ? `${chatCount} saved ${chatCount === 1 ? 'chat' : 'chats'}` : 'Any question', run: () => openOverlay({ name: 'ask' }) },
+              { key: 'ask', icon: 'chat', fill: false, bg: C.infoBg, fg: C.info, title: 'Ask Lera', sub: chatCount ? tn(chatCount, '{n} saved chat', '{n} saved chats') : 'Any question', run: () => openOverlay({ name: 'ask' }) },
               { key: 'add', icon: 'plus', fill: false, bg: C.tint, fg: C.brand, title: 'Add', sub: 'New notes', run: () => go({ name: 'upload' }) },
             ],
           ].map((pair, r) => (
@@ -230,7 +231,7 @@ export function HomeScreen() {
                       <View style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: C.tint, alignItems: 'center', justifyContent: 'center' }}><Icon name="file" size={20} color={C.brand} /></View>
                       <View style={{ flex: 1 }}>
                         <T w={700} s={15.5}>{d.title}</T>
-                        <T s={13} c={C.ink2}>{d.units.reduce((n, u) => n + u.topics.length, 0)} lessons · {Math.round(m * 100)}% mastered</T>
+                        <T s={13} c={C.ink2}>{tn(d.units.reduce((n, u) => n + u.topics.length, 0), '{n} lesson · {p}% mastered', '{n} lessons · {p}% mastered', { p: Math.round(m * 100) })}</T>
                       </View>
                       <Icon name="chevron" size={18} />
                     </View>

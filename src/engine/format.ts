@@ -1,4 +1,4 @@
-import { Node, add, div, mul, neg, num, pow, sym, toLatex, toText } from './ast';
+import { Node, add, div, mul, neg, num, pow, sym, toText } from './ast';
 import { Frac, ONE, fEq, fIsInt, frac } from './frac';
 import { Poly, pTerms } from './poly';
 
@@ -37,4 +37,3 @@ export function polyToNode(p: Poly): Node {
 }
 
 export const polyToText = (p: Poly): string => toText(polyToNode(p));
-export const polyToLatex = (p: Poly): string => toLatex(polyToNode(p));

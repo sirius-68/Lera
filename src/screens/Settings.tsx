@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { LANGS, t } from '../i18n';
 import { inHost, post } from '../host';
 import { SUBJECT_LABEL } from '../engine/concepts-calc';
 import { Subject } from '../engine/types';
@@ -77,6 +78,18 @@ export function SettingsScreen() {
               })}
             </div>
             <p className="faint" style={{ fontSize: 13 }}>Decides which ideas are offered under Practice. Your notes are always read in full.</p>
+          </section>
+
+          <section className="col" style={{ gap: 8 }}>
+            <span className="label">{t('Language')}</span>
+            <div className="chips-row">
+              {LANGS.map((l) => (
+                <button key={l.id} className={`chip-toggle ${profile.language === l.id ? 'on' : ''}`} aria-pressed={profile.language === l.id} onClick={() => { haptic(5); actions.setProfile({ language: l.id }); }}>
+                  {profile.language === l.id && <Icon name="check" size={14} stroke={3} />} {l.label}
+                </button>
+              ))}
+            </div>
+            <p className="faint" style={{ fontSize: 13 }}>{t('The app, and Lera’s answers, use this language.')}{profile.language !== 'en' ? ` ${t('Some screens are still in English while the translation is finished.')}` : ''}</p>
           </section>
 
           <section className="col" style={{ gap: 8 }}>

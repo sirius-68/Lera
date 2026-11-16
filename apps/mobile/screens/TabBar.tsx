@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { startTransition, useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,7 +15,7 @@ const ITEMS: { name: Tab; label: string; icon: string }[] = [
   { name: 'progress', label: 'Progress', icon: 'chart' },
 ];
 
-function Item({ item, on, due }: { item: (typeof ITEMS)[number]; on: boolean; due: number }) {
+function Item({ item, on, due, onPick }: { item: (typeof ITEMS)[number]; on: boolean; due: number; onPick: () => void }) {
   const v = useSharedValue(on ? 1 : 0);
   useEffect(() => {
     v.value = withSpring(on ? 1 : 0, SPRING);
@@ -25,10 +25,12 @@ function Item({ item, on, due }: { item: (typeof ITEMS)[number]; on: boolean; du
     <Pressable
       accessibilityRole="tab"
       accessibilityState={{ selected: on }}
-      onPress={() => {
-        if (!on) buzz(4);
-        setTab(item.name);
+      onPressIn={() => {
+        if (on) return;
+        buzz(4);
+        onPick();
       }}
+      onPress={() => startTransition(() => setTab(item.name))}
       style={{ flex: 1, height: 52, alignItems: 'center', justifyContent: 'center', gap: 2 }}
     >
       <Animated.View style={icon}><Icon name={item.icon} size={23} color={on ? C.brand : C.ink3} fill={on && item.icon === 'home'} /></Animated.View>
@@ -42,7 +44,7 @@ function Item({ item, on, due }: { item: (typeof ITEMS)[number]; on: boolean; du
   );
 }
 
-/** The four tabs. The tinted pill slides under the one you are on. */
+/** The four tabs. The tinted pill slides under the one you are on, starting the moment a tab is touched. */
 export function TabBar() {
   const insets = useSafeAreaInsets();
   const tab = useShell((s) => s.tab);
@@ -59,7 +61,7 @@ export function TabBar() {
   return (
     <View onLayout={(e) => setW(e.nativeEvent.layout.width)} style={{ flexDirection: 'row', paddingTop: 8, paddingHorizontal: 8, paddingBottom: 8 + insets.bottom, backgroundColor: '#fff', boxShadow: `0px -1px 0px ${C.line}, 0px -10px 30px rgba(40,30,120,0.05)` }}>
       {cell > 0 && <Animated.View style={[{ position: 'absolute', top: 8, left: 8, width: cell, height: 52, borderRadius: 16, backgroundColor: C.tint }, pill]} />}
-      {ITEMS.map((item) => <Item key={item.name} item={item} on={tab === item.name} due={due} />)}
+      {ITEMS.map((item, i) => <Item key={item.name} item={item} on={tab === item.name} due={due} onPick={() => (x.value = withSpring(i, SPRING))} />)}
     </View>
   );
 }

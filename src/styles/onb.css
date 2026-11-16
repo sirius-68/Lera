@@ -2,10 +2,6 @@
 
 .ob { background: #fff; }
 .ob-top { display: flex; align-items: center; gap: 10px; padding: calc(10px + var(--safe-t)) 12px 6px; min-height: 58px; }
-.ob-bar { flex: 1; height: 10px; border-radius: 999px; background: var(--tint-2); overflow: hidden; }
-.ob-bar > i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--brand-l), var(--brand)); transition: width 0.7s var(--spring); position: relative; min-width: 10px; }
-.ob-bar > i::after { content: ''; position: absolute; top: 2.5px; left: 8px; right: 8px; height: 2.5px; border-radius: 3px; background: rgba(255, 255, 255, 0.45); }
-.ob-skip { font-size: 14px; font-weight: 600; color: var(--ink-3); padding: 8px 10px; border-radius: 10px; }
 
 /* one step: scrolls if it must, button pinned to the bottom */
 .ob-step { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: none; display: flex; flex-direction: column; padding: 4px 22px 0; animation: ob-in 0.45s var(--ease) both; }
@@ -33,16 +29,6 @@
 .ob-list > *:nth-child(4) { animation-delay: 0.3s; }
 .ob-list > *:nth-child(5) { animation-delay: 0.36s; }
 .ob-list > *:nth-child(6) { animation-delay: 0.42s; }
-.ob-reply { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px; border-radius: 16px; background: var(--tint); font-size: 14.5px; line-height: 1.4; animation: rise 0.4s var(--ease) both; }
-.ob-reply .lera { flex-shrink: 0; }
-
-/* the stage a motion graphic plays on */
-.ob-stage { position: relative; height: 258px; flex-shrink: 0; margin: 2px -6px 8px; border-radius: 30px; background: radial-gradient(120% 100% at 50% 0%, #f1efff 0%, #f8f7ff 60%, #fff 100%); overflow: hidden; display: grid; place-items: center; }
-.ob-stage::before, .ob-stage::after { content: ''; position: absolute; border-radius: 50%; pointer-events: none; }
-.ob-stage::before { width: 150px; height: 150px; left: -50px; top: -60px; background: rgba(108, 99, 255, 0.08); animation: drift 9s ease-in-out infinite; }
-.ob-stage::after { width: 110px; height: 110px; right: -30px; bottom: -40px; background: rgba(245, 179, 1, 0.12); animation: drift 11s ease-in-out infinite reverse; }
-.ob-stage.warm { background: radial-gradient(120% 100% at 50% 0%, #fff1e0 0%, #fff8ef 60%, #fff 100%); }
-.ob-stage.green { background: radial-gradient(120% 100% at 50% 0%, #e6f7ef 0%, #f3fbf7 60%, #fff 100%); }
 @keyframes drift { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(18px, 14px) scale(1.12); } }
 .sc { position: relative; width: 300px; height: 232px; z-index: 1; }
 .sc svg { display: block; overflow: visible; }
@@ -125,16 +111,7 @@
 .sc-return .v1 .bump { animation: r-b1 8s var(--spring) infinite; }
 @keyframes r-b0 { 0%, 26% { transform: scale(0); } 31%, 100% { transform: scale(1); } }
 @keyframes r-b1 { 0%, 54% { transform: scale(0); } 59%, 100% { transform: scale(1); } }
-
-/* 4 — graphs */
-.sc-graph .curve { stroke-dasharray: 100; stroke-dashoffset: 100; animation: g-draw 1.6s 0.3s var(--ease) forwards; }
 @keyframes g-draw { to { stroke-dashoffset: 0; } }
-.sc-graph .rider { opacity: 0; animation: fade 0.5s 1.7s both; }
-.sc-chip { position: absolute; display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px; border-radius: 999px; background: #fff; border: 1.5px solid #e3e1ff; box-shadow: 0 3px 0 #e3e1ff; font-size: 13px; font-weight: 700; color: var(--brand-d); animation: pop 0.5s 1.9s var(--spring) both; }
-.sc-chip.slope { right: 14px; top: 10px; }
-.sc-chip.fn { left: 14px; top: 10px; animation-delay: 0.9s; }
-.sc-chip.fn .mathv { font-size: 14px; }
-.needle { width: 22px; height: 3px; border-radius: 3px; background: var(--ink); animation: g-needle 6s infinite cubic-bezier(0.45, 0, 0.55, 1); }
 @keyframes g-needle { 0%, 100% { transform: rotate(62deg); } 50% { transform: rotate(-62deg); } }
 
 /* 5 — plain words (8s loop) */
@@ -210,11 +187,6 @@
 .ob-sheet { padding: 22px 24px calc(22px + var(--safe-b)); display: flex; flex-direction: column; gap: 10px; animation: rise 0.6s 0.15s var(--ease) both; }
 .ob-sheet .ob-h { text-align: center; font-size: 31px; }
 .ob-sheet .ob-p { text-align: center; margin-top: 0; }
-.ob-points { display: flex; justify-content: center; gap: 6px; margin: 2px 0 4px; flex-wrap: wrap; }
-.ob-points span { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border-radius: 999px; background: var(--tint); color: var(--brand-d); font-size: 12.5px; font-weight: 700; animation: pop 0.5s var(--spring) both; }
-.ob-points span:nth-child(2) { animation-delay: 0.45s; }
-.ob-points span:nth-child(3) { animation-delay: 0.6s; }
-.ob-points span:nth-child(1) { animation-delay: 0.3s; }
 
 /* cards with a small picture on the left */
 .ob-card { display: flex; align-items: center; gap: 13px; width: 100%; padding: 13px 14px; border-radius: 20px; border: 1.5px solid var(--line-d); box-shadow: 0 4px 0 var(--line-d); background: #fff; text-align: left; font-size: 16px; font-weight: 700; transition: transform 0.12s var(--ease), box-shadow 0.12s, border-color 0.2s, background 0.2s; }
@@ -236,8 +208,6 @@
 .ob-projection i:nth-child(n + 5) { background: linear-gradient(180deg, #ffd24a, var(--gold)); }
 @keyframes grow-bar { from { transform: scaleY(0); } }
 .ob-projection-cap { font-size: 13.5px; color: var(--ink-2); margin-top: 8px; line-height: 1.45; }
-.ob-done { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; text-align: center; padding: 0 26px; }
-
 
 /* ───────── second pass: questions asked in a bubble, tiles, a three-part bar ───────── */
 .ob-segs { flex: 1; display: flex; gap: 6px; }

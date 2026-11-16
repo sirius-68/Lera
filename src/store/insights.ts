@@ -1,4 +1,5 @@
 import { CONCEPTS } from '../engine/concepts';
+import { t, tn } from '../i18n';
 import type { ConceptId } from '../engine/types';
 import { dayOf, daysBetween, dueNow, statusOf, streak } from './learner';
 import type { AppState, AttemptRecord, LearnEvent } from './types';
@@ -246,12 +247,12 @@ export function dailyQuests(s: Input, now: Date = new Date()): Quest[] {
   const mine = s.attempts.filter((a) => a.day === today);
   const solvedToday = mine.filter((a) => a.verdict === 'solved');
   const n = Math.max(2, Math.min(5, m.next.problems - 1));
-  const quests: Quest[] = [{ id: 'solve', title: `Solve ${n} problems`, done: Math.min(n, solvedToday.length), of: n, icon: 'pencil' }];
+  const quests: Quest[] = [{ id: 'solve', title: tn(n, 'Solve {n} problem', 'Solve {n} problems'), done: Math.min(n, solvedToday.length), of: n, icon: 'pencil' }];
   const target = dueNow(s.concepts, today)[0]?.concept ?? m.weakest[0];
-  if (target) quests.push({ id: 'weak', title: `One clean solve: ${CONCEPTS[target].title}`, done: mine.some((a) => clean(a) && a.concepts.includes(target)) ? 1 : 0, of: 1, icon: 'target' });
-  else quests.push({ id: 'read', title: 'Read one lesson', done: Object.values(s.read).includes(today) ? 1 : 0, of: 1, icon: 'book' });
-  if (m.style.hintReliance > 0.4) quests.push({ id: 'nohint', title: 'Solve one with no hints', done: solvedToday.some((a) => a.hintRung === 0) ? 1 : 0, of: 1, icon: 'bulb' });
-  else if (m.style.mistakes === 'careless') quests.push({ id: 'clean', title: 'One solution with every line clean', done: mine.some(clean) ? 1 : 0, of: 1, icon: 'check' });
-  else quests.push({ id: 'streak', title: m.habits.streak > 1 ? `Keep your ${m.habits.streak}-day streak` : 'Start a streak', done: mine.length ? 1 : 0, of: 1, icon: 'flame' });
+  if (target) quests.push({ id: 'weak', title: t('One clean solve: {idea}', { idea: t(CONCEPTS[target].title) }), done: mine.some((a) => clean(a) && a.concepts.includes(target)) ? 1 : 0, of: 1, icon: 'target' });
+  else quests.push({ id: 'read', title: t('Read one lesson'), done: Object.values(s.read).includes(today) ? 1 : 0, of: 1, icon: 'book' });
+  if (m.style.hintReliance > 0.4) quests.push({ id: 'nohint', title: t('Solve one with no hints'), done: solvedToday.some((a) => a.hintRung === 0) ? 1 : 0, of: 1, icon: 'bulb' });
+  else if (m.style.mistakes === 'careless') quests.push({ id: 'clean', title: t('One solution with every line clean'), done: mine.some(clean) ? 1 : 0, of: 1, icon: 'check' });
+  else quests.push({ id: 'streak', title: m.habits.streak > 1 ? t('Keep your {n}-day streak', { n: m.habits.streak }) : t('Start a streak'), done: mine.length ? 1 : 0, of: 1, icon: 'flame' });
   return quests;
 }

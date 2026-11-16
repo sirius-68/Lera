@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { CONCEPTS } from '../engine/concepts';
 import { functionOfLine } from '../ingest/calc';
-import { isMathLine, plain } from '../ingest/structure';
+import { isMathLine, parseExercises, plain } from '../ingest/structure';
 import { prettyInline } from '../ingest/text';
 import { Block, LeraDoc, Topic } from '../ingest/types';
 import { Lera } from '../mascot/Lera';
@@ -213,10 +213,18 @@ function MathBlock({ text, steps, caption, index, ctx }: { text: string; steps?:
   );
 }
 
-/** Worked examples from the notes are revealed a line at a time: predict, then look. */
+/** Worked examples from the notes are revealed a line at a time: predict, then look. Each one can also be tried, or explained. */
 function ExampleCard({ block, index, ctx }: { block: Extract<Block, { t: 'example' }>; index: number; ctx: ReaderCtx }) {
   const [shown, setShown] = useState(1);
   const total = block.lines.length;
+  // the example's own question, as something to solve: taken from its first line (or its title, when the question sits there)
+  const problem = useMemo(() => {
+    for (const src of [block.lines[0], block.title, `${block.lines[0] ?? ''} ${block.lines[1] ?? ''}`]) {
+      const found = src ? parseExercises(plain(src), undefined, ctx.topicId).problems[0] : undefined;
+      if (found) return { ...found, id: `${ctx.topicId}:ex${index}`, source: 'notes' as const };
+    }
+    return null;
+  }, [block, index, ctx.topicId]);
   return (
     <div className="rd-example">
       <span className="label">{block.title || 'Example'}</span>
@@ -232,17 +240,33 @@ function ExampleCard({ block, index, ctx }: { block: Extract<Block, { t: 'exampl
           </div>
         ))}
       </div>
-      {shown < total && (
+      <div className="ex-acts">
+        {shown < total && (
+          <button
+            className="reveal"
+            onClick={() => {
+              haptic(5);
+              setShown(shown + 1);
+            }}
+          >
+            Next line <span className="faint">· {shown}/{total}</span> <Icon name="down" size={16} />
+          </button>
+        )}
+        {problem && (
+          <button className="reveal alt" onClick={() => { haptic(5); go({ name: 'session', problems: [problem], title: block.title || 'Example' }); }}>
+            <Icon name="pencil" size={15} /> Try it myself
+          </button>
+        )}
         <button
-          className="reveal"
+          className="reveal alt"
           onClick={() => {
             haptic(5);
-            setShown(shown + 1);
+            openOverlay({ name: 'ask', topicId: ctx.topicId, seed: `Explain this example to me step by step, and say why each step is allowed: ${block.lines.map((l) => plain(l)).join(' ; ')}` });
           }}
         >
-          Next line <span className="faint">· {shown}/{total}</span> <Icon name="down" size={16} />
+          <Icon name="chat" size={15} /> Explain it
         </button>
-      )}
+      </div>
     </div>
   );
 }

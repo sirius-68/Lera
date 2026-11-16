@@ -64,20 +64,32 @@ function syncHistory(): void {
 const deep = (n: NavState): boolean => n.stack.length > 1 || n.overlay !== null;
 let leaveTimer: ReturnType<typeof setTimeout> | undefined;
 
+const tellHost = () => {
+  const top = nav.stack[nav.stack.length - 1];
+  post({ t: 'nav', deep: deep(nav), depth: nav.stack.length, top: top.name, overlay: nav.overlay?.name ?? null, tab: nav.stack[0].name });
+};
+
 const emit = () => {
   syncHistory();
   clearTimeout(leaveTimer);
   if (inHost) {
-    const top = nav.stack[nav.stack.length - 1];
-    post({ t: 'nav', deep: deep(nav), depth: nav.stack.length, top: top.name, overlay: nav.overlay?.name ?? null, tab: nav.stack[0].name });
     if (deep(view) && !deep(nav)) {
-      // keep the screen drawn while the native app slides it away, then let go of it
+      // closing: keep the screen drawn while the native app slides it away, then let go of it
+      tellHost();
       leaveTimer = setTimeout(() => {
         view = nav;
         listeners.forEach((l) => l());
       }, 280);
       return;
     }
+    if (!deep(view) && deep(nav)) {
+      // opening: draw the screen first, and only then let the native app slide it in, so it never slides in empty
+      view = nav;
+      listeners.forEach((l) => l());
+      requestAnimationFrame(() => requestAnimationFrame(tellHost));
+      return;
+    }
+    tellHost();
   }
   view = nav;
   listeners.forEach((l) => l());

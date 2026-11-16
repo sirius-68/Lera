@@ -36,21 +36,35 @@ export function StreakScreen() {
   const peak = Math.max(1, ...month.map((d) => d.xp));
   // the header floats above the page: content scrolls underneath it, and it folds down to the week strip
   const hero = useRef<HTMLDivElement | null>(null);
+  const main = useRef<HTMLDivElement | null>(null);
   const [heroH, setHeroH] = useState(360);
-  const [compact, setCompact] = useState(false);
+  // how far the header can fold: the height of the flame and the two lines under it
+  const fold = useRef(200);
   useLayoutEffect(() => {
-    if (hero.current && !compact) setHeroH(hero.current.offsetHeight);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (hero.current) setHeroH(hero.current.offsetHeight);
+    if (main.current) fold.current = main.current.offsetHeight;
   }, [days, doneToday]);
+  // The fold follows the finger: every scrolled pixel moves the header by the same amount, until only the week is left.
+  // Only transforms and opacity change, so the page is never laid out again while scrolling.
+  const frame = useRef(0);
+  const onScroll = (e: { currentTarget: HTMLElement }) => {
+    const top = e.currentTarget.scrollTop;
+    cancelAnimationFrame(frame.current);
+    frame.current = requestAnimationFrame(() => {
+      const p = Math.max(0, Math.min(1, top / fold.current));
+      hero.current?.style.setProperty('--p', p.toFixed(4));
+      hero.current?.style.setProperty('--fold', `${fold.current}px`);
+    });
+  };
 
   return (
     <div className="screen streak-screen" data-dir="1">
-      <div className={`streak-hero ${compact ? 'compact' : ''}`} ref={hero}>
+      <div className="streak-hero" ref={hero}>
         <div className="topbar" style={{ color: '#fff' }}>
           <button className="iconbtn onflame" onClick={back} aria-label="Back"><Icon name="back" /></button>
           <h1 style={{ color: '#fff' }}>Streak</h1>
         </div>
-        <div className="streak-main">
+        <div className="streak-main" ref={main}>
           <div className={`flame-wrap ${doneToday ? 'lit' : ''}`}>
             <span className="flame-glow" />
             <Icon name="flame" size={92} fill />
@@ -71,7 +85,7 @@ export function StreakScreen() {
         </div>
       </div>
 
-      <div className="scroll streak-scroll" onScroll={(e: { currentTarget: HTMLElement }) => setCompact(e.currentTarget.scrollTop > 28)}>
+      <div className="scroll streak-scroll" onScroll={onScroll}>
         <div className="stagger" style={{ padding: `${heroH + 18}px 20px 30px`, display: 'flex', flexDirection: 'column', gap: 14 }}>
           {!doneToday && (
             <div className="center">

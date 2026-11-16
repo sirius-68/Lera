@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { pickLang } from '../i18n';
 import { BUILD_AI } from '../ai/config';
 import { AttemptAnalysis, ConceptId, Problem } from '../engine/types';
 import { LeraDoc } from '../ingest/types';
@@ -18,7 +19,7 @@ const KEY = 'lera.state.v1';
 export const emptyProfile = (): Profile => ({
   name: '',
   email: '',
-  language: 'en',
+  language: pickLang(hostConfig?.lang ?? (typeof navigator !== 'undefined' ? navigator.language : 'en')),
   focusMinutes: 10,
   subjects: ['algebra'],
   dailyXp: 30,

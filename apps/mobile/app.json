@@ -28,6 +28,15 @@
     "plugins": [
       "expo-router",
       "expo-font",
+      "expo-localization",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#ffffff",
+          "image": "./assets/splash.png",
+          "imageWidth": 220
+        }
+      ],
       [
         "expo-notifications",
         {
@@ -37,9 +46,6 @@
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "splash": {
-      "backgroundColor": "#ffffff"
     }
   }
 }

@@ -7,7 +7,7 @@ import { structureDoc } from './structure';
 import { cleanText } from './text';
 import { IngestProgress, LeraDoc, RawDoc, RawPara } from './types';
 
-export type { LeraDoc, Topic, Unit, Block, IngestProgress } from './types';
+export type { LeraDoc, IngestProgress } from './types';
 
 function sniff(bytes: Uint8Array, name: string): 'pdf' | 'docx' | 'doc' | 'text' {
   const head = String.fromCharCode(...bytes.slice(0, 5));
@@ -82,6 +82,11 @@ export interface IngestOptions {
   ai?: AiConfig | null;
   onProgress?: (p: IngestProgress) => void;
   signal?: AbortSignal;
+  /**
+   * Called once the words have been read and before they are arranged into lessons. It may return the same
+   * paragraphs in another language (after asking the person), or null to leave them alone.
+   */
+  translate?: (paras: RawPara[]) => Promise<RawPara[] | null>;
 }
 
 /** File bytes → structured, interactive notes. */
@@ -101,6 +106,10 @@ export async function ingestBytes(bytes: Uint8Array, fileName: string, opts: Ing
     raw = readText(new TextDecoder('utf-8').decode(bytes), fileName);
   }
   if (raw.paras.length === 0) throw new Error('This file doesn’t seem to contain any text I can read.');
+  if (opts.translate) {
+    const translated = await opts.translate(raw.paras);
+    if (translated) raw = { ...raw, paras: translated };
+  }
   report('structuring', 0.5);
 
   let doc: LeraDoc;
@@ -125,9 +134,4 @@ export async function ingestBytes(bytes: Uint8Array, fileName: string, opts: Ing
   report('path', 0.95);
   report('done', 1);
   return doc;
-}
-
-export async function ingestFile(file: File, opts: IngestOptions = {}): Promise<LeraDoc> {
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  return ingestBytes(bytes, file.name, opts);
 }

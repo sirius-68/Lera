@@ -86,10 +86,11 @@ function startHostLink(): void {
     }
   });
   // the widget buttons in Settings ask the native side, which owns the widget
-  if (hostConfig?.canPin !== undefined) {
+  const canPin = hostConfig?.canPin;
+  if (canPin !== undefined) {
     (globalThis as Record<string, unknown>).LeraNative = {
       setWidget: () => undefined,
-      canPin: () => hostConfig.canPin === true,
+      canPin: () => canPin === true,
       pinWidget: (wide: boolean) => (post({ t: 'pin', wide }), true),
       takeAction: () => '',
     };

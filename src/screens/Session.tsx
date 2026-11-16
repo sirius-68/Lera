@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { aiCheckOpen, aiDiagnose, aiSimplify } from '../ai/tasks';
 import { aiReady } from '../ai/providers';
-import { analyze, cleanPath, hintLadder, HintLadder } from '../engine/analyze';
+import { analyze, cleanPath, hintLadder, HintLadder, stepConcepts } from '../engine/analyze';
 import { isCalc } from '../engine/calc/check';
 import { CONCEPTS } from '../engine/concepts';
 import { PLAIN } from '../engine/concepts-calc';
@@ -18,6 +18,7 @@ import { Icon } from '../ui/icons';
 import { MathField, MathFieldHandle } from '../ui/MathField';
 import type { Kind } from '../ui/mathrow';
 import { MathView, RichText } from '../ui/math';
+import { TermText } from '../ui/terms';
 import { WeakCard } from './Main';
 
 interface Result {
@@ -145,7 +146,7 @@ function DiagnosisCard({ diag, onReview, onFix, fixShown, aiNote, onSense }: { d
         <span className={`chip ${chipTone(diag.severity)}`}>{SEVERITY_LABEL[diag.severity]}</span>
         <b className="grow" style={{ fontSize: 14.5, lineHeight: 1.3 }}><RichText text={diag.title} /></b>
       </div>
-      <p style={{ fontSize: 14.5, lineHeight: 1.5, marginTop: 8 }}><RichText text={aiNote ?? diag.message} /></p>
+      <p style={{ fontSize: 14.5, lineHeight: 1.5, marginTop: 8 }}><TermText text={aiNote ?? diag.message} /></p>
       {diag.severity !== 'strategy' && (
         <div className="sense" data-state={sense ?? 'ask'}>
           {sense === null && (
@@ -217,8 +218,13 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
   const fieldRef = useRef<MathFieldHandle | null>(null);
   /** The final answer, given before any working was shown. */
   const [answerFirst, setAnswerFirst] = useState<string | null>(null);
-  // asked once per problem: if the answer alone comes back a second time it is taken, so nobody gets stuck
-  const needsWorking = answerFirst === null;
+  const clean = useMemo(() => cleanPath(problem), [problem]);
+  const cleanConcepts = useMemo(() => stepConcepts(problem, clean), [problem, clean]);
+  // A problem that takes one step has no working to show: the answer is the working, and it is simply accepted.
+  // For longer ones the working is asked for once; if the answer alone comes back a second time it is taken, so nobody gets stuck.
+  const needsWorking = answerFirst === null && clean.length > 1;
+  /** What "Done" found when the work was not right or not finished yet. */
+  const [review, setReview] = useState<{ wrong: number[]; remaining: string | null } | null>(null);
   const [gaps, setGaps] = useState(false);
   const scroller = useRef<HTMLDivElement | null>(null);
   const started = useRef(Date.now());
@@ -230,7 +236,6 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
   const allChecked = mode === 'line' || checkedCount >= lines.length;
   const solved = analysis.verdict === 'solved' && allChecked;
   const finished = solved || revealed;
-  const clean = useMemo(() => cleanPath(problem), [problem]);
   const vars = useMemo(() => {
     if (isCalc(problem.kind)) return [problem.variable ?? 'x'];
     const found = [...new Set((problem.given.match(/[a-z]/gi) ?? []).filter((c) => !/[e]/i.test(c) || problem.given.includes('e')))];
@@ -302,15 +307,16 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
 
   // the field keeps one Enter handler for its whole life; this always points at the current commit
   const commitRef = useRef<() => void>(() => undefined);
-  const commit = () => {
+  /** The tick: take the line being written and move to the next one. Returns the lines as they now stand, or null if the line was not taken. */
+  const commit = (): string[] | null => {
     // "= 6" carries on from the line above: the sign is dropped, the rest is the line
     const text = input.trim().replace(/^=\s*(?=[^=]*$)/, '');
-    if (!text || finished) return;
+    if (!text || finished) return null;
     if (gaps) {
       setNote('One of the boxes is still empty. Fill it in, or delete it.');
       setShake((n) => n + 1);
       haptic([12, 30, 12]);
-      return;
+      return null;
     }
     const next = [...lines, text];
     const a = analyze(problem, next);
@@ -320,7 +326,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       setShake((n) => n + 1);
       setMood('curious');
       haptic([12, 30, 12]);
-      return;
+      return null;
     }
     // The right answer with no working: accepted, but the working is the point. I can only find how someone
     // thinks, and where it goes wrong, from the lines in between. So the answer is kept aside and the steps asked for.
@@ -332,9 +338,10 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       setMood('thumbsup');
       haptic([10, 40, 16]);
       setNote(null);
-      return;
+      return null;
     }
     setLines(next);
+    setReview(null);
     fieldRef.current?.clear();
     setInput('');
     setHintOpen(false);
@@ -343,7 +350,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       setNote(null);
       setOpenDiag(null);
       setMood('calculating'); // she reads along but keeps quiet until asked
-      return;
+      return next;
     }
     setNote(line.status === 'unchecked' ? line.note ?? 'I can’t compare this line with the one above, so I’ve left it unmarked.' : null);
     const idx = next.length - 1;
@@ -372,20 +379,24 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       if (line.status === 'recovered') setNote('Back on track: this line is true to the original problem again.');
       setTimeout(() => setMood('idle'), 1100);
     }
+      return next;
   };
 
-  commitRef.current = commit;
+  commitRef.current = () => void commit();
 
-  /** "When I finish" mode: mark every line written so far, all at once. */
-  const checkAll = () => {
-    if (!lines.length || finished) return;
-    const a = analysis;
-    setCheckedCount(lines.length);
+  /**
+   * "Done": I have finished solving. Every line written is read and marked, and what is wrong is named.
+   * If it is solved, the problem ends. If not, the mistakes are listed, to fix or to see solved step by step.
+   */
+  const reviewWork = (all: string[] = lines) => {
+    if (!all.length || finished) return;
+    const a = all === lines ? analysis : analyze(problem, all);
+    setCheckedCount(all.length);
     setHintOpen(false);
-    const wrong = a.lines.filter((l) => l.status === 'wrong');
-    if (a.verdict === 'solved' && lines.length === 1 && needsWorking) {
+    const wrong = a.lines.map((l, i) => (l.status === 'wrong' ? i : -1)).filter((i) => i >= 0);
+    if (a.verdict === 'solved' && all.length === 1 && needsWorking) {
       // only the answer was written: keep it aside and ask for the working
-      setAnswerFirst(lines[0]);
+      setAnswerFirst(all[0]);
       actions.track('answer_only');
       setLines([]);
       setCheckedCount(0);
@@ -393,29 +404,42 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       return;
     }
     if (a.verdict === 'solved') {
-      for (const l of wrong) if (l.diag) seen.current.set(`${l.diag.code}:${l.diag.concept}`, l.diag);
-      setOpenDiag(wrong.length ? a.lines.findIndex((l) => l.status === 'wrong') : null);
+      for (const i of wrong) {
+        const d = a.lines[i].diag;
+        if (d) seen.current.set(`${d.code}:${d.concept}`, d);
+      }
+      setOpenDiag(wrong.length ? wrong[0] : null);
       setNote(null);
+      setReview(null);
       setMood('celebrate');
       haptic([10, 50, 20]);
       record(a, rung);
-    } else if (wrong.length) {
-      setOpenDiag(a.lines.findIndex((l) => l.status === 'wrong'));
-      setMood('oops');
+      return;
+    }
+    setNote(null);
+    setReview({ wrong, remaining: wrong.length ? null : a.remaining ?? 'Every line follows, but it isn’t finished yet.' });
+    setOpenDiag(wrong.length ? wrong[0] : null);
+    setMood(wrong.length ? 'oops' : 'happy');
+    if (wrong.length) {
       haptic([14, 40, 14]);
       setTimeout(() => setMood('thinking'), 1400);
-      setNote(`${wrong.length === 1 ? 'One line doesn’t' : `${wrong.length} lines don’t`} follow. Tap a flagged line to see why, then write the corrected line underneath, or delete back to it.`);
-    } else {
-      setOpenDiag(null);
-      setMood('happy');
-      setNote(a.remaining ?? 'Every line follows, but it isn’t finished yet. Keep going.');
     }
+  };
+
+  /** The Done button: take whatever is still in the box as the last line, then review everything. */
+  const done = () => {
+    if (input.trim()) {
+      const next = commit();
+      if (next) reviewWork(next);
+      return;
+    }
+    reviewWork();
   };
 
   const switchMode = () => {
     const nextMode = mode === 'line' ? 'end' : 'line';
     haptic(5);
-    if (nextMode === 'line') checkAll();
+    if (nextMode === 'line') reviewWork();
     else setCheckedCount(lines.length);
     setMode(nextMode);
     actions.setProfile({ checkMode: nextMode });
@@ -438,6 +462,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
   const reveal = () => {
     actions.track('reveal');
     setRevealed(true);
+    setReview(null);
     setHintOpen(false);
     setRung(3);
     setMood('idle');
@@ -482,7 +507,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
               <span className="chip ok"><Icon name="check" size={13} stroke={3.2} /> Right answer</span>
               <MathView text={answerFirst} />
             </div>
-            <p><b>Now show me how you got there.</b> Write your working, at least two lines, ending with the answer. The answer tells me you can do it. The steps show me how you think, and that is where I can help.</p>
+            <p><b>Now show me how you got there.</b> This one takes about {clean.length} lines. Write them, ending with the answer. The answer tells me you can do it. The steps show me how you think, and that is where I can help.</p>
           </div>
         )}
         <ol className="lines">
@@ -544,6 +569,27 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
           </div>
         )}
         {note && !finished && <p className="ws-note"><Icon name="question" size={16} /> <span>{note}</span></p>}
+
+        {review && !finished && (
+          <div className={`ws-review ${review.wrong.length ? 'bad' : ''}`} role="status">
+            <b>{review.wrong.length ? (lines.length === 1 ? 'I read your line. It needs another look.' : `I read all ${lines.length} of your lines. ${review.wrong.length === 1 ? 'One needs' : `${review.wrong.length} need`} another look.`) : 'Right so far, but not finished.'}</b>
+            {review.wrong.map((i) => {
+              const d = analysis.lines[i]?.diag;
+              return (
+                <button key={i} className="ws-review-line" onClick={() => setOpenDiag(i)}>
+                  <span className={`chip ${d ? chipTone(d.severity) : 'gap'}`}>Line {i + 1}</span>
+                  <span className="grow"><RichText text={d?.title ?? 'This line does not follow from the one above.'} /></span>
+                  <Icon name="chevron" size={15} />
+                </button>
+              );
+            })}
+            {review.remaining && <p><TermText text={review.remaining} /></p>}
+            <div className="row" style={{ gap: 8, marginTop: 4 }}>
+              <button className="tool" onClick={() => setReview(null)}>{review.wrong.length ? 'Fix it myself' : 'Keep going'}</button>
+              <button className="tool go" onClick={reveal}>Show it solved, step by step</button>
+            </div>
+          </div>
+        )}
 
         {hintOpen && hint && !finished && (
           <div className="hint">
@@ -612,12 +658,23 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
                 </button>
                 {(compare || revealed) && (
                   <ol className="route">
-                    {clean.map((s, i) => (
-                      <li key={i} style={{ animationDelay: `${i * 90}ms` }}>
-                        <MathView text={s.line} block />
-                        <span className="muted"><RichText text={s.why} /></span>
-                      </li>
-                    ))}
+                    {clean.map((s, i) => {
+                      const c = cleanConcepts[i];
+                      // the rule is spelled out the first time a step leans on it, not on every line
+                      const rule = c && cleanConcepts.indexOf(c) === i ? CONCEPTS[c] : null;
+                      return (
+                        <li key={i} style={{ animationDelay: `${i * 90}ms` }}>
+                          <MathView text={s.line} block />
+                          <span className="muted"><b>What I did.</b> <TermText text={s.why} /></span>
+                          {rule && clean.length > 1 && (
+                            <span className="route-why">
+                              <b>Why it is allowed.</b> <TermText text={rule.short} />{' '}
+                              <button className="linkbtn" onClick={() => openOverlay({ name: 'review', concept: rule.id })}>{rule.title} <Icon name="chevron" size={13} /></button>
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ol>
                 )}
               </div>
@@ -642,13 +699,8 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
               <Icon name={mode === 'end' ? 'clock' : 'check'} size={16} stroke={2.6} /> {mode === 'end' ? 'At the end' : 'As I go'}
             </button>
             <span className="grow" />
-            {mode === 'end' && lines.length > checkedCount && (
-              <button className="tool go" onClick={checkAll}>
-                <Icon name="check" size={16} stroke={3} /> Check my work
-              </button>
-            )}
-            {(lines.length > 0 || !!input.trim()) && !(mode === 'end' && lines.length > checkedCount) && (
-              <button className="tool go" onClick={() => (input.trim() ? commit() : checkAll())}>
+            {(lines.length > 0 || !!input.trim()) && (
+              <button className="tool go" onClick={done} aria-label="I have finished solving: check all my work">
                 <Icon name="check" size={16} stroke={3} /> Done
               </button>
             )}

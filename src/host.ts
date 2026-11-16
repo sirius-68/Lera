@@ -8,6 +8,8 @@
  */
 export interface HostConfig {
   platform?: 'android' | 'ios' | 'web';
+  /** The phone's language, e.g. 'fr-FR'. */
+  lang?: string;
   insets?: { top: number; bottom: number };
   /** The launcher can add a home-screen widget for us (Android). */
   canPin?: boolean;
