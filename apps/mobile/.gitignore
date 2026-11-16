@@ -1,8 +1,8 @@
 node_modules
 .expo
 dist*
-android
-ios
+/android
+/ios
 expo-env.d.ts
 web/island.js
 # copied from android-overrides/ by scripts/sync-widgets.mjs
