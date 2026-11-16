@@ -85,7 +85,7 @@ export const TASKS: Record<string, Task> = {
     },
   },
   // Ask Lera: a conversation about maths, it has to be right and kind
-  chat: { ladder: ['medium', 'hard'], maxTokens: 600 },
+  chat: { ladder: ['medium', 'hard'], maxTokens: 900 },
   // a word problem the engine cannot check: the model's judgement is the check, so the best one does it
   checkOpen: { ladder: ['hard'], maxTokens: 400, check: (r) => isObject(firstJson(r)) && typeof (firstJson(r) as { correct?: unknown }).correct === 'boolean' },
   // putting a mistake the engine already found into words

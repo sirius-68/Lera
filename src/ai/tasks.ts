@@ -17,7 +17,7 @@ Write maths in plain linear text between dollar signs, like $3x + 4 = 19$ or $x^
 
 interface AiTopic {
   title?: string;
-  blocks?: { t?: string; text?: string; items?: string[]; lines?: string[]; title?: string; label?: string }[];
+  blocks?: { t?: string; text?: string; items?: string[]; lines?: string[]; title?: string; label?: string; rows?: unknown[][] }[];
   exercises?: { instruction?: string; math?: string; text?: string }[];
 }
 interface AiDoc {
@@ -37,7 +37,7 @@ Return ONLY a JSON object:
       "blocks": [
         {"t":"p","text":string} | {"t":"h","text":string} | {"t":"math","text":string} |
         {"t":"list","items":[string]} | {"t":"example","title":string,"lines":[string]} |
-        {"t":"note","label":string,"text":string}
+        {"t":"note","label":string,"text":string} | {"t":"table","rows":[[string]]}
       ],
       "exercises": [{"instruction": string, "math": string}]
   }]}],
@@ -47,7 +47,10 @@ Return ONLY a JSON object:
 Rules:
 - Keep the author's wording for explanations. Do not summarise away content.
 - Write all maths as plain linear text: 3x + 4 = 19, x^2 - 5x + 6, (x + 1)/(x - 2), sqrt(9), <=, >=. Inside prose, wrap maths in $...$.
-- "math" blocks are display equations on their own line.
+- If the notes contain LaTeX (\\int, \\frac{..}{..}, \\sin, ^{..}), keep it EXACTLY as written, backslashes included. Never convert LaTeX to plain text or the other way.
+- "math" blocks are display equations on their own line: one formula per block, no surrounding words.
+- A table in the notes (rows of values in columns, such as a function beside its integral) is a "table" block: "rows" is a list of rows, each a list of cell strings, the heading row first. Never flatten a table into sentences.
+- Keep the author's line breaks in meaning: a new sentence group is a new "p" block; a formula between two sentences is its own "math" block between two "p" blocks.
 - Worked examples (question plus worked steps) go in "example" blocks, one step per line.
 - Anything the student is meant to do themselves goes in "exercises", NOT in blocks. "instruction" is the task in words (Solve for x, Simplify, Factorise, Expand, Evaluate when x = 2); "math" is only the expression or equation.
 - Word problems with no single expression: put the full text in "instruction" and leave "math" empty.
@@ -100,6 +103,11 @@ function toBlocks(raw: AiTopic['blocks']): Block[] {
       case 'example':
         if (Array.isArray(b.lines) && b.lines.length) out.push({ t: 'example', title: b.title?.trim() || 'Example', lines: b.lines.map(String) });
         break;
+      case 'table': {
+        const rows = Array.isArray(b.rows) ? b.rows.filter((r) => Array.isArray(r) && r.length).map((r) => r.map(String)) : [];
+        if (rows.length > 1) out.push({ t: 'table', rows });
+        break;
+      }
       case 'note':
         if (text) out.push({ t: 'note', label: b.label?.trim() || 'Note', text });
         break;
@@ -232,7 +240,13 @@ export interface TutorContext {
 }
 
 /** Lera's voice, plus the language the student reads the app in. */
-const voice = (): string => (getLang() === 'en' ? VOICE : `${VOICE}\nWrite everything the student will read in ${langName()}. Leave formulas, numbers and maths notation exactly as they are.`);
+const FORMAT = `How to write your answer:
+- Every formula, variable and expression is LaTeX between dollar signs: $u = \\sin x$, $\\int u\\,dv = uv - \\int v\\,du$. Never leave a backslash command outside dollar signs.
+- A formula that is a step of its own goes on its own line between double dollar signs: $$I = \\frac{e^x(\\sin x - \\cos x)}{2} + C$$
+- One idea per short paragraph, with a blank line between paragraphs. For steps, use a numbered list.
+- Values in rows and columns go in a Markdown table (| a | b | with a |---|---| line under the heading row).`;
+
+const voice = (): string => `${VOICE}\n${FORMAT}${getLang() === 'en' ? '' : `\nWrite everything the student will read in ${langName()}. Leave formulas, numbers and maths notation exactly as they are.`}`;
 
 function describe(ctx: TutorContext): string {
   const parts: string[] = [];
@@ -247,13 +261,13 @@ function describe(ctx: TutorContext): string {
 
 export async function aiChat(config: AiConfig, history: ChatMessage[], ctx: TutorContext, signal?: AbortSignal): Promise<string> {
   const system = `${voice()}
-Answer in at most 80 words. If the student asks for the answer to the problem they are solving, give the next idea or a question that leads to it, not the answer.
+Answer in at most 80 words, or up to 170 when asked to explain an example or go step by step. If the student asks for the answer to the problem they are solving, give the next idea or a question that leads to it, not the answer.
 The algebra checker's verdict in the context below is always right; never contradict it.
 
 ${describe(ctx)}`;
   // still asking after three questions: the router starts one model higher
   const asked = history.filter((m) => m.role === 'user').length;
-  return chat(config, [{ role: 'system', content: system }, ...history.slice(-8)], { task: 'chat', level: asked >= 3 ? 1 : 0, temperature: 0.4, maxTokens: 320, signal });
+  return chat(config, [{ role: 'system', content: system }, ...history.slice(-8)], { task: 'chat', level: asked >= 3 ? 1 : 0, temperature: 0.4, maxTokens: 700, signal });
 }
 
 /** A second opinion in words for a step the rule-based diagnosis could not name. */

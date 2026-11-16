@@ -16,6 +16,7 @@ import { ChatMsg } from '../store/types';
 import { Button3D, Sheet, confirmDialog, haptic, leraReact, toast } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import { MathView, RichText } from '../ui/math';
+import { Md } from '../ui/Md';
 
 /* ───────────── three-minute review ───────────── */
 
@@ -200,7 +201,7 @@ export function AskSheet({ topicId, seed, problem, lines }: AskProps) {
 
   const excerpt = found
     ? found.topic.blocks
-        .map((b) => (b.t === 'list' ? b.items.join(' ') : b.t === 'example' ? b.lines.join(' ') : b.text))
+        .map((b) => (b.t === 'list' ? b.items.join(' ') : b.t === 'example' ? b.lines.join(' ') : b.t === 'table' ? b.rows.map((r) => r.join(' | ')).join('\n') : b.text))
         .join('\n')
         .slice(0, 1200)
     : undefined;
@@ -333,9 +334,7 @@ export function AskSheet({ topicId, seed, problem, lines }: AskProps) {
           {msgs.map((m, i) => (
             <div key={m.id ?? i} className={`msg-wrap ${m.role}`}>
               <button className={`msg ${m.role}`} onClick={() => { haptic(4); setOpenMsg(openMsg === m.id ? null : m.id); }} aria-expanded={openMsg === m.id} aria-label={`${m.role === 'user' ? 'Your message' : 'Lera’s answer'}. Tap for options.`}>
-                {m.text.split(/\n{2,}/).map((para, j) => (
-                  <p key={j}><RichText text={para} /></p>
-                ))}
+                <Md text={m.text} />
               </button>
               {openMsg === m.id && (
                 <div className="msg-tools">

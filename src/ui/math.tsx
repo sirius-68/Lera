@@ -1,5 +1,6 @@
 import katex from 'katex';
 import { AS_WRITTEN, mathLatex, writtenLatex } from '../engine/latex';
+import { cleanTex, hasTex, markTex } from '../engine/tex';
 import { prettyInline } from '../ingest/text';
 
 const cache = new Map<string, string | null>();
@@ -12,7 +13,9 @@ export function typeset(text: string, display = false): string | null {
   let html: string | null = null;
   try {
     // a formula quoted from a document is set the way the document wrote it; anything it cannot place falls back to the engine
-    const latex = text.startsWith(AS_WRITTEN) ? writtenLatex(text.slice(1)) ?? mathLatex(text.slice(1)) : mathLatex(text);
+    const body = text.startsWith(AS_WRITTEN) ? text.slice(1) : text;
+    // maths already written in LaTeX (from a file, or by the AI) is drawn as it stands; the engine's own notation is converted
+    const latex = hasTex(body) ? cleanTex(body) : text.startsWith(AS_WRITTEN) ? writtenLatex(body) ?? mathLatex(body) : mathLatex(text);
     if (latex) html = katex.renderToString(latex, { displayMode: display, throwOnError: false, output: 'html', strict: 'ignore' });
   } catch {
     html = null;
@@ -71,7 +74,7 @@ export function tokenize(text: string): Tok[] {
 export function RichText({ text }: { text: string }) {
   return (
     <>
-      {tokenize(text).map((tok, i) =>
+      {tokenize(markTex(text)).map((tok, i) =>
         tok.t === 'math' ? <MathView key={i} text={tok.s} /> : tok.t === 'bold' ? <strong key={i}>{tok.s}</strong> : <span key={i}>{tok.s}</span>,
       )}
     </>

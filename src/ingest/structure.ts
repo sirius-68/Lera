@@ -1,4 +1,5 @@
 import { Statement, statementToText, statementVars, walk, Node } from '../engine/ast';
+import { cleanTex, hasTex, isTexLine, markTex } from '../engine/tex';
 import { finalForm, isCollected, prepare } from '../engine/check';
 import { cleanPath } from '../engine/analyze';
 import { CONCEPTS, conceptsForText } from '../engine/concepts';
@@ -286,6 +287,25 @@ function splitParts(text: string): { lead?: string; parts: string[] } {
   return { parts: [text] };
 }
 
+/**
+ * Marks the maths inside a line of prose so it is drawn. A line with LaTeX in it keeps its LaTeX exactly
+ * (a whole-line formula is left for the reader to set on its own); other lines get their powers and
+ * fractions marked the usual way.
+ */
+const FN_NAMES = /\b(arc(sin|cos|tan)|sinh|cosh|tanh|sin|cos|tan|sec|csc|cot|ln|log|exp|sqrt|lim|dx|dy|du|dv|dt)\b/g;
+/** A table cell that holds nothing but a formula ("1/√(1 − x^2)", "ln|sec x|") is typeset whole. */
+function cellMath(cell: string): string {
+  if (hasTex(cell) || cell.includes('$')) return inlineMath(cell);
+  const rest = cell.replace(FN_NAMES, ' ');
+  const formula = !/[A-Za-z]{2,}/.test(rest) && (rest !== cell || /[=+−\-*/^√|<>≤≥]/.test(cell) || /\d[A-Za-z]|[A-Za-z]\d/.test(cell));
+  return formula ? `$${cell}$` : inlineMath(cell);
+}
+
+function inlineMath(text: string): string {
+  if (!hasTex(text)) return markInlineMath(text);
+  return isTexLine(plain(text)) ? text : markTex(text);
+}
+
 /** The problems in a line of text: "Solve 3x + 2 = 11", or several parts (a) (b) (c) under one instruction. */
 export function parseExercises(text: string, inherited: string | undefined, topicId: string): { problems: Problem[]; instruction?: string } {
   const { lead, parts } = splitParts(text);
@@ -461,10 +481,10 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
       startTopic(`${baseTitle} · part ${partNo}`, true);
     }
     const t = ensureTopic();
-    load += raw.t === 'list' ? raw.items.join(' ').length + 60 : raw.t === 'example' ? 400 : raw.t === 'graph' ? 500 : raw.text.length + 40;
+    load += raw.t === 'list' ? raw.items.join(' ').length + 60 : raw.t === 'example' ? 400 : raw.t === 'graph' ? 500 : raw.t === 'table' ? raw.rows.length * 60 : raw.text.length + 40;
     // prose from files without equation objects: typeset the powers it mentions
     const b: Block =
-      raw.t === 'p' || raw.t === 'note' ? { ...raw, text: markInlineMath(raw.text) } : raw.t === 'list' ? { ...raw, items: raw.items.map(markInlineMath) } : raw;
+      raw.t === 'p' || raw.t === 'note' ? { ...raw, text: inlineMath(raw.text) } : raw.t === 'list' ? { ...raw, items: raw.items.map(inlineMath) } : raw;
     const last = t.blocks[t.blocks.length - 1];
     if (b.t === 'list' && last && last.t === 'list' && last.ordered === b.ordered) last.items.push(...b.items);
     else t.blocks.push(b);
@@ -532,16 +552,23 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
       }
     }
 
+    if (tg.para.table) {
+      const rows = tg.para.table.map((r) => r.map(cellMath));
+      // a first row of plain words is the heading row; a first row of values is just the first row
+      pushBlock({ t: 'table', rows, head: tg.para.table[0].every((c) => !/[\d=+^/|√]/.test(c)) });
+      continue;
+    }
     const exm = EXAMPLE_LEAD.exec(text);
     if (exm) {
       const rest = text.slice(exm[0].length).trim();
-      inExample = { t: 'example', title: exm[2] ? `Example ${exm[2]}` : 'Example', lines: rest ? [markInlineMath(rest)] : [] };
+      inExample = { t: 'example', title: exm[2] ? `Example ${exm[2]}` : 'Example', lines: rest ? [inlineMath(rest)] : [] };
       pushBlock(inExample);
       instructionLive = false;
       continue;
     }
 
-    const mathy = !!tg.para.math || isMathLine(text);
+    const tex = isTexLine(plain(text));
+    const mathy = !!tg.para.math || tex || isMathLine(text);
 
     const note = NOTE_LEAD.exec(text);
 
@@ -549,7 +576,7 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
       const worked = /^(solution|answer|step|so|therefore|then|check|hence|решение|ответ)\b/i.test(text);
       const keep = !note && !VERB.test(bare) && (mathy || worked || text.length <= 110);
       if (keep && inExample.lines.length < 14) {
-        inExample.lines.push(...(tg.para.rows ?? [text]).map(markInlineMath));
+        inExample.lines.push(...(tg.para.rows ?? [text]).map(inlineMath));
         continue;
       }
       inExample = null;
@@ -608,6 +635,11 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
       pendingFigure = null;
       continue;
     }
+    // a formula written in LaTeX in the file is kept exactly as written, and drawn
+    if (tex) {
+      pushBlock({ t: 'math', text: cleanTex(plain(text)) });
+      continue;
+    }
     if (mathy) {
       const tidy = (row: string) => toMathText(plain(row)).replace(/[.;,]+$/, '');
       const rows = tg.para.rows?.map(tidy);
@@ -660,7 +692,7 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
       const fromExercises = [...tally.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c);
       let ranked = [...fromText, ...fromExercises].filter((c) => CONCEPTS[c]);
       if (ranked.length === 0) {
-        const body = tp.blocks.map((b) => ('text' in b ? b.text : b.t === 'list' ? b.items.join(' ') : b.lines.join(' '))).join(' ').slice(0, 1500);
+        const body = tp.blocks.map((b) => ('text' in b ? b.text : b.t === 'list' ? b.items.join(' ') : b.t === 'table' ? b.rows.flat().join(' ') : b.lines.join(' '))).join(' ').slice(0, 1500);
         ranked = [...conceptsForText(`${u.title} ${body}`)];
       }
       tp.concepts = [...new Set(ranked)].slice(0, 4);

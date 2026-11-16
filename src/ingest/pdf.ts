@@ -56,6 +56,13 @@ interface Line {
   caption?: string;
   /** The row contains a rebuilt fraction. */
   frac?: boolean;
+  /** The row's text cut at its wide gaps, and where each piece starts: the cells of a table row, if its neighbours line up. */
+  cells?: string[];
+  cols?: number[];
+  /** Every gap in the row wider than a word space: where the text could be cut, and where the next piece starts. */
+  gaps?: { at: number; x: number }[];
+  /** The row's text before tidying, which `gaps` counts along. */
+  rawText?: string;
 }
 
 function mode<T>(entries: [T, number][]): T | undefined {
@@ -105,6 +112,9 @@ function buildLines(glyphs: Glyph[], page: number, pageWidth: number, pageHeight
     let text = '';
     let prevEnd: number | null = null;
     let breakAt = -1;
+    // every wide gap in the row: where the text is cut, and where the next piece starts on the page
+    const cuts: { at: number; x: number }[] = [];
+    const gaps: { at: number; x: number }[] = [];
     let hasFrac = false;
     let inkEnd: number | null = null;
     // a raised (or lowered) run can be split over several glyphs: "n", "−1" → ^(n−1)
@@ -128,10 +138,13 @@ function buildLines(glyphs: Glyph[], page: number, pageWidth: number, pageHeight
         continue;
       }
       // a wide gap in a row: a formula on the left and its name on the right
-      if (inkEnd !== null && breakAt < 0 && text.trim() && g.x - inkEnd > 2.4 * dom) {
+      if (inkEnd !== null && text.trim() && g.x - inkEnd > 2.4 * dom) {
         flush();
-        breakAt = text.length;
+        if (breakAt < 0) breakAt = text.length;
+        cuts.push({ at: text.length, x: g.x });
       }
+      // a narrower gap, still wider than a space: a column edge when the cell before it is long
+      if (inkEnd !== null && text.trim() && g.x - inkEnd > 0.7 * dom) gaps.push({ at: text.length, x: g.x });
       if (g.frac) {
         flush();
         hasFrac = true;
@@ -168,6 +181,12 @@ function buildLines(glyphs: Glyph[], page: number, pageWidth: number, pageHeight
     }
     flush();
     let caption: string | undefined;
+    let cells: string[] | undefined;
+    if (cuts.length) {
+      const ends = [...cuts.map((c) => c.at), text.length];
+      cells = [text.slice(0, ends[0]), ...cuts.map((c, k) => text.slice(c.at, ends[k + 1]))].map((c) => cleanText(c));
+      if (cells.some((c) => !c || c.length > 40)) cells = undefined;
+    }
     if (breakAt > 0) {
       const left = text.slice(0, breakAt).trim();
       const right = text.slice(breakAt).trim();
@@ -183,8 +202,14 @@ function buildLines(glyphs: Glyph[], page: number, pageWidth: number, pageHeight
     if (hasFrac || row !== rawRow) text = text.replace(/\s*·\s*/g, ' · ').replace(/\s+\)/g, ')').replace(/\(\s+/g, '(');
     const clean = cleanText(text.replace(/(\d\/\d+)(?=[A-Za-z(])/g, '$1 '));
     if (!clean) continue;
+    const x0 = Math.min(...inked.map((g) => g.x));
+    const plainRow = !caption && !TOC_TAIL.test(clean) && !/ \.{5} /.test(text);
     lines.push({
       caption,
+      cells: plainRow ? cells : undefined,
+      cols: plainRow && cells ? [x0, ...cuts.map((c) => c.x)] : undefined,
+      gaps: plainRow && gaps.length ? gaps : undefined,
+      rawText: plainRow && gaps.length ? text : undefined,
       frac: hasFrac || undefined,
       text: clean,
       x0: Math.min(...inked.map((g) => g.x)),
@@ -244,8 +269,55 @@ function assemble(lines: Line[]): RawPara[] {
   const left = Math.min(...lines.filter((l) => round(l.size) === body).map((l) => l.x0));
   const width = Math.max(1, right - left);
 
+  // rows of a table: at least two rows in a row, cut into the same number of pieces that start at the same places
+  const tableStart = new Map<Line, Line[]>();
+  const inTable = new Set<Line>();
+  for (let i = 0; i < lines.length; i++) {
+    const a = lines[i];
+    if (!a.cells || !a.cols) continue;
+    const rows = [a];
+    while (i + rows.length < lines.length) {
+      const b = lines[i + rows.length];
+      const last = rows[rows.length - 1];
+      const aligned = !!b.cells && !!b.cols && b.cells.length === a.cells.length && b.page === a.page && b.cols.every((x, k) => Math.abs(x - a.cols![k]) < 1.5 * a.size) && last.y - b.y < 4.5 * a.size;
+      if (!aligned) break;
+      rows.push(b);
+    }
+    // rows above and below whose gaps are narrower (a long first cell) but sit at the same column edges belong too
+    const fit = (l: Line | undefined, near: Line): string[] | null => {
+      if (!l || inTable.has(l) || !l.gaps || !l.rawText || l.page !== a.page) return null;
+      if (Math.abs(l.x0 - a.cols![0]) > 1.5 * a.size || Math.abs(l.y - near.y) > 4.5 * a.size) return null;
+      const at: number[] = [];
+      for (const x of a.cols!.slice(1)) {
+        const g = l.gaps.find((c) => Math.abs(c.x - x) < 1.5 * a.size);
+        if (!g) return null;
+        at.push(g.at);
+      }
+      const ends = [...at, l.rawText.length];
+      const cells = [l.rawText.slice(0, at[0]), ...at.map((p, k) => l.rawText!.slice(p, ends[k + 1]))].map((c) => cleanText(c));
+      return cells.every((c) => c && c.length <= 40) ? cells : null;
+    };
+    let top = i;
+    for (let c = fit(lines[top - 1], lines[top]); c; c = fit(lines[top - 1], lines[top])) {
+      lines[top - 1].cells = c;
+      rows.unshift(lines[--top]);
+    }
+    let end = i + rows.length - (i - top) - 1;
+    for (let c = fit(lines[end + 1], lines[end]); c; c = fit(lines[end + 1], lines[end])) {
+      lines[end + 1].cells = c;
+      rows.push(lines[++end]);
+    }
+    if (rows.length >= 2) {
+      tableStart.set(rows[0], rows);
+      rows.forEach((r) => inTable.add(r));
+      i = end;
+    }
+  }
+
   interface Draft {
     parts: Line[];
+    /** Rows of a table, one line each. */
+    table?: boolean;
     /** Maths set on rows of its own, away from the margin. */
     display?: boolean;
   }
@@ -258,6 +330,12 @@ function assemble(lines: Line[]): RawPara[] {
   let lastNumber: number | null = null;
 
   for (const line of lines) {
+    if (inTable.has(line)) {
+      const rows = tableStart.get(line);
+      if (rows) drafts.push({ parts: rows, table: true });
+      cur = null;
+      continue;
+    }
     const prev = cur ? cur.parts[cur.parts.length - 1] : null;
     let split = !prev;
     if (prev) {
@@ -320,6 +398,11 @@ function assemble(lines: Line[]): RawPara[] {
   const headingSizes = bigSizes.filter((s) => s !== titleSize);
 
   return drafts.map((dft, i): RawPara => {
+    if (dft.table) {
+      const rows = dft.parts.map((l) => l.cells ?? [l.text]);
+      // written out with bars as well, so anything that only reads the text (the AI, a search) still sees a table
+      return { text: rows.map((r) => `| ${r.join(' | ')} |`).join('\n'), table: rows, scale: 1, page: dft.parts[0].page, x: dft.parts[0].x0 };
+    }
     let text = '';
     for (const part of dft.parts) {
       if (!text) text = part.text;

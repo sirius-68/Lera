@@ -4,6 +4,7 @@ import { CONCEPTS } from '../engine/concepts';
 import { functionOfLine } from '../ingest/calc';
 import { isMathLine, parseExercises, plain } from '../ingest/structure';
 import { prettyInline } from '../ingest/text';
+import { isTexLine } from '../engine/tex';
 import { Block, LeraDoc, Topic } from '../ingest/types';
 import { Lera } from '../mascot/Lera';
 import { actions, useStore } from '../store';
@@ -15,6 +16,7 @@ import { Celebration } from '../ui/Celebrate';
 import { Icon } from '../ui/icons';
 import { Graph } from '../ui/Graph';
 import { MathView, tokenize } from '../ui/math';
+import { Table } from '../ui/Md';
 import { AS_WRITTEN } from '../engine/latex';
 
 export const HIGHLIGHT_COLORS = ['#22c55e', '#3b82f6', '#06b6d4', '#f59e0b', '#ec4899', '#a855f7', '#ef4444', '#6366f1'];
@@ -166,6 +168,8 @@ function BlockView({ block, index, ctx }: { block: Block; index: number; ctx: Re
     }
     case 'example':
       return <ExampleCard block={block} index={index} ctx={ctx} />;
+    case 'table':
+      return <Table rows={block.rows} head={block.head} />;
     case 'note':
       return (
         <aside className="rd-note">
@@ -231,7 +235,7 @@ function ExampleCard({ block, index, ctx }: { block: Extract<Block, { t: 'exampl
       <div className="col" style={{ gap: 8, marginTop: 8 }}>
         {block.lines.slice(0, shown).map((line, i) => (
           <div key={i} className="ex-line">
-            {isMathLine(plain(line)) ? (
+            {isMathLine(plain(line)) || isTexLine(plain(line)) ? (
               // a line that is only maths is one piece: it is selected, highlighted and saved whole
               <div className="ex-math"><SegText text={`$${plain(line)}$`} block={index} item={i} ctx={ctx} /></div>
             ) : (
@@ -279,7 +283,7 @@ interface Page {
 }
 
 const weightOf = (b: Block): number =>
-  b.t === 'p' || b.t === 'note' ? b.text.length + 40 : b.t === 'list' ? b.items.join(' ').length + 60 : b.t === 'example' ? 420 : b.t === 'graph' ? 560 : b.t === 'math' ? 150 : 50;
+  b.t === 'p' || b.t === 'note' ? b.text.length + 40 : b.t === 'table' ? b.rows.length * 70 + 60 : b.t === 'list' ? b.items.join(' ').length + 60 : b.t === 'example' ? 420 : b.t === 'graph' ? 560 : b.t === 'math' ? 150 : 50;
 
 /**
  * A lesson is read a screenful at a time. A new page starts at every sub-heading from the notes,

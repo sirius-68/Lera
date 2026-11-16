@@ -288,3 +288,16 @@
 .ex-acts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .ex-acts .reveal { margin-top: 0; }
 .reveal.alt { background: #fff; border: 1.5px solid var(--line-d); color: var(--ink); }
+
+/* what the AI writes: formulas on their own line, lists, small headings, tables */
+.md-math { margin: 8px 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; text-align: center; }
+.md-math::-webkit-scrollbar { display: none; }
+.md-h { font-weight: 700; margin-top: 6px; }
+.md-list { margin: 6px 0; padding-left: 22px; display: flex; flex-direction: column; gap: 5px; }
+.md-table { margin: 10px 0; overflow-x: auto; border: 1.5px solid var(--line); border-radius: 14px; background: #fff; }
+.md-table table { border-collapse: collapse; width: 100%; font-size: 14.5px; }
+.md-table th, .md-table td { padding: 9px 12px; text-align: left; border-bottom: 1.5px solid var(--line); vertical-align: middle; }
+.md-table th { background: var(--tint); color: var(--brand-d); font-weight: 700; font-size: 13.5px; }
+.md-table tr:last-child td { border-bottom: 0; }
+.md-table td + td, .md-table th + th { border-left: 1.5px solid var(--line); }
+.msg p + p, .msg p + .md-math, .msg .md-math + p, .msg ol + p, .msg p + ol, .msg p + ul { margin-top: 8px; }

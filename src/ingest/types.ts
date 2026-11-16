@@ -15,6 +15,8 @@ export interface RawPara {
   rows?: string[];
   /** Words set beside the formula on the same row. */
   caption?: string;
+  /** Rows of a table found in the file, each a list of cells. `text` holds the same rows written with bars. */
+  table?: string[][];
   /** A picture or drawing sits here in the file. */
   figure?: boolean;
   page?: number;
@@ -40,6 +42,8 @@ export type Block =
   | { t: 'list'; ordered: boolean; items: string[] }
   | { t: 'example'; title: string; lines: string[] }
   | { t: 'note'; label: string; text: string }
+  /** Rows of cells. The first row is the heading row unless `head` is false. Cells may hold `$maths$`. */
+  | { t: 'table'; rows: string[][]; head?: boolean }
   /** A graph rebuilt from the functions the notes name. `text` is the caption. */
   | { t: 'graph'; text: string; fns: string[] };
 
