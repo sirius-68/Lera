@@ -63,12 +63,14 @@ jobs:
 
       - name: Daily-limit table
         if: env.skip != 'true' && env.HAS_DB_PASSWORD == 'true'
+        # optional: the router works without the table (it simply has no daily limit), so this never stops a deploy
+        continue-on-error: true
         working-directory: backend
         env:
-          DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
-          supabase link --project-ref "$PROJECT_REF" --password "$DB_PASSWORD"
-          supabase db push --password "$DB_PASSWORD"
+          supabase link --project-ref "$PROJECT_REF"
+          supabase db push --remote --password "$SUPABASE_DB_PASSWORD"
 
       - name: Hand the keys to Supabase
         if: env.skip != 'true'
