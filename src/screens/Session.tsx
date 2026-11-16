@@ -1,5 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { aiCheckOpen, aiDiagnose, aiSimplify } from '../ai/tasks';
 import { aiReady } from '../ai/providers';
 import { analyze, cleanPath, hintLadder, HintLadder } from '../engine/analyze';
@@ -18,7 +17,7 @@ import { CelebrationFlow, Scene } from '../ui/Celebrate';
 import { Icon } from '../ui/icons';
 import { MathField, MathFieldHandle } from '../ui/MathField';
 import type { Kind } from '../ui/mathrow';
-import { MathView, RichText, typeset } from '../ui/math';
+import { MathView, RichText } from '../ui/math';
 import { WeakCard } from './Main';
 
 interface Result {
@@ -66,16 +65,16 @@ function Keyboard({ vars, onKey, onTpl, onDelete, onEnter, onMove, ready, calc }
         <button onClick={() => onMove(-1)} aria-label="Move left"><Icon name="left" size={18} /></button>
         <button onClick={() => onMove(1)} aria-label="Move right"><Icon name="right" size={18} /></button>
         <button className="tpl" onClick={() => onTpl('frac')} aria-label="Fraction"><span className="f"><i /><i /></span></button>
-        <button className="tpl" onClick={() => onTpl('pow')} aria-label="Power">x<sup><i /></sup></button>
+        <button className="tpl" onClick={() => onTpl('pow')} aria-label="Power">x<i className="hi" /></button>
         <button className="tpl" onClick={() => onTpl('sqrt')} aria-label="Square root">√<i /></button>
         {calc ? (
           <>
-            <button className="tpl" onClick={() => onTpl('ddx')} aria-label="Derivative">d/d{a} <i /></button>
-            <button className="tpl" onClick={() => onTpl('int')} aria-label="Integral">∫ <i /></button>
-            <button className="tpl" onClick={() => onTpl('defint')} aria-label="Integral with limits">∫<sub><i /></sub><sup><i /></sup></button>
-            <button className="tpl" onClick={() => onTpl('lim')} aria-label="Limit">lim<sub><i /></sub></button>
+            <button className="tpl" onClick={() => onTpl('ddx')} aria-label="Derivative">d/d{a}<i /></button>
+            <button className="tpl" onClick={() => onTpl('int')} aria-label="Integral"><svg viewBox="0 0 10 28" aria-hidden="true"><path d="M8.6 2.2c-2.3-.9-3.1.7-3.3 3.2L4.7 22.6c-.2 2.5-1 4.1-3.3 3.2" /></svg><i /></button>
+            <button className="tpl" onClick={() => onTpl('defint')} aria-label="Integral with limits"><svg viewBox="0 0 10 28" aria-hidden="true"><path d="M8.6 2.2c-2.3-.9-3.1.7-3.3 3.2L4.7 22.6c-.2 2.5-1 4.1-3.3 3.2" /></svg><span className="st"><i /><i /></span><i /></button>
+            <button className="tpl" onClick={() => onTpl('lim')} aria-label="Limit">lim<i className="lo" /></button>
             <button onClick={() => onKey('tan(')}>tan</button>
-            <button className="tpl" onClick={() => { onKey('e'); onTpl('pow'); }} aria-label="e to the power">e<sup><i /></sup></button>
+            <button className="tpl" onClick={() => { onKey('e'); onTpl('pow'); }} aria-label="e to the power">e<i className="hi" /></button>
             <button onClick={() => onKey('inf')}>∞</button>
             <button onClick={() => onKey('DNE')}>no limit</button>
           </>
@@ -304,7 +303,8 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
   // the field keeps one Enter handler for its whole life; this always points at the current commit
   const commitRef = useRef<() => void>(() => undefined);
   const commit = () => {
-    const text = input.trim();
+    // "= 6" carries on from the line above: the sign is dropped, the rest is the line
+    const text = input.trim().replace(/^=\s*(?=[^=]*$)/, '');
     if (!text || finished) return;
     if (gaps) {
       setNote('One of the boxes is still empty. Fill it in, or delete it.');
@@ -326,6 +326,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     // thinks, and where it goes wrong, from the lines in between. So the answer is kept aside and the steps asked for.
     if (a.verdict === 'solved' && next.length === 1 && needsWorking) {
       setAnswerFirst(text);
+      actions.track('answer_only');
       fieldRef.current?.clear();
       setInput('');
       setMood('thumbsup');
@@ -385,6 +386,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     if (a.verdict === 'solved' && lines.length === 1 && needsWorking) {
       // only the answer was written: keep it aside and ask for the working
       setAnswerFirst(lines[0]);
+      actions.track('answer_only');
       setLines([]);
       setCheckedCount(0);
       setMood('thumbsup');
@@ -427,12 +429,14 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       return;
     }
     setHint(ladder);
+    actions.track('hint', { rung: Math.min(3, hintOpen ? rung + 1 : Math.max(1, rung)) });
     setRung((r) => Math.min(3, hintOpen ? r + 1 : Math.max(1, r)));
     setHintOpen(true);
     setMood('eureka');
   };
 
   const reveal = () => {
+    actions.track('reveal');
     setRevealed(true);
     setHintOpen(false);
     setRung(3);
@@ -472,6 +476,15 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
           <div className="given"><MathView text={problem.given} block /></div>
         </div>
 
+        {answerFirst && !finished && (
+          <div className="answer-first">
+            <div className="row" style={{ gap: 8 }}>
+              <span className="chip ok"><Icon name="check" size={13} stroke={3.2} /> Right answer</span>
+              <MathView text={answerFirst} />
+            </div>
+            <p><b>Now show me how you got there.</b> Write your working, at least two lines, ending with the answer. The answer tells me you can do it. The steps show me how you think, and that is where I can help.</p>
+          </div>
+        )}
         <ol className="lines">
           {analysis.lines.map((line, i) => (
             <li key={`${i}:${line.text}`} className={`line ${isChecked(i) ? line.status : 'pending'}`} data-final={line.isFinal && solved && i === analysis.lines.length - 1 ? '' : undefined}>
@@ -511,17 +524,8 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
           ))}
         </ol>
 
-        {answerFirst && !finished && (
-          <div className="answer-first">
-            <div className="row" style={{ gap: 8 }}>
-              <span className="chip ok"><Icon name="check" size={13} stroke={3.2} /> Right answer</span>
-              <MathView text={answerFirst} />
-            </div>
-            <p><b>Now show me how you got there.</b> Write your working, at least two lines, ending with the answer. The answer tells me you can do it. The steps show me how you think, and that is where I can help.</p>
-          </div>
-        )}
         {!finished && (
-          <div className="entry" key={shake} data-shake={shake ? '' : undefined}>
+          <div className="entry" data-shake={shake ? (shake % 2 ? 'a' : 'b') : undefined}>
             <span className="n">{lines.length + 1}</span>
             <div className="grow">
               <MathField
@@ -858,6 +862,11 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
   const touched = new Set(list.map((m) => m.concept));
   const weak = weaknesses({ attempts, concepts, docs, understood }).filter((w) => (w.concept && touched.has(w.concept)) || w.kind === 'lesson').slice(0, 2);
   const [party, setParty] = useState(true);
+  useEffect(() => {
+    actions.track('session_end', { solved, total: results.length, seconds: Math.round(seconds) });
+    // once, when the summary first shows
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const scenes = useMemo<Scene[]>(() => {
     if (solved === 0) return [];
     const out: Scene[] = [

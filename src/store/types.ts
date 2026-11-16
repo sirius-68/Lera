@@ -69,6 +69,16 @@ export interface SavedItem {
   pinned?: boolean;
 }
 
+/**
+ * Something done in the app that the attempt log doesn't already record. Kept short (see store/insights.ts).
+ * `d` carries at most a few small values: a topic or concept id, a count, a label.
+ */
+export interface LearnEvent {
+  at: string;
+  t: 'open' | 'onboarded' | 'lesson' | 'session_start' | 'session_end' | 'hint' | 'reveal' | 'answer_only' | 'ask' | 'sense' | 'widget' | 'celebrate' | 'upload';
+  d?: Record<string, string | number | boolean>;
+}
+
 /** One message in a conversation with Lera. */
 export interface ChatMsg {
   id: string;
@@ -154,4 +164,6 @@ export interface AppState {
   understood: Record<string, string>;
   /** Conversations with Lera, one thread per lesson (and 'general' for everything else). */
   chats: Record<string, ChatMsg[]>;
+  /** What else was done in the app, newest last, for the learner model. */
+  events: LearnEvent[];
 }

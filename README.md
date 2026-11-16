@@ -87,6 +87,10 @@ The Android home-screen widgets are native (`android-overrides/StreakWidget.java
 
 A PDF only says where each piece of text sits, so a stacked fraction read row by row falls apart. `src/ingest/layout2d.ts` puts it back before rows are formed: a short piece directly above another, with full-size text on the line between them, is a fraction; big brackets and dots that a symbol font reports as letters (`c … m`, `$`) are restored; the small numbers written beside crossed-out factors go, along with a row that is only cancelling. Formulas set on rows of their own keep their rows (`steps`) and the name printed beside them (`caption`), and are typeset as written (`writtenLatex`) rather than tidied by the engine.
 
+## The learner model
+
+`src/store/insights.ts` works out, on the phone, how this person studies: when, how fast, how cleanly, whether mistakes are slips or gaps, how much they lean on hints, and what to offer next. It feeds today's three quests on Home, the "How you learn" card on Progress, and the summary given to the AI tutor. `docs/BACKEND.md` describes what a server and its model should do with it, and the rules for structuring a book server-side.
+
 ## Profiles
 
 `src/store/auth.ts` keeps a profile on the device: the email and a salted PBKDF2 hash of the password, which locks the app after signing out. Build with `LERA_AUTH_URL` set and the same screens call that server instead (`POST /signup`, `/signin`, `/reset`).

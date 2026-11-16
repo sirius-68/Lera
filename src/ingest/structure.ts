@@ -408,6 +408,9 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
   let instruction: string | undefined;
   let instructionLive = false;
 
+  let load = 0;
+  let baseTitle = '';
+  let partNo = 1;
   const ensureUnit = (): Unit => {
     if (!unit) {
       unit = { id: `u${units.length + 1}`, title, topics: [] };
@@ -421,6 +424,9 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
       const name = u.topics.length === 0 ? (u.title === title ? 'Introduction' : 'Overview') : `Part ${u.topics.length + 1}`;
       topic = { id: `${u.id}t${u.topics.length + 1}`, title: name, blocks: [], exercises: [], concepts: [] };
       u.topics.push(topic);
+      load = 0;
+      baseTitle = name;
+      partNo = 1;
     }
     return topic;
   };
@@ -430,8 +436,31 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
     instruction = undefined;
     instructionLive = false;
   };
+  /**
+   * A lesson is something to finish in one sitting. A long section becomes several lessons: at its next
+   * sub-heading once it has grown past LESSON_SOFT, or, with no sub-heading to break at, at a paragraph
+   * once past LESSON_HARD. (About 1,250 characters fill a phone page: these are roughly 4 and 9 pages.)
+   */
+  const LESSON_SOFT = 4500;
+  const LESSON_HARD = 11000;
+  const startTopic = (name: string, continued = false): Topic => {
+    const u = ensureUnit();
+    topic = { id: `${u.id}t${u.topics.length + 1}`, title: name, blocks: [], exercises: [], concepts: [] };
+    u.topics.push(topic);
+    load = 0;
+    if (!continued) {
+      baseTitle = name;
+      partNo = 1;
+    }
+    return topic;
+  };
   const pushBlock = (raw: Block) => {
+    if (topic && load > LESSON_HARD && raw.t === 'p' && !inExample) {
+      partNo += 1;
+      startTopic(`${baseTitle} · part ${partNo}`, true);
+    }
     const t = ensureTopic();
+    load += raw.t === 'list' ? raw.items.join(' ').length + 60 : raw.t === 'example' ? 400 : raw.t === 'graph' ? 500 : raw.text.length + 40;
     // prose from files without equation objects: typeset the powers it mentions
     const b: Block =
       raw.t === 'p' || raw.t === 'note' ? { ...raw, text: markInlineMath(raw.text) } : raw.t === 'list' ? { ...raw, items: raw.items.map(markInlineMath) } : raw;
@@ -454,9 +483,7 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
       continue;
     }
     if (tg.role === 'topic') {
-      const u = ensureUnit();
-      topic = { id: `${u.id}t${u.topics.length + 1}`, title: cleanHeading(text), blocks: [], exercises: [], concepts: [] };
-      u.topics.push(topic);
+      startTopic(cleanHeading(text));
       resetFlow();
       continue;
     }
@@ -468,7 +495,9 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
     }
     if (tg.role === 'sub') {
       resetFlow();
-      pushBlock({ t: 'h', text: cleanHeading(text) });
+      // a sub-heading inside a lesson that is already long starts the next lesson
+      if (topic && load > LESSON_SOFT) startTopic(cleanHeading(text));
+      else pushBlock({ t: 'h', text: cleanHeading(text) });
       continue;
     }
 
@@ -615,6 +644,12 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
 
   // 5. tidy up and annotate
   for (const u of units) {
+    // a few opening lines before the first section ("In this chapter…") are not a lesson of their own
+    const lead = u.topics[0];
+    if (lead && u.topics.length > 1 && /^(Overview|Introduction)$/.test(lead.title) && lead.exercises.length === 0 && lead.blocks.reduce((n, b) => n + ('text' in b ? b.text.length : b.t === 'list' ? b.items.join(' ').length : 400), 0) < 600) {
+      u.topics[1].blocks.unshift(...lead.blocks);
+      lead.blocks = [];
+    }
     u.topics = u.topics.filter((tp) => tp.blocks.length > 0 || tp.exercises.length > 0);
     for (const tp of u.topics) {
       // the title says what a topic is about; its exercises confirm it; the body text is only a fallback

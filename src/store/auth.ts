@@ -156,6 +156,3 @@ export async function confirmReset(email: string, code: string, newPassword: str
   return { ok: true, email };
 }
 
-export function forgetAccount(): void {
-  localStorage.removeItem(KEY);
-}

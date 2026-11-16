@@ -118,34 +118,6 @@ export function SceneReturn() {
   );
 }
 
-/** A curve draws itself; a point rides it, carrying its tangent. */
-export function SceneGraph() {
-  const curve = 'M36 40 C84 236 216 236 264 40';
-  return (
-    <div className="sc sc-graph" aria-hidden="true">
-      <svg viewBox="0 0 300 220" width="100%" height="100%">
-        {[60, 100, 140, 180].map((y) => (
-          <line key={y} x1="24" y1={y} x2="276" y2={y} stroke="#ececf5" strokeWidth="1.5" />
-        ))}
-        {[70, 110, 150, 190, 230].map((x) => (
-          <line key={x} x1={x} y1="26" x2={x} y2="196" stroke="#ececf5" strokeWidth="1.5" />
-        ))}
-        <line x1="24" y1="180" x2="276" y2="180" stroke="#b9b9cc" strokeWidth="2" />
-        <line x1="150" y1="26" x2="150" y2="196" stroke="#b9b9cc" strokeWidth="2" />
-        <path className="curve" d={curve} pathLength="100" fill="none" stroke="#6c63ff" strokeWidth="4.5" strokeLinecap="round" />
-        <g className="rider">
-          <line x1="-44" y1="0" x2="44" y2="0" stroke="#1a1a2e" strokeWidth="2.6" strokeLinecap="round" />
-          <circle r="8" fill="#fff" stroke="#6c63ff" strokeWidth="4" />
-          <animateMotion dur="6s" repeatCount="indefinite" rotate="auto" keyPoints="0.08;0.92;0.08" keyTimes="0;0.5;1" calcMode="spline" keySplines="0.45 0 0.55 1;0.45 0 0.55 1" path={curve} />
-        </g>
-      </svg>
-      <div className="sc-chip slope">
-        <i className="needle" /> slope
-      </div>
-      <div className="sc-chip fn"><MathView text="y = x^2 - 4" /></div>
-    </div>
-  );
-}
 
 /** The textbook sentence goes; a plain one arrives; and Lera asks whether it landed. */
 export function ScenePlain() {

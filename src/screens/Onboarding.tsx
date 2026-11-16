@@ -151,14 +151,6 @@ function Ask({ mood, hint, children }: { mood: Mood; hint?: ReactNode; children:
   );
 }
 
-function Reply({ text, mood = 'happy' }: { text: string; mood?: Mood }) {
-  return (
-    <div className="ob-reply" key={text}>
-      <Lera size={34} mood={mood} interactive={false} />
-      <span>{text}</span>
-    </div>
-  );
-}
 
 export function Onboarding() {
   const profile = useStore((s) => s.profile);

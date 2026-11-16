@@ -283,20 +283,4 @@ export function weaknesses(state: State, today: string = dayOf()): Weakness[] {
     });
 }
 
-/** The single most useful thing to do next, for the home screen. */
-export function topWeakness(state: State, today: string = dayOf()): Weakness | null {
-  return weaknesses(state, today)[0] ?? null;
-}
 
-/** Subjects ranked by how much trouble they are giving — for the progress screen. */
-export function troubleBySubject(state: Pick<AppState, 'attempts'>): { subject: string; marks: number; problems: number }[] {
-  const map = new Map<string, { marks: number; problems: number }>();
-  for (const a of state.attempts) {
-    const subject = SUBJECT_LABEL[subjectOf(a.concepts[0] ?? 'arithmetic')];
-    const e = map.get(subject) ?? { marks: 0, problems: 0 };
-    e.problems++;
-    e.marks += a.marks.filter((m) => m.severity === 'gap' || m.severity === 'slip').length;
-    map.set(subject, e);
-  }
-  return [...map.entries()].map(([subject, v]) => ({ subject, ...v })).sort((a, b) => b.marks - a.marks);
-}

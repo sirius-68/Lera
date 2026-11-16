@@ -420,8 +420,3 @@ export function lineToLatex(input: string): string | null {
   return r.ok ? statementToLatex(r.st) : null;
 }
 
-/** Parse something that must be a plain expression (no relation). */
-export function parseExpr(input: string): Node | null {
-  const r = parseLine(input);
-  return r.ok && r.st.kind === 'expr' ? r.st.expr : null;
-}

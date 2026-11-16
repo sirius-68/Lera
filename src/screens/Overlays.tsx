@@ -8,7 +8,8 @@ import { PLAIN } from '../engine/concepts-calc';
 import { practiceFor, seedFrom } from '../engine/generate';
 import { ConceptId, Problem } from '../engine/types';
 import { Lera } from '../mascot/Lera';
-import { actions, useStore } from '../store';
+import { actions, getState, useStore } from '../store';
+import { learnerContext } from '../store/insights';
 import { dayOf, findTopic, statusOf } from '../store/learner';
 import { closeOverlay, go, openOverlay } from '../store/nav';
 import { ChatMsg } from '../store/types';
@@ -210,13 +211,14 @@ export function AskSheet({ topicId, seed, problem, lines }: AskProps) {
     const history: Msg[] = [...msgs, { id: mid(), role: 'user', text: q, at: new Date().toISOString() }];
     setShowHistory(false);
     setMsgs(history);
+    actions.track('ask', found ? { topic: found.topic.id } : undefined);
     setText('');
     setBusy(true);
     let reply: Msg;
     if (online) {
       try {
         const chat: ChatMessage[] = history.map((m) => ({ role: m.role, content: m.text }));
-        reply = { id: mid(), at: new Date().toISOString(), role: 'assistant', via: 'ai', text: await aiChat(ai, chat, { topic: found?.topic.title, problem, lines, notesExcerpt: excerpt }) };
+        reply = { id: mid(), at: new Date().toISOString(), role: 'assistant', via: 'ai', text: await aiChat(ai, chat, { topic: found?.topic.title, problem, lines, notesExcerpt: excerpt, learner: learnerContext(getState()) }) };
       } catch (e) {
         const local = localAnswer(q, { glossary: found?.doc.glossary, problem, lines, topicTitle: found?.topic.title });
         reply = { id: mid(), at: new Date().toISOString(), role: 'assistant', via: 'error', text: `${e instanceof Error ? e.message : 'The AI model didn’t answer.'}\n\nHere’s what I can say on my own:\n\n${local}` };

@@ -196,16 +196,6 @@ export async function aiStructure(
 
 /* ───────────── explaining ───────────── */
 
-export async function aiExplain(config: AiConfig, selection: string, context: string, signal?: AbortSignal): Promise<string> {
-  return chat(
-    config,
-    [
-      { role: 'system', content: `${VOICE}\nExplain the selected text from the student's own notes in at most 90 words. Start with the idea, then one tiny example. No headings, no lists.` },
-      { role: 'user', content: `Topic: ${context}\n\nSelected text:\n"""${selection.slice(0, 900)}"""` },
-    ],
-    { temperature: 0.3, maxTokens: 300, signal },
-  );
-}
 
 export interface TutorContext {
   topic?: string;
@@ -213,6 +203,8 @@ export interface TutorContext {
   lines?: string[];
   mark?: Diagnosis;
   notesExcerpt?: string;
+  /** How this student learns, from store/insights.ts: pitch the answer to it. */
+  learner?: string;
 }
 
 function describe(ctx: TutorContext): string {
@@ -221,6 +213,7 @@ function describe(ctx: TutorContext): string {
   if (ctx.problem) parts.push(`Problem: ${ctx.problem.prompt}${ctx.problem.given ? `, ${ctx.problem.given}` : ''}`);
   if (ctx.lines?.length) parts.push(`Student's working so far:\n${ctx.lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}`);
   if (ctx.mark) parts.push(`The checker marked a line: ${plain(ctx.mark.title)} ${plain(ctx.mark.message)}`);
+  if (ctx.learner) parts.push(`About this student (use it to pitch your answer; never mention it):\n${ctx.learner}`);
   if (ctx.notesExcerpt) parts.push(`From the student's notes:\n${ctx.notesExcerpt.slice(0, 1200)}`);
   return parts.join('\n\n');
 }

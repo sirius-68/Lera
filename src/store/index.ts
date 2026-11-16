@@ -3,8 +3,9 @@ import { BUILD_AI } from '../ai/config';
 import { AttemptAnalysis, ConceptId, Problem } from '../engine/types';
 import { LeraDoc } from '../ingest/types';
 import { idbAll, idbAvailable, idbClear, idbDelete, idbPut } from './docdb';
+import { withEvent } from './insights';
 import { AttemptMeta, dayOf, recordAttempt } from './learner';
-import { AppState, ChatMsg, Highlight, Note, Profile, SavedItem } from './types';
+import { AppState, ChatMsg, Highlight, LearnEvent, Note, Profile, SavedItem } from './types';
 
 /**
  * One small store for the whole app. Everything the learner does is kept on
@@ -40,6 +41,7 @@ export const emptyState = (): AppState => ({
   read: {},
   understood: {},
   chats: {},
+  events: [],
 });
 
 function load(): AppState {
@@ -195,7 +197,7 @@ export const actions = {
   },
 
   openTopic(topicId: string): void {
-    setState((s) => ({ lastTopicId: topicId, read: s.read[topicId] ? s.read : { ...s.read, [topicId]: dayOf() } }));
+    setState((s) => ({ lastTopicId: topicId, read: s.read[topicId] ? s.read : { ...s.read, [topicId]: dayOf() }, events: withEvent(s.events ?? [], 'lesson', { topic: topicId }) }));
   },
 
   addHighlight(h: Omit<Highlight, 'id'>): void {
@@ -234,6 +236,11 @@ export const actions = {
   },
 
   /** Replace one conversation thread (kept to its most recent messages). */
+  /** Note something the learner model should know about (see store/insights.ts). */
+  track(t: LearnEvent['t'], d?: LearnEvent['d']): void {
+    setState((s) => ({ events: withEvent(s.events ?? [], t, d) }));
+  },
+
   setChat(thread: string, msgs: ChatMsg[]): void {
     setState((s) => ({ chats: { ...s.chats, [thread]: msgs.slice(-80) } }));
   },

@@ -93,3 +93,73 @@ test('short notes with no contents are left alone', () => {
   assert.ok(out.via === 'type' || out.via === 'numbering');
   assert.equal(out.paras.length, 4);
 });
+
+/** A book in the "Part / Chapter" style: an at-a-glance list, then the full contents; printed page 1 is the file's page 7. */
+function partsBook(): RawPara[] {
+  const p: RawPara[] = [
+    { text: 'ALGEBRA II', page: 1, scale: 2.6 },
+    { text: 'Copyright 2006 Example Publishing. All rights reserved. ISBN 978-0-00-000000-0', page: 2 },
+    { text: 'Contents at a Glance', page: 3, scale: 1.8 },
+    ...['Introduction ..... 1', 'Part I: Homing in on Basic Solutions ..... 3', 'Chapter 1: Going Beyond Beginning Algebra ..... 5', 'Chapter 2: Toeing the Straight Line: Linear Equations ..... 9', 'Part II: Facing Off with Functions ..... 13', 'Chapter 3: Graphing Your Way to the Good Life ..... 15', 'Index ..... 19'].map((text) => ({ text, page: 3, x: 72 })),
+    { text: 'Table of Contents', page: 4, scale: 1.8 },
+    { text: 'Introduction ..... 1', page: 4, x: 72 },
+    { text: 'Part I: Homing in on Basic Solutions ..... 3', page: 4, x: 72 },
+    { text: 'Chapter 1: Going Beyond Beginning Algebra ..... 5', page: 4, x: 72 },
+    { text: 'Outlining Algebra Properties ..... 5', page: 4, x: 90 },
+    { text: 'Ordering Your Operations ..... 7', page: 4, x: 90 },
+    { text: 'Chapter 2: Toeing the Straight Line: Linear Equations ..... 9', page: 4, x: 72 },
+    { text: 'Linear Equations: Handling the First Degree ..... 9', page: 4, x: 90 },
+    { text: 'Part II: Facing Off with Functions ..... 13', page: 4, x: 72 },
+    { text: 'Chapter 3: Graphing Your Way to the Good Life ..... 15', page: 4, x: 72 },
+    { text: 'Graphing Lines ..... 16', page: 4, x: 90 },
+    { text: 'Index ..... 19', page: 4, x: 72 },
+    { text: 'Introduction', page: 7, scale: 2 },
+    { text: 'This book assumes you have met algebra before.', page: 7 },
+    { text: 'Part I: Homing in on Basic Solutions', page: 9, scale: 2.4 },
+    { text: 'In this part you review the basics.', page: 9 },
+    { text: 'Chapter 1', page: 11, scale: 1.3 },
+    { text: 'Going Beyond Beginning Algebra', page: 11, scale: 2 },
+    { text: 'Algebra has rules that keep it honest.', page: 11 },
+    { text: 'Outlining Algebra Properties', page: 11, scale: 1.5 },
+    { text: 'The commutative property lets you swap the order.', page: 11 },
+    { text: 'Chapter 1: Going Beyond Beginning Algebra 6', page: 12, scale: 0.85 },
+    { text: 'Ordering Your Operations', page: 13, scale: 1.5 },
+    { text: 'Powers first, then multiplying, then adding.', page: 13 },
+    { text: 'Chapter 2', page: 15, scale: 1.3 },
+    { text: 'Toeing the Straight Line: Linear Equations', page: 15, scale: 2 },
+    { text: 'Linear Equations: Handling the First Degree', page: 15, scale: 1.5 },
+    { text: 'A linear equation has the variable to the first power.', page: 15 },
+    { text: 'Part II: Facing Off with Functions', page: 19, scale: 2.4 },
+    { text: 'In this part you meet functions.', page: 19 },
+    // a blank page was left out of the file here: from now on the printed number is one further ahead
+    { text: 'Chapter 3', page: 20, scale: 1.3 },
+    { text: 'Graphing Your Way to the Good Life', page: 20, scale: 2 },
+    { text: 'Chapter 3: Graphing Your Way to the Good Life 16', page: 21, scale: 0.85 },
+    { text: 'Graphing Lines', page: 21, scale: 1.5 },
+    { text: 'A line needs two points.', page: 21 },
+    { text: 'Index', page: 24, scale: 2 },
+    { text: 'absolute value, 31; binomial, 44', page: 24 },
+  ];
+  return p;
+}
+
+test('"Contents at a Glance" plus the full contents: each entry once, parts marked, sections nested', () => {
+  const { entries, pages } = readContentsPages(partsBook());
+  assert.deepEqual([...pages], [3, 4]);
+  assert.equal(entries.filter((e) => /Chapter 1:/.test(e.title)).length, 1);
+  assert.equal(entries.filter((e) => e.part).length, 2);
+  assert.equal(entries.find((e) => e.title === 'Graphing Lines')!.level, 2);
+  assert.equal(entries.find((e) => /Chapter 3/.test(e.title))!.printed, 15);
+});
+
+test('chapters are placed by page: every chapter found, running heads and part dividers gone', () => {
+  const out = applyBookStructure(partsBook(), [], 24);
+  assert.equal(out.via, 'contents');
+  const chapters = out.paras.filter((p) => p.level === 1).map((p) => p.text);
+  assert.deepEqual(chapters, ['Going Beyond Beginning Algebra', 'Toeing the Straight Line: Linear Equations', 'Graphing Your Way to the Good Life']);
+  const sections = out.paras.filter((p) => p.level === 2).map((p) => p.text);
+  assert.deepEqual(sections, ['Outlining Algebra Properties', 'Ordering Your Operations', 'Linear Equations: Handling the First Degree', 'Graphing Lines']);
+  const text = out.paras.map((p) => p.text).join('\n');
+  for (const gone of ['assumes you have met', 'In this part', 'Beginning Algebra 6', 'Good Life 16', 'binomial, 44', 'Copyright', '.....']) assert.ok(!text.includes(gone), gone);
+  assert.ok(text.includes('A line needs two points.'));
+});

@@ -174,6 +174,9 @@ function buildLines(glyphs: Glyph[], page: number, pageWidth: number, pageHeight
       if (/=/.test(left) && !/[A-Za-z]{4,}/.test(left) && (right.match(/[A-Za-z]{3,}/g) ?? []).length >= 2 && !/=/.test(right)) {
         text = left;
         caption = cleanText(right);
+      } else if (/^(\d{1,4}|[ivxlc]{1,7})$/.test(right) && /[A-Za-z]{2,}/.test(left) && !/=/.test(left)) {
+        // a contents line set with a tab instead of dots: write the dots in, so it reads like any other
+        text = `${left} ..... ${right}`;
       }
     }
     // a fraction keeps a space from what follows it, so "1/2x" is never read as 1/(2x)
@@ -197,24 +200,39 @@ function buildLines(glyphs: Glyph[], page: number, pageWidth: number, pageHeight
   return lines;
 }
 
+/** Dot leaders and a page number at the end of a line. */
+const TOC_TAIL = /[.·…_]{3,}\s*(\d{1,4}|[ivxlc]{1,7})$/;
 const BULLET = /^([•▪◦●○■□➢➤✓–—-]|\(?[a-zA-Z0-9]{1,2}[.)])\s+/;
 const PAGE_NO = /^(page\s+)?\d{1,4}(\s*(of|\/)\s*\d{1,4})?$/i;
 
+/**
+ * Running heads and feet: the book's or chapter's name and the page number, repeated at the edge of page after page.
+ * A line counts when it is the first or last on its page, sits in the outer margin, and the same words (numbers
+ * aside) hold that place on at least three pages. Chapter heads change with the chapter, so "most pages" is too strict.
+ */
 function stripFurniture(lines: Line[], pages: number): Line[] {
-  const edge = (l: Line) => l.y > l.pageHeight * 0.92 || l.y < l.pageHeight * 0.08;
+  const first = new Map<number, Line>();
+  const last = new Map<number, Line>();
+  for (const l of lines) {
+    if (!first.has(l.page) || l.y > (first.get(l.page) as Line).y) first.set(l.page, l);
+    if (!last.has(l.page) || l.y < (last.get(l.page) as Line).y) last.set(l.page, l);
+  }
+  const edge = (l: Line) => (l === first.get(l.page) && l.y > l.pageHeight * 0.9) || (l === last.get(l.page) && l.y < l.pageHeight * 0.1);
+  const keyOf = (l: Line) => l.text.replace(/\d+/g, '#').toLowerCase();
   const seen = new Map<string, Set<number>>();
   for (const l of lines) {
     if (!edge(l)) continue;
-    const key = l.text.replace(/\d+/g, '#').toLowerCase();
+    const key = keyOf(l);
     if (!seen.has(key)) seen.set(key, new Set());
     seen.get(key)!.add(l.page);
   }
+  const need = pages >= 8 ? 3 : Math.max(3, Math.ceil(pages * 0.5));
   const repeated = new Set<string>();
-  for (const [key, set] of seen) if (pages >= 3 && set.size >= Math.max(3, Math.ceil(pages * 0.5))) repeated.add(key);
+  for (const [key, set] of seen) if (pages >= 3 && set.size >= need) repeated.add(key);
   return lines.filter((l) => {
     if (!edge(l)) return true;
     if (PAGE_NO.test(l.text)) return false;
-    return !repeated.has(l.text.replace(/\d+/g, '#').toLowerCase());
+    return !repeated.has(keyOf(l));
   });
 }
 
@@ -276,6 +294,8 @@ function assemble(lines: Line[]): RawPara[] {
       const numbered = /^\(?(\d{1,2})[.)]\s/.exec(line.text);
       if (numbered) lastNumber = Number(numbered[1]);
     }
+    // a contents line ("Title ..... 25") is always a paragraph of its own
+    if (prev && (TOC_TAIL.test(prev.text) || TOC_TAIL.test(line.text))) split = true;
     // rows of working stay together when each begins with the sign that carries on from the row above;
     // anything else next to a displayed formula starts afresh
     const shown = isDisplay(line);
@@ -345,17 +365,6 @@ function assemble(lines: Line[]): RawPara[] {
 /** The two steps between glyphs and paragraphs, for tests. */
 export const pdfInternals = { buildLines, assemble };
 
-/** Paragraphs straight off the pages, before any decision about structure — for tests and tools. */
-export async function readPdfRaw(pdfjs: PdfModule, data: Uint8Array): Promise<RawPara[]> {
-  const doc = await pdfjs.getDocument({ data, useSystemFonts: true, isEvalSupported: false, verbosity: 0 }).promise;
-  let lines: Line[] = [];
-  try {
-    for (let n = 1; n <= doc.numPages; n++) lines.push(...(await pageLines(doc, n)));
-  } finally {
-    await doc.destroy?.();
-  }
-  return assemble(stripFurniture(lines, doc.numPages));
-}
 
 async function pageLines(doc: PdfDocument, n: number): Promise<Line[]> {
   const page = await doc.getPage(n);

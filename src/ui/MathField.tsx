@@ -140,9 +140,9 @@ export const MathField = forwardRef<MathFieldHandle, Props>(function MathField({
       case 'ddx':
         return <span key={key} className="mf-fn"><span className="mf-frac lead"><span className="top"><em>d</em></span><span className="bot"><em>d{v}</em></span></span><b>(</b>{slot(0)}<b>)</b></span>;
       case 'int':
-        return <span key={key} className="mf-fn"><i className="mf-int">∫</i>{slot(0)}<em className="dx">d{v}</em></span>;
+        return <span key={key} className="mf-fn"><svg className="mf-int" viewBox="0 0 10 28" aria-hidden="true"><path d="M8.6 2.2c-2.3-.9-3.1.7-3.3 3.200L4.7 22.600c-.2 2.5-1 4.1-3.3 3.2" /></svg>{slot(0)}<em className="dx">d{v}</em></span>;
       case 'defint':
-        return <span key={key} className="mf-fn"><span className="mf-lims"><span>{slot(1, true)}</span><i className="mf-int">∫</i><span>{slot(0, true)}</span></span>{slot(2)}<em className="dx">d{v}</em></span>;
+        return <span key={key} className="mf-fn"><span className="mf-lims"><span>{slot(1, true)}</span><svg className="mf-int" viewBox="0 0 10 28" aria-hidden="true"><path d="M8.6 2.2c-2.3-.9-3.1.7-3.3 3.200L4.7 22.600c-.2 2.5-1 4.1-3.3 3.2" /></svg><span>{slot(0, true)}</span></span>{slot(2)}<em className="dx">d{v}</em></span>;
       case 'lim':
         return <span key={key} className="mf-fn"><span className="mf-lim"><span>lim</span><span className="to"><em>{v}</em>→{slot(0, true)}</span></span>{slot(1)}</span>;
     }

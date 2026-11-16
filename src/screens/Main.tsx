@@ -1,5 +1,5 @@
 import '../styles/onb.css';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { CONCEPTS } from '../engine/concepts';
 import { SUBJECT_LABEL, subjectOf } from '../engine/concepts-calc';
@@ -9,6 +9,7 @@ import { LeraDoc } from '../ingest/types';
 import { Lera, Mood } from '../mascot/Lera';
 import { actions, persisted, useStore } from '../store';
 import { levelOf, totalXp, weekStrip, xpByDay } from '../store/game';
+import { dailyQuests, learnerModel } from '../store/insights';
 import { byDay, confidence, dayOf, docMastery, dueNow, findTopic, insights, reviewQueue, statusOf, streak, topicMastery, topicStatus } from '../store/learner';
 import { go, openOverlay, Route } from '../store/nav';
 import { AttemptRecord } from '../store/types';
@@ -108,6 +109,8 @@ export function HomeScreen() {
   const week = weekStrip(game);
   const last = findTopic(docs, lastTopicId) ?? (docs[0]?.units[0]?.topics[0] ? findTopic(docs, docs[0].units[0].topics[0].id) : null);
   const weak = weaknesses({ attempts, concepts, docs, understood })[0];
+  const events = useStore((s) => s.events);
+  const quests = useMemo(() => dailyQuests({ attempts, concepts, profile, events, read }), [attempts, concepts, profile, events, read]);
 
   let mood: Mood = 'idle';
   let line: string;
@@ -184,6 +187,25 @@ export function HomeScreen() {
           </section>
 
           {!persisted && <p className="warn"><Icon name="alert" size={17} /> <span>This browser isn’t letting Lera save. Your progress will last until you close the app.</span></p>}
+
+          {docs.length > 0 && (
+            <section className="card quests">
+              <div className="row" style={{ justifyContent: 'space-between' }}>
+                <span className="label">Today’s quests</span>
+                <span className="chip plain">{quests.filter((q) => q.done >= q.of).length}/{quests.length}</span>
+              </div>
+              {quests.map((q) => (
+                <div key={q.id} className={`quest ${q.done >= q.of ? 'done' : ''}`}>
+                  <span className="quest-ic"><Icon name={q.done >= q.of ? 'check' : q.icon} size={17} stroke={q.done >= q.of ? 3.2 : 2} /></span>
+                  <div className="grow">
+                    <b>{q.title}</b>
+                    <i><em style={{ width: `${(q.done / q.of) * 100}%` }} /></i>
+                  </div>
+                  <span className="quest-n">{q.done}/{q.of}</span>
+                </div>
+              ))}
+            </section>
+          )}
 
           {weak && (
             <section className="col" style={{ gap: 8 }}>
@@ -556,6 +578,9 @@ export function ProgressScreen() {
   const slips = attempts.reduce((s, a) => s + a.marks.filter((m) => m.severity === 'slip').length, 0);
   const xp = totalXp({ attempts, read });
   const lv = levelOf(xp);
+  const profile = useStore((s) => s.profile);
+  const events = useStore((s) => s.events);
+  const model = useMemo(() => learnerModel({ attempts, concepts, profile, events, read }), [attempts, concepts, profile, events, read]);
 
   return (
     <div className="screen" data-dir="0">
@@ -573,6 +598,19 @@ export function ProgressScreen() {
           </div>
         ) : (
           <div className="stagger" style={{ padding: '2px 20px 26px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {model.evidence !== 'none' && (
+            <section className="card learn-card">
+              <span className="label">How you learn</span>
+              <ul>
+                {model.habits.usualTime && <li><Icon name="clock" size={16} /> <span>You mostly practise in the <b>{model.habits.usualTime}</b>{model.habits.usualHour !== null ? `, around ${model.habits.usualHour}:00` : ''}.</span></li>}
+                {model.skill.pace !== null && <li><Icon name="bolt" size={16} /> <span>About <b>{model.skill.pace < 90 ? `${Math.round(model.skill.pace)} seconds` : `${Math.round(model.skill.pace / 60)} minutes`}</b> a problem, <b>{Math.round(model.skill.cleanRate * 100)}%</b> clean lately{model.skill.trend > 0.05 ? ', and improving' : model.skill.trend < -0.05 ? ', a little down' : ''}.</span></li>}
+                {model.style.mistakes !== 'few' && <li><Icon name="target" size={16} /> <span>{model.style.mistakes === 'careless' ? <>Your mistakes are mostly <b>slips</b>: you know the rule and lose a sign or a number. One more check per line fixes most of them.</> : model.style.mistakes === 'conceptual' ? <>Your mistakes are mostly <b>gaps</b>: a rule that isn’t there yet. Reviews matter more than extra problems.</> : <>A mix of <b>slips and gaps</b>. I’ll keep bringing the gaps back.</>}</span></li>}
+                {model.topErrors[0] && <li><Icon name="refresh" size={16} /> <span>Most repeated: <b>{model.topErrors[0].title}</b> ({model.topErrors[0].count} times).</span></li>}
+                {model.style.hintReliance > 0.4 && <li><Icon name="bulb" size={16} /> <span>You take a hint on <b>{Math.round(model.style.hintReliance * 100)}%</b> of problems. Try the first line alone before asking.</span></li>}
+              </ul>
+              <p className="faint" style={{ fontSize: 12.5 }}>Worked out on this phone from your own working.</p>
+            </section>
+          )}
             <button className="level-card" onClick={() => go({ name: 'streak' })}>
               <span className="level-n">{lv.level}</span>
               <div className="grow" style={{ textAlign: 'left' }}>

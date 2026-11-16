@@ -1,5 +1,5 @@
 /* ───────── the working line: maths typed into boxes ───────── */
-.mf { position: relative; min-height: 44px; display: flex; align-items: center; overflow-x: auto; scrollbar-width: none; outline: none; padding: 6px 2px; font-family: KaTeX_Main, 'Times New Roman', serif; font-size: 22px; line-height: 1.2; color: var(--ink); cursor: text; -webkit-user-select: none; user-select: none; }
+.mf { position: relative; min-height: 46px; display: flex; align-items: center; overflow-x: auto; scrollbar-width: none; outline: none; padding: 6px 2px; font-family: KaTeX_Main, 'Times New Roman', serif; font-size: 22px; line-height: 1.2; color: var(--ink); cursor: text; -webkit-user-select: none; user-select: none; }
 .mf::-webkit-scrollbar { display: none; }
 .mf-ph { position: absolute; left: 4px; font-family: var(--font); font-size: 16px; color: var(--ink-3); pointer-events: none; white-space: nowrap; }
 .mf-row { display: inline-flex; align-items: center; min-height: 1.25em; white-space: nowrap; }
@@ -24,18 +24,28 @@
 .mf-abs { display: inline-flex; align-items: center; border-left: 1.6px solid currentColor; border-right: 1.6px solid currentColor; padding: 0 3px; margin: 0 3px; }
 .mf-fn { display: inline-flex; align-items: center; margin: 0 2px; }
 .mf-fn > b { font-weight: 400; }
-.mf-int { font-style: normal; font-size: 1.7em; line-height: 1; margin: 0 2px 0 0; font-family: KaTeX_Size2, KaTeX_Main, serif; }
+.mf-int { width: 0.42em; height: 1.75em; flex-shrink: 0; margin: 0 3px 0 1px; overflow: visible; }
+.mf-int path { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
 .mf-fn .dx { margin-left: 5px; }
 .mf-lims { display: inline-flex; flex-direction: column; align-items: center; margin-right: 3px; }
-.mf-lims .mf-int { font-size: 1.35em; margin: -2px 0; }
+.mf-lims .mf-int { width: 0.42em; height: 1.75em; flex-shrink: 0; margin: 0 3px 0 1px; overflow: visible; }
+.mf-int path { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
 .mf-lim { display: inline-flex; flex-direction: column; align-items: center; margin-right: 6px; line-height: 1.05; }
 .mf-lim .to { display: inline-flex; align-items: center; font-size: 0.68em; }
 .mf-lim .to .mf-row.small { font-size: 1em; }
-/* template keys on the keyboard */
-.kbd-extra button.tpl { background: var(--tint); color: var(--brand-d); font-family: KaTeX_Main, 'Times New Roman', serif; font-size: 16px; min-width: 44px; }
-.kbd-extra button.tpl i { display: inline-block; width: 9px; height: 11px; border: 1.4px dashed currentColor; border-radius: 3px; vertical-align: middle; opacity: 0.8; }
+/* template keys on the keyboard: each shows its shape with dashed boxes, centred in the key */
+.kbd-extra { align-items: stretch; padding-bottom: 8px; }
+.kbd-extra button { height: 42px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.kbd-extra button.tpl { gap: 2px; min-width: 48px; padding: 0 12px; background: var(--tint); color: var(--brand-d); font-family: KaTeX_Main, 'Times New Roman', serif; font-size: 17px; }
+.kbd-extra button.tpl i { display: block; width: 8px; height: 10px; border: 1.4px dashed currentColor; border-radius: 3px; opacity: 0.85; flex-shrink: 0; }
 .kbd-extra button.tpl .f { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
-.kbd-extra button.tpl .f i { width: 8px; height: 7px; }
-.kbd-extra button.tpl .f::after { content: ''; order: 1; width: 13px; border-top: 1.4px solid currentColor; }
+.kbd-extra button.tpl .f i { width: 9px; height: 8px; }
+.kbd-extra button.tpl .f::after { content: ''; order: 1; width: 15px; border-top: 1.5px solid currentColor; }
 .kbd-extra button.tpl .f i:last-child { order: 2; }
-.kbd-extra button.tpl sup i, .kbd-extra button.tpl sub i { width: 6px; height: 7px; }
+.kbd-extra button.tpl .st { display: inline-flex; flex-direction: column; justify-content: space-between; height: 26px; }
+.kbd-extra button.tpl .st i { width: 6px; height: 7px; }
+.kbd-extra button.tpl .hi { align-self: flex-start; margin-top: 7px; }
+.kbd-extra button.tpl .hi, .kbd-extra button.tpl .lo { width: 6px; height: 7px; }
+.kbd-extra button.tpl .lo { align-self: flex-end; margin-bottom: 7px; }
+.kbd-extra button.tpl svg { height: 24px; width: 9px; overflow: visible; }
+.kbd-extra button.tpl svg path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
