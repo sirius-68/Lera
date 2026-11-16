@@ -10,9 +10,10 @@ import { enableReminders } from '../store/remind';
 import { Celebration } from '../ui/Celebrate';
 import { Button3D, Confetti, haptic, toast } from '../ui/kit';
 import { Icon } from '../ui/icons';
+import { Graph } from '../ui/Graph';
 import { MathView } from '../ui/math';
 import '../styles/onb.css';
-import { SceneBell, SceneGraph, SceneLines, ScenePath, ScenePlain, SceneReturn, SceneReward } from './onb/Scenes';
+import { SceneBell, SceneLines, ScenePath, ScenePlain, SceneReturn, SceneReward } from './onb/Scenes';
 import { canPinWidget, hasWidget, pinWidget } from '../store/widget';
 import { AuthPanel } from './Auth';
 import { SceneWidget, TileArt } from './onb/Art';
@@ -56,7 +57,7 @@ interface Choice {
 }
 
 const STAGE: Choice[] = [
-  { id: 'school', emoji: '🎒', title: 'At school', reply: 'Good — I’ll keep to what your notes cover and build it up step by step.' },
+  { id: 'school', emoji: '🎒', title: 'At school', reply: 'Good, I’ll keep to what your notes cover and build it up step by step.' },
   { id: 'uni', emoji: '🎓', title: 'College or university', reply: 'Then pace matters. I’ll help you keep up with the lectures you upload.' },
   { id: 'self', emoji: '📚', title: 'Teaching myself', reply: 'I like that. Bring any book or notes; I’ll turn them into a path.' },
   { id: 'back', emoji: '🔁', title: 'Coming back after a break', reply: 'It comes back faster than you’d think. We’ll find what’s still solid first.' },
@@ -70,13 +71,15 @@ const WHY: Choice[] = [
   { id: 'sharp', emoji: '🧩', title: 'I just want to stay sharp', reply: 'A few minutes a day is plenty. I’ll bring back what’s fading.' },
 ];
 
+// The places a solution usually goes wrong, in the order they happen: reading the question, setting it up,
+// choosing a method, carrying it out, recalling the rule, and checking (after Newman's error analysis).
 const TRIPS: Choice[] = [
-  { id: 'signs', emoji: '➖', title: 'Minus signs and small slips', focus: 'catching sign slips' },
-  { id: 'method', emoji: '🧭', title: 'Not knowing which method to use', focus: 'choosing the right method' },
-  { id: 'steps', emoji: '⏩', title: 'Skipping steps and rushing', focus: 'slowing down the last line' },
-  { id: 'blank', emoji: '😶', title: 'Going blank when it gets hard', focus: 'small steps and gentle hints' },
-  { id: 'find', emoji: '🔍', title: 'Not finding where I went wrong', focus: 'pointing at the exact line' },
-  { id: 'forget', emoji: '🫧', title: 'Understanding it, then forgetting', focus: 'bringing ideas back before they fade' },
+  { id: 'read', emoji: '🔎', title: 'Understanding what the question asks', focus: 'reading the question before solving' },
+  { id: 'setup', emoji: '🧱', title: 'Setting the problem up as an equation', focus: 'turning the problem into maths' },
+  { id: 'method', emoji: '🧭', title: 'Choosing which rule or method to use', focus: 'choosing the right method' },
+  { id: 'steps', emoji: '➗', title: 'Signs, fractions and powers along the way', focus: 'signs, fractions and powers in each line' },
+  { id: 'forget', emoji: '🫧', title: 'Remembering rules and formulas', focus: 'bringing rules back before they fade' },
+  { id: 'find', emoji: '✅', title: 'Checking my work and finding the mistake', focus: 'pointing at the exact line that breaks' },
 ];
 
 const WHEN: (Choice & { time: string })[] = [
@@ -90,7 +93,7 @@ const FEEL: { mood: Mood; label: string; short: string; line: string }[] = [
   { mood: 'sad', label: 'Lost', short: 'We’ll start where it’s solid.', line: 'That’s an honest answer. We’ll start where it’s solid and build from there.' },
   { mood: 'nervous', label: 'Shaky', short: 'I’ll find the loose rules.', line: 'Shaky usually means two or three rules aren’t fixed yet. I’ll find which.' },
   { mood: 'happy', label: 'Okay', short: 'Let’s make it reliable.', line: 'Okay is a good place to start. Let’s turn it into reliable.' },
-  { mood: 'cool', label: 'Confident', short: 'Then I’ll be picky.', line: 'Then I’ll be picky — and show you the faster routes.' },
+  { mood: 'cool', label: 'Confident', short: 'Then I’ll be picky.', line: 'Then I’ll be picky, and show you the faster routes.' },
 ];
 
 interface Spot {
@@ -108,7 +111,7 @@ const SPOT_ALGEBRA: Spot = {
   lines: ['3x = 19 + 4', '3x = 23', 'x = 23/3'],
   wrong: 0,
   right: '3x = 19 - 4',
-  why: 'The **+ 4** crossed the equals sign but kept its sign. It should arrive as **− 4**. Everything after that line was done correctly — on top of a mistake.',
+  why: 'The **+ 4** crossed the equals sign but kept its sign. It should arrive as **− 4**. Everything after that line was done correctly, on top of a mistake.',
 };
 
 const SPOT_CALC: Spot = {
@@ -487,7 +490,7 @@ export function Onboarding() {
             {(
               [
                 ['line', 'As I go', 'Every line gets a tick or a flag the moment you write it. Best for learning a new method.', ['ok', 'ok', 'bad']],
-                ['end', 'When I finish', 'Write the whole solution first. Then I mark every line at once — like handing in your work.', ['wait', 'wait', 'wait']],
+                ['end', 'When I finish', 'Write the whole solution first. Then I mark every line at once, like handing in your work.', ['wait', 'wait', 'wait']],
               ] as ['line' | 'end', string, string, string[]][]
             ).map(([id, title, sub, demo]) => (
               <button key={id} className={`mode-card ${mode === id ? 'on' : ''}`} aria-pressed={mode === id} onClick={() => { haptic(6); setMode(id); }}>
@@ -541,9 +544,8 @@ export function Onboarding() {
 
       {step === 'graph' && (
         <div className={cls} key="graph">
-          <Show title={<>Graphs you can <em>touch</em>.</>} text="Drag a curve. See its slope.">
-            <SceneGraph />
-          </Show>
+          <Ask mood="detective" hint="Drag along the curve. Tap Slope.">Graphs you can touch.</Ask>
+          <div data-noswipe><Graph fns={['x^2 - 4']} /></div>
           {foot('Continue')}
         </div>
       )}
@@ -616,10 +618,10 @@ export function Onboarding() {
           <div className="ob-peek"><Lera size={74} mood={built >= 5 ? 'party' : 'calculating'} interactive={false} /></div>
           <ul className="plan peeked">
             {[
-              ['target', 'What you’ll study', subjects.map((s) => SUBJECTS.find((x) => x.id === s)?.title).join(' · ')],
+              ['target', 'Where your lessons come from', `your own notes · ${subjects.map((s) => SUBJECTS.find((x) => x.id === s)?.title).join(' · ')}`],
               ['eye', 'What I’ll watch for', focus.length ? focus.join(', ') : 'where your reasoning breaks'],
               ['check', 'How I’ll check', mode === 'line' ? 'each line, as you write it' : 'the whole solution, when you finish'],
-              ['flame', 'Your daily goal', `${goalInfo.xp} XP — ${goalInfo.sub}`],
+              ['flame', 'Your daily goal', `${goalInfo.xp} XP, ${goalInfo.sub}`],
               ['bell', 'Best time for you', `${whenInfo.title.toLowerCase()}, around ${whenInfo.time}`],
             ].map(([icon, label, value], i) => (
               <li key={label} data-on={built > i ? '' : undefined}>

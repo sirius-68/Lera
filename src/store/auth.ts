@@ -9,8 +9,8 @@
  *    does not sync or recover anything.
  *
  *  - A server. Build with LERA_AUTH_URL set and the same calls go to
- *    POST {url}/signup, /signin and /reset with JSON bodies
- *    { email, password, name? }, expecting { ok: true } or { error }.
+ *    POST {url}/signup, /signin, /reset ({ email }: emails a 6-digit code) and
+ *    /reset/confirm ({ email, code, password }), all expecting { ok: true } or { error }.
  */
 declare const __LERA_AUTH_URL__: string | undefined;
 const REMOTE = typeof __LERA_AUTH_URL__ !== 'undefined' && __LERA_AUTH_URL__ ? __LERA_AUTH_URL__.replace(/\/$/, '') : '';
@@ -106,21 +106,53 @@ export async function signIn(email: string, password: string): Promise<AuthResul
   return { ok: true, email };
 }
 
+/** A reset that has been asked for and not yet confirmed (no server: kept in memory only, ten minutes). */
+let pending: { email: string; code: string; until: number } | null = null;
+
+export type ResetStart = { ok: true; email: string; /** Set only when there is no server to email it. */ code?: string } | { ok: false; error: string };
+
 /**
- * Forgotten password. With a server this asks it to email a link. Without one, the profile
- * exists only on this phone — so the person who holds the phone may set a new password for it.
+ * Forgotten password, step 1: ask for a confirmation code for this email.
+ * With a server the code is emailed (POST /reset). Without one there is nothing that can send an email,
+ * so the code is handed back to be shown on the phone itself.
  */
-export async function resetPassword(email: string, newPassword?: string): Promise<AuthResult> {
+export async function requestReset(email: string): Promise<ResetStart> {
   email = email.trim().toLowerCase();
   if (!validEmail(email)) return { ok: false, error: 'That email doesn’t look right.' };
   if (REMOTE) return remote('/reset', { email });
   const account = getAccount();
   if (!account || account.email !== email) return { ok: false, error: 'No profile with that email on this phone.' };
-  if (newPassword === undefined) return { ok: true, email };
+  const n = new Uint32Array(1);
+  if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(n);
+  else n[0] = Math.floor(Math.random() * 1e9);
+  const code = String(n[0] % 1000000).padStart(6, '0');
+  pending = { email, code, until: Date.now() + 10 * 60 * 1000 };
+  return { ok: true, email, code };
+}
+
+/** Step 2: is this the code that was sent? (With a server the code is checked there, together with step 3.) */
+export function checkResetCode(email: string, code: string): AuthResult {
+  email = email.trim().toLowerCase();
+  if (!/^\d{6}$/.test(code.trim())) return { ok: false, error: 'The code is six digits.' };
+  if (REMOTE) return { ok: true, email };
+  if (!pending || pending.email !== email || Date.now() > pending.until) return { ok: false, error: 'That code has expired. Ask for a new one.' };
+  if (pending.code !== code.trim()) return { ok: false, error: 'That code isn’t right.' };
+  return { ok: true, email };
+}
+
+/** Step 3: set the new password. Only works with the code from step 1. */
+export async function confirmReset(email: string, code: string, newPassword: string): Promise<AuthResult> {
+  email = email.trim().toLowerCase();
   const problem = passwordProblem(newPassword);
   if (problem) return { ok: false, error: problem };
+  if (REMOTE) return remote('/reset/confirm', { email, code: code.trim(), password: newPassword });
+  const checked = checkResetCode(email, code);
+  if (!checked.ok) return checked;
+  const account = getAccount();
+  if (!account || account.email !== email) return { ok: false, error: 'No profile with that email on this phone.' };
   const salt = newSalt();
   localStorage.setItem(KEY, JSON.stringify({ ...account, salt, hash: await stretch(newPassword, salt) }));
+  pending = null;
   return { ok: true, email };
 }
 

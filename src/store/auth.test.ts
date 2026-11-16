@@ -38,11 +38,19 @@ test('a second profile cannot silently replace the first', async () => {
   assert.equal(auth.getAccount()!.email, 'eko@example.com');
 });
 
-test('a forgotten password can be reset on the phone that holds the profile', async () => {
-  assert.equal((await auth.resetPassword('wrong@example.com')).ok, false);
-  assert.equal((await auth.resetPassword('eko@example.com')).ok, true);
-  assert.equal((await auth.resetPassword('eko@example.com', 'weak')).ok, false);
-  assert.equal((await auth.resetPassword('eko@example.com', 'integrals99')).ok, true);
+test('a forgotten password needs the confirmation code before a new one can be set', async () => {
+  assert.equal((await auth.requestReset('wrong@example.com')).ok, false);
+  const start = await auth.requestReset('eko@example.com');
+  assert.ok(start.ok && /^\d{6}$/.test(start.code ?? ''));
+  const code = start.ok ? (start.code as string) : '';
+  const wrong = code === '000000' ? '000001' : '000000';
+  assert.equal(auth.checkResetCode('eko@example.com', wrong).ok, false);
+  assert.equal((await auth.confirmReset('eko@example.com', wrong, 'integrals99')).ok, false);
+  assert.equal((await auth.signIn('eko@example.com', 'algebra2026')).ok, true, 'the old password still works until the code is confirmed');
+  assert.equal(auth.checkResetCode('eko@example.com', code).ok, true);
+  assert.equal((await auth.confirmReset('eko@example.com', code, 'weak')).ok, false);
+  assert.equal((await auth.confirmReset('eko@example.com', code, 'integrals99')).ok, true);
   assert.equal((await auth.signIn('eko@example.com', 'algebra2026')).ok, false);
   assert.equal((await auth.signIn('eko@example.com', 'integrals99')).ok, true);
+  assert.equal((await auth.confirmReset('eko@example.com', code, 'another2026')).ok, false, 'a code works once');
 });

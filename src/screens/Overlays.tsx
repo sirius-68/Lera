@@ -128,7 +128,7 @@ export function ReviewSheet({ concept }: { concept: ConceptId }) {
           {sense === 'yes' && <span className="sense-ok"><Icon name="check" size={14} stroke={3} /> Good. Now prove it to yourself with three quick ones.</span>}
           {sense === 'no' && (
             <div className="plainer">
-              <p>That’s fine — it means we go slower, not that you can’t do it. Read the <b>plain words</b> box at the top once more, then tap through the worked example one step at a time, guessing each step before you reveal it.</p>
+              <p>That’s fine, it means we go slower, not that you can’t do it. Read the <b>plain words</b> box at the top once more, then tap through the worked example one step at a time, guessing each step before you reveal it.</p>
               <button className="review-link" onClick={() => openOverlay({ name: 'ask', seed: `I don’t understand ${c.title.toLowerCase()}. Can you explain it more simply?` })}>
                 <Icon name="chat" size={15} />
                 <span>Ask Lera about this</span>
@@ -165,11 +165,31 @@ const mid = (): string => `m${Date.now().toString(36)}${Math.floor(Math.random()
 export function AskSheet({ topicId, seed, problem, lines }: AskProps) {
   const ai = useStore((s) => s.ai);
   const docs = useStore((s) => s.docs);
-  const found = findTopic(docs, topicId);
-  // one continuing conversation per lesson; it is still there the next time the sheet opens
-  const thread = found ? found.topic.id : 'general';
-  const msgs = useStore((s) => s.chats[thread]) ?? NO_MSGS;
+  const chats = useStore((s) => s.chats);
+  // Conversations are kept as sessions, like any chat app: each has its own id, and the list of them is the history.
+  // A session started from a lesson remembers the lesson ("t:<topic>:<time>"); older ones are keyed by the topic alone.
+  const topicOf = (id: string): string | undefined => (id.startsWith('t:') ? id.slice(2, id.lastIndexOf(':')) : id.startsWith('c:') || id === 'general' ? undefined : id);
+  const lastAt = (id: string): string => chats[id]?.[chats[id].length - 1]?.at ?? '';
+  const sessions = Object.keys(chats).filter((id) => chats[id]?.length).sort((a, b) => lastAt(b).localeCompare(lastAt(a)));
+  const fresh = (forTopic?: string) => (forTopic ? `t:${forTopic}:${Date.now()}` : `c:${Date.now()}`);
+  const [thread, setThread] = useState<string>(() => {
+    // from a lesson or a problem: carry on that lesson's latest chat; from the home screen: a new one
+    const mine = topicId ? sessions.find((id) => topicOf(id) === topicId) : undefined;
+    return mine && !seed ? mine : fresh(topicId);
+  });
+  // opened from the home screen with earlier chats: show them first
+  const [showHistory, setShowHistory] = useState(() => !topicId && !seed && !problem && sessions.length > 0);
+  const found = findTopic(docs, topicOf(thread) ?? (thread.startsWith('c:') ? undefined : topicId));
+  const msgs = chats[thread] ?? NO_MSGS;
   const setMsgs = (next: Msg[]) => actions.setChat(thread, next);
+  const titleOf = (id: string): string => (chats[id]?.find((m) => m.role === 'user')?.text ?? 'Chat').replace(/\*\*|\$/g, '').slice(0, 70);
+  const whenOf = (id: string): string => {
+    const at = lastAt(id);
+    if (!at) return '';
+    const d = new Date(at);
+    const days = Math.round((new Date(new Date().toDateString()).getTime() - new Date(d.toDateString()).getTime()) / 86400000);
+    return days <= 0 ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : days === 1 ? 'Yesterday' : days < 7 ? `${days} days ago` : d.toLocaleDateString([], { day: 'numeric', month: 'short' });
+  };
   const [openMsg, setOpenMsg] = useState<string | null>(null);
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -188,6 +208,7 @@ export function AskSheet({ topicId, seed, problem, lines }: AskProps) {
     const q = question.trim();
     if (!q || busy) return;
     const history: Msg[] = [...msgs, { id: mid(), role: 'user', text: q, at: new Date().toISOString() }];
+    setShowHistory(false);
     setMsgs(history);
     setText('');
     setBusy(true);
@@ -247,7 +268,10 @@ export function AskSheet({ topicId, seed, problem, lines }: AskProps) {
     setOpenMsg(null);
   };
   const clearAll = async () => {
-    if (await confirmDialog('Clear this conversation?', { body: 'The messages in this chat will be removed. Anything you saved to your notebook stays.', yes: 'Clear', danger: true })) actions.clearChat(thread);
+    if (await confirmDialog('Delete this chat?', { body: 'Its messages will be removed. Anything you saved to your notebook stays.', yes: 'Delete', danger: true })) {
+      actions.clearChat(thread);
+      setThread(fresh(topicOf(thread)));
+    }
   };
 
   const quick = problem ? ['Give me a hint', 'What should I do first?'] : found ? [`Explain “${found.topic.title}” simply`, 'What is a coefficient?', 'What are like terms?'] : ['What is a coefficient?', 'Why do signs flip?', 'How do I factorise?'];
@@ -258,20 +282,42 @@ export function AskSheet({ topicId, seed, problem, lines }: AskProps) {
         <div className="row" style={{ padding: '0 20px 8px', gap: 10 }}>
           <Lera size={44} mood={busy ? 'thinking' : 'idle'} />
           <div className="grow">
-            <b style={{ fontSize: 17 }}>Ask Lera</b>
+            <b style={{ fontSize: 17 }}>{showHistory ? 'Your chats' : 'Ask Lera'}</b>
             <p className="faint" style={{ fontSize: 12.5 }}>
-              {found ? found.topic.title : 'Anything in your notes'}{msgs.length ? ` · ${msgs.length} messages kept` : ''}
+              {showHistory ? `${sessions.length} saved ${sessions.length === 1 ? 'chat' : 'chats'}` : found ? found.topic.title : 'Anything in your notes'}
             </p>
           </div>
-          {msgs.length > 0 && (
-            <button className="iconbtn" onClick={clearAll} aria-label="Clear this conversation"><Icon name="trash" size={18} /></button>
+          {!showHistory && sessions.length > 0 && (
+            <button className="iconbtn" onClick={() => { haptic(4); setShowHistory(true); }} aria-label="Chat history"><Icon name="clock" size={19} /></button>
+          )}
+          <button className="iconbtn" onClick={() => { haptic(4); setThread(fresh(showHistory ? undefined : topicOf(thread))); setShowHistory(false); }} aria-label="New chat"><Icon name="plus" size={20} /></button>
+          {!showHistory && msgs.length > 0 && (
+            <button className="iconbtn" onClick={clearAll} aria-label="Delete this chat"><Icon name="trash" size={18} /></button>
           )}
         </div>
-        <div className="ask-list" ref={list}>
+        {showHistory && (
+          <div className="ask-list chat-history">
+            {sessions.map((id) => {
+              const t = findTopic(docs, topicOf(id));
+              return (
+                <div key={id} className="chat-row">
+                  <button className="grow" onClick={() => { haptic(4); setThread(id); setShowHistory(false); }}>
+                    <b>{titleOf(id)}</b>
+                    <span>{t ? `${t.topic.title} · ` : ''}{chats[id].length} messages · {whenOf(id)}</span>
+                    <em>{(chats[id][chats[id].length - 1]?.text ?? '').replace(/\*\*|\$/g, '').slice(0, 90)}</em>
+                  </button>
+                  <button className="iconbtn" aria-label="Delete this chat" onClick={async () => { if (await confirmDialog('Delete this chat?', { yes: 'Delete', danger: true })) actions.clearChat(id); }}><Icon name="trash" size={17} /></button>
+                </div>
+              );
+            })}
+            {sessions.length === 0 && <p className="muted" style={{ textAlign: 'center', padding: 24 }}>No chats yet.</p>}
+          </div>
+        )}
+        {!showHistory && <div className="ask-list" ref={list}>
           {msgs.length === 0 && !busy && (
             <div className="center" style={{ gap: 10, padding: '18px 10px' }}>
               <p className="muted" style={{ fontSize: 15, maxWidth: 280, lineHeight: 1.5 }}>
-                {problem ? 'Stuck on this problem? Ask, and I’ll point at the idea — not the answer.' : 'Ask about anything in your notes.'}
+                {problem ? 'Stuck on this problem? Ask, and I’ll point at the idea, not the answer.' : 'Ask about anything in your notes.'}
               </p>
               <div className="col" style={{ gap: 8, alignSelf: 'stretch' }}>
                 {quick.map((qk) => (
@@ -305,7 +351,7 @@ export function AskSheet({ topicId, seed, problem, lines }: AskProps) {
               <i /><i /><i />
             </div>
           )}
-        </div>
+        </div>}
         <form
           className="ask-form"
           onSubmit={(e: { preventDefault(): void }) => {
@@ -313,7 +359,7 @@ export function AskSheet({ topicId, seed, problem, lines }: AskProps) {
             void ask(text);
           }}
         >
-          <input className="field" placeholder="Ask a question…" value={text} onChange={(e: { target: { value: string } }) => setText(e.target.value)} aria-label="Your question" />
+          <input className="field" placeholder={showHistory ? 'Start a new chat…' : 'Ask a question…'} value={text} onChange={(e: { target: { value: string } }) => setText(e.target.value)} aria-label="Your question" />
           <button type="submit" className="send" disabled={!text.trim() || busy} aria-label="Send">
             <Icon name="arrow" size={20} />
           </button>

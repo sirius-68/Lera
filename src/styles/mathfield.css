@@ -1,0 +1,41 @@
+/* ───────── the working line: maths typed into boxes ───────── */
+.mf { position: relative; min-height: 44px; display: flex; align-items: center; overflow-x: auto; scrollbar-width: none; outline: none; padding: 6px 2px; font-family: KaTeX_Main, 'Times New Roman', serif; font-size: 22px; line-height: 1.2; color: var(--ink); cursor: text; -webkit-user-select: none; user-select: none; }
+.mf::-webkit-scrollbar { display: none; }
+.mf-ph { position: absolute; left: 4px; font-family: var(--font); font-size: 16px; color: var(--ink-3); pointer-events: none; white-space: nowrap; }
+.mf-row { display: inline-flex; align-items: center; min-height: 1.25em; white-space: nowrap; }
+.mf-row.small { font-size: 0.68em; }
+.mf-row.empty { min-width: 0.85em; min-height: 1.1em; justify-content: center; border: 1.5px dashed #b9b4ff; border-radius: 5px; background: #f6f5ff; margin: 1px 2px; }
+.mf-row.empty.on { border-style: solid; border-color: var(--brand); background: var(--tint); }
+.mf-tok { padding: 0 1px; }
+.mf-tok.var { font-family: KaTeX_Math, 'Times New Roman', serif; font-style: italic; }
+.mf-tok.op { padding: 0 5px; }
+.mf-caret { display: inline-block; width: 2px; height: 1.15em; margin: 0 -1px; background: var(--brand); border-radius: 2px; animation: mf-blink 1.05s steps(1) infinite; flex-shrink: 0; }
+.mf-row.small .mf-caret { height: 1.05em; }
+@keyframes mf-blink { 50% { opacity: 0; } }
+.mf-frac { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; margin: 0 3px; font-size: 0.86em; }
+.mf-frac .top { display: flex; justify-content: center; align-self: stretch; padding: 0 4px 2px; border-bottom: 1.6px solid currentColor; }
+.mf-frac .bot { display: flex; justify-content: center; padding: 2px 4px 0; }
+.mf-frac.lead { font-size: 0.74em; margin-right: 1px; }
+.mf-frac em, .mf-fn em { font-family: KaTeX_Math, 'Times New Roman', serif; }
+.mf-pow { align-self: flex-start; margin-top: -0.25em; line-height: 1; }
+.mf-sqrt { display: inline-flex; align-items: stretch; margin: 0 2px; }
+.mf-sqrt > i { font-style: normal; font-size: 1.15em; line-height: 1; margin-right: -1px; align-self: center; }
+.mf-sqrt .under { display: inline-flex; align-items: center; border-top: 1.6px solid currentColor; padding: 2px 3px 0; margin-top: 2px; }
+.mf-abs { display: inline-flex; align-items: center; border-left: 1.6px solid currentColor; border-right: 1.6px solid currentColor; padding: 0 3px; margin: 0 3px; }
+.mf-fn { display: inline-flex; align-items: center; margin: 0 2px; }
+.mf-fn > b { font-weight: 400; }
+.mf-int { font-style: normal; font-size: 1.7em; line-height: 1; margin: 0 2px 0 0; font-family: KaTeX_Size2, KaTeX_Main, serif; }
+.mf-fn .dx { margin-left: 5px; }
+.mf-lims { display: inline-flex; flex-direction: column; align-items: center; margin-right: 3px; }
+.mf-lims .mf-int { font-size: 1.35em; margin: -2px 0; }
+.mf-lim { display: inline-flex; flex-direction: column; align-items: center; margin-right: 6px; line-height: 1.05; }
+.mf-lim .to { display: inline-flex; align-items: center; font-size: 0.68em; }
+.mf-lim .to .mf-row.small { font-size: 1em; }
+/* template keys on the keyboard */
+.kbd-extra button.tpl { background: var(--tint); color: var(--brand-d); font-family: KaTeX_Main, 'Times New Roman', serif; font-size: 16px; min-width: 44px; }
+.kbd-extra button.tpl i { display: inline-block; width: 9px; height: 11px; border: 1.4px dashed currentColor; border-radius: 3px; vertical-align: middle; opacity: 0.8; }
+.kbd-extra button.tpl .f { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }
+.kbd-extra button.tpl .f i { width: 8px; height: 7px; }
+.kbd-extra button.tpl .f::after { content: ''; order: 1; width: 13px; border-top: 1.4px solid currentColor; }
+.kbd-extra button.tpl .f i:last-child { order: 2; }
+.kbd-extra button.tpl sup i, .kbd-extra button.tpl sub i { width: 6px; height: 7px; }

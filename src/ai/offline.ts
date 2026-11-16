@@ -58,10 +58,10 @@ export function localAnswer(question: string, ctx: LocalContext): string {
     if (ladder) return `${ladder.nudge}\n\n${ladder.method}`;
   }
   if (ctx.problem && /\b(answer|solution)\b/i.test(q)) {
-    return 'I won’t hand over the answer — but tap **Hint** under your working and I’ll walk you there one rung at a time.';
+    return 'I won’t hand over the answer, but tap **Hint** under your working and I’ll walk you there one rung at a time.';
   }
 
-  for (const t of termsIn(q, glossary)) parts.push(`**${cap(t)}** — ${glossary[t]}`);
+  for (const t of termsIn(q, glossary)) parts.push(`**${cap(t)}**, ${glossary[t]}`);
 
   const concept = bestConcept(q) ?? conceptsForText(q)[0] ?? (parts.length === 0 && ctx.topicTitle ? conceptsForText(ctx.topicTitle)[0] : undefined);
   if (concept) {

@@ -96,7 +96,7 @@ export interface Diagnosis {
 export type LineStatus =
   | 'ok' //          follows from the line above, and still true to the problem
   | 'wrong' //       does not follow from the line above
-  | 'carried' //     follows from the line above — but that line was already off
+  | 'carried' //     follows from the line above, but that line was already off
   | 'recovered' //   doesn't follow from the (wrong) line above, yet is correct again
   | 'unreadable' //  couldn't be parsed
   | 'unchecked'; //  parsed, but not something that can be compared

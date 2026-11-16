@@ -115,7 +115,7 @@ export function analyze(problem: Problem, rawLines: string[]): AttemptAnalysis {
       concept: problem.concepts[0] ?? 'simplest-form',
       severity: 'strategy',
       title: 'Right answer, long road.',
-      message: `You got there in ${steps} lines; it can be done in ${cleanSteps}. Nothing was wrong — there’s just a shorter route worth seeing.`,
+      message: `You got there in ${steps} lines; it can be done in ${cleanSteps}. Nothing was wrong, there’s just a shorter route worth seeing.`,
     });
   }
 
@@ -206,13 +206,13 @@ const NUDGE: Record<StepTag, string> = {
   'clear-fractions': 'The fractions are making this harder than it needs to be. What could you multiply everything by to get rid of them?',
   expand: 'There are brackets in the way. What does the number outside do to each term inside?',
   collect: 'Some terms on the same side are the same kind. What happens if you combine them?',
-  move: 'You want the unknown on one side and plain numbers on the other. Which term could you move — and what happens to its sign?',
+  move: 'You want the unknown on one side and plain numbers on the other. Which term could you move, and what happens to its sign?',
   divide: 'The unknown is being multiplied by a number. What undoes multiplying?',
   'standard-form': 'Quadratics are easiest when one side is zero. What would you move across?',
   factor: 'Can you write this as two brackets multiplied together?',
   'common-factor': 'Look at what every term has in common. Can you take it outside a bracket?',
   'zero-product': 'If two things multiply to make zero, what must be true about one of them?',
-  sqrt: 'What undoes squaring — and how many answers does it give?',
+  sqrt: 'What undoes squaring, and how many answers does it give?',
   formula: 'This one won’t split into neat brackets. Which formula works for every quadratic?',
   substitute: 'Start by swapping each letter for its value. Use brackets around negatives.',
   evaluate: 'Which operation has to happen first here?',

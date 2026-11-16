@@ -314,7 +314,7 @@ export function Graph({ fns, caption, height = 250 }: { fns: string[]; caption?:
           <>
             <span><b>x</b> {fmt(trace!.x)}</span>
             <span><b>y</b> {fmt(t.y)}</span>
-            <span className="slope"><b>slope</b> {Number.isFinite(t.m) ? fmt(t.m) : '—'}</span>
+            <span className="slope"><b>slope</b> {Number.isFinite(t.m) ? fmt(t.m) : '·'}</span>
           </>
         ) : (
           <span className="faint">{caption || 'Rebuilt from the function in your notes.'}</span>
@@ -325,7 +325,7 @@ export function Graph({ fns, caption, height = 250 }: { fns: string[]; caption?:
       </div>
       {slope && (
         <figcaption className="graph-cap">
-          Dashed: the slope of the curve at each x — its derivative, <MathView text={`y = ${curves[trace?.i ?? 0].dText}`} />. Where the dashed curve crosses zero, the solid one is flat.
+          Dashed: the slope of the curve at each x, its derivative, <MathView text={`y = ${curves[trace?.i ?? 0].dText}`} />. Where the dashed curve crosses zero, the solid one is flat.
         </figcaption>
       )}
     </figure>

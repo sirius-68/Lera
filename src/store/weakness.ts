@@ -70,10 +70,10 @@ type Family = 'sign' | 'brackets' | 'fractions' | 'powers' | 'inside' | 'numbers
 const FAMILY_TEXT: Record<Family, { title: string; detail: string; concept: ConceptId }> = {
   sign: { title: 'Minus signs keep slipping', detail: 'Across different topics, the same thing goes wrong: a sign flips or gets lost. Before you move on from a line, point at every minus and ask “did this one survive?”', concept: 'signed-arithmetic' },
   brackets: { title: 'Brackets are costing you marks', detail: 'When something multiplies a bracket, part of the bracket gets left out. Draw an arrow from the outside term to **each** term inside before you write the next line.', concept: 'distributive' },
-  fractions: { title: 'Fractions trip you in several topics', detail: 'The method is usually right until a fraction appears. Clear fractions first — multiply everything by a common bottom — then carry on with whole numbers.', concept: 'fractions' },
+  fractions: { title: 'Fractions trip you in several topics', detail: 'The method is usually right until a fraction appears. Clear fractions first, multiply everything by a common bottom, then carry on with whole numbers.', concept: 'fractions' },
   powers: { title: 'Powers go wrong in more than one place', detail: 'Whether it is multiplying powers or differentiating them, the little number on top is being mishandled. Say out loud what happens to the power before you write it.', concept: 'exponent-rules' },
   inside: { title: 'The “inside” keeps getting forgotten', detail: 'When one function sits inside another, you deal with the outside and stop. Both differentiating and integrating need a second step for the inside.', concept: 'chain-rule' },
-  numbers: { title: 'The method is right — the sums aren’t', detail: 'Your marks are mostly miscounted numbers, not wrong rules. Write the small sums at the side instead of doing them in your head.', concept: 'arithmetic' },
+  numbers: { title: 'The method is right, the sums aren’t', detail: 'Your marks are mostly miscounted numbers, not wrong rules. Write the small sums at the side instead of doing them in your head.', concept: 'arithmetic' },
 };
 
 function familyOf(code: string, concept: ConceptId): Family | null {
@@ -114,7 +114,7 @@ export function weaknesses(state: State, today: string = dayOf()): Weakness[] {
       kind: 'gap',
       tone: 'gap',
       title: CONCEPTS[c.id].title,
-      detail: `Marked as a gap ${times(c.gaps)}${c.lastTitle ? ` — “${c.lastTitle.replace(/\*\*/g, '')}”` : ''}. It clears after ${need === 2 ? 'two clean solves on different days' : need === 1 ? 'one more clean solve on another day' : 'today’s clean solve settles'}.`,
+      detail: `Marked as a gap ${times(c.gaps)}${c.lastTitle ? `, “${c.lastTitle.replace(/\*\*/g, '')}”` : ''}. It clears after ${need === 2 ? 'two clean solves on different days' : need === 1 ? 'one more clean solve on another day' : 'today’s clean solve settles'}.`,
       concept: c.id,
       score: 100 + c.gaps * 8 - c.cleanDays.length * 15,
     });
@@ -132,7 +132,7 @@ export function weaknesses(state: State, today: string = dayOf()): Weakness[] {
         kind: 'root',
         tone: 'gap',
         title: `Start with: ${CONCEPTS[pre].title}`,
-        detail: `**${CONCEPTS[c.id].title}** is built on **${CONCEPTS[pre].title}**, and that one is shaky too. Fix the earlier idea first — the later one often fixes itself.`,
+        detail: `**${CONCEPTS[c.id].title}** is built on **${CONCEPTS[pre].title}**, and that one is shaky too. Fix the earlier idea first, the later one often fixes itself.`,
         concept: pre,
         score: 120 + (p?.gaps ?? 0) * 5,
       });
@@ -147,7 +147,7 @@ export function weaknesses(state: State, today: string = dayOf()): Weakness[] {
       kind: 'pattern',
       tone: 'slip',
       title: `A habit, not a one-off: ${CONCEPTS[c.id].title}`,
-      detail: `You know this rule — and you have still slipped on it ${times(c.slips)}${c.slipDays.length > 1 ? ` across ${c.slipDays.length} days` : ''}. That is a pattern worth two minutes.`,
+      detail: `You know this rule, and you have still slipped on it ${times(c.slips)}${c.slipDays.length > 1 ? ` across ${c.slipDays.length} days` : ''}. That is a pattern worth two minutes.`,
       concept: c.id,
       score: 70 + c.slips * 4,
     });
@@ -185,7 +185,7 @@ export function weaknesses(state: State, today: string = dayOf()): Weakness[] {
         kind: 'hints',
         tone: 'gap',
         title: `Leaning on hints: ${CONCEPTS[id].title}`,
-        detail: `In ${shown} of your last ${recent.length} problems here you needed to be shown the line. Being shown feels like knowing — it isn’t yet. Read the review, then try one with no hints.`,
+        detail: `In ${shown} of your last ${recent.length} problems here you needed to be shown the line. Being shown feels like knowing, it isn’t yet. Read the review, then try one with no hints.`,
         concept: id,
         score: 75 + shown * 5,
       });
@@ -205,7 +205,7 @@ export function weaknesses(state: State, today: string = dayOf()): Weakness[] {
       kind: 'unfinished',
       tone: 'slip',
       title: integral ? 'The + C keeps going missing' : 'You stop one line early',
-      detail: integral ? `${unfinished.length} of your recent integrals were right but unfinished — the **+ C** was missing. Make it the last thing your hand does.` : `${unfinished.length} of your last ${recent.length} problems were correct as far as they went, but not finished. Before you stop, ask: can anything still be combined, cancelled or worked out?`,
+      detail: integral ? `${unfinished.length} of your recent integrals were right but unfinished, the **+ C** was missing. Make it the last thing your hand does.` : `${unfinished.length} of your last ${recent.length} problems were correct as far as they went, but not finished. Before you stop, ask: can anything still be combined, cancelled or worked out?`,
       concept: integral ? 'constant-of-integration' : 'simplest-form',
       score: 60 + unfinished.length * 3,
     });
@@ -231,7 +231,7 @@ export function weaknesses(state: State, today: string = dayOf()): Weakness[] {
   if (positions.length >= 5) {
     const first = positions.filter((p) => p.first).length / positions.length;
     const last = positions.filter((p) => p.last).length / positions.length;
-    if (first >= 0.6) add({ id: 'early', kind: 'early', tone: 'info', title: 'Most mistakes are on your first line', detail: 'The first move is where it goes wrong — usually the set-up, not the working. Before writing anything, say what kind of problem it is and which rule it needs.', score: 50, action: { label: 'Practise set-ups', type: 'practice' } });
+    if (first >= 0.6) add({ id: 'early', kind: 'early', tone: 'info', title: 'Most mistakes are on your first line', detail: 'The first move is where it goes wrong, usually the set-up, not the working. Before writing anything, say what kind of problem it is and which rule it needs.', score: 50, action: { label: 'Practise set-ups', type: 'practice' } });
     else if (last >= 0.6) add({ id: 'late', kind: 'late', tone: 'info', title: 'Most mistakes are on your last line', detail: 'You do the hard part, then slip at the finish. Re-read the final line against the one above it before you move on.', score: 50, concept: 'simplest-form' });
   }
 
@@ -250,7 +250,7 @@ export function weaknesses(state: State, today: string = dayOf()): Weakness[] {
       kind: 'lesson',
       tone: 'gap',
       title: `Go back to the lesson: ${title}`,
-      detail: `${bad} of your last ${last.length} problems from this lesson had a real gap, a wrong finish or a revealed answer. More practice won’t fix that — **reading the lesson again will**.`,
+      detail: `${bad} of your last ${last.length} problems from this lesson had a real gap, a wrong finish or a revealed answer. More practice won’t fix that, **reading the lesson again will**.`,
       score: 95 + bad * 3,
       action: { label: `Re-read: ${title}`, type: 'lesson', topicId },
     });
@@ -261,7 +261,7 @@ export function weaknesses(state: State, today: string = dayOf()): Weakness[] {
     if (statusOf(c) !== 'solid' || !c.lastSeen) continue;
     const idle = daysBetween(c.lastSeen, today);
     if (idle < 30) continue;
-    add({ id: `rusty:${c.id}`, kind: 'rusty', tone: 'info', title: `Getting rusty: ${CONCEPTS[c.id].title}`, detail: `You had this — ${idle} days ago. One quick problem now is cheaper than relearning it later.`, concept: c.id, score: 30 + Math.min(20, idle / 5), action: { label: 'One quick problem', type: 'practice', concept: c.id } });
+    add({ id: `rusty:${c.id}`, kind: 'rusty', tone: 'info', title: `Getting rusty: ${CONCEPTS[c.id].title}`, detail: `You had this, ${idle} days ago. One quick problem now is cheaper than relearning it later.`, concept: c.id, score: 30 + Math.min(20, idle / 5), action: { label: 'One quick problem', type: 'practice', concept: c.id } });
   }
 
   // 11. explanations that didn't land
@@ -269,7 +269,7 @@ export function weaknesses(state: State, today: string = dayOf()): Weakness[] {
     if (v !== 'no' || !(id in CONCEPTS)) continue;
     const cid = id as ConceptId;
     if (out.some((w) => w.concept === cid)) continue;
-    add({ id: `confused:${cid}`, kind: 'confused', tone: 'info', title: `Still unclear: ${CONCEPTS[cid].title}`, detail: 'You said the explanation didn’t make sense. That’s useful to know — here it is again in plainer words, with an example to walk through.', concept: cid, score: 65, action: { label: 'Explain it again', type: 'review', concept: cid } });
+    add({ id: `confused:${cid}`, kind: 'confused', tone: 'info', title: `Still unclear: ${CONCEPTS[cid].title}`, detail: 'You said the explanation didn’t make sense. That’s useful to know, here it is again in plainer words, with an example to walk through.', concept: cid, score: 65, action: { label: 'Explain it again', type: 'review', concept: cid } });
   }
 
   // one finding per concept+kind, strongest first

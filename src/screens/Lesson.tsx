@@ -592,12 +592,12 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
       await navigator.clipboard.writeText(text);
       toast(done);
     } catch {
-      toast('Copying isn’t allowed here — select and copy by hand.');
+      toast('Copying isn’t allowed here, select and copy by hand.');
     }
   };
 
   const share = async (text: string) => {
-    const payload = { title: topic.title, text: `“${text}” — from my notes on ${topic.title}` };
+    const payload = { title: topic.title, text: `“${text}”, from my notes on ${topic.title}` };
     try {
       if (navigator.share) await navigator.share(payload);
       else await copy(payload.text, 'Copied, ready to share');
@@ -669,46 +669,40 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
             ))}
             {topic.blocks.length === 0 && <p className="rd-p muted">{hasPractice ? 'Your notes have exercises under this heading but no explanation. Head to Practice.' : 'This heading has no text under it in your notes.'}</p>}
           </article>
-          {lastOne ? (
-            <div className="page-foot center">
-              {hasPractice ? (
-                <Button3D sheen onClick={() => setTab('practice')}>
-                  <Icon name="pencil" size={18} /> Practise this lesson
-                </Button3D>
-              ) : nextTopic ? (
-                <Button3D sheen onClick={toNext}>
-                  Next lesson <Icon name="arrow" size={18} />
-                </Button3D>
-              ) : (
-                <Button3D sheen variant="ok" onClick={toNext}>
-                  <Icon name="check" size={18} stroke={3} /> Finish
-                </Button3D>
-              )}
-              {!hasPractice && nextTopic && <span className="faint" style={{ fontSize: 13, textAlign: 'center' }}>Up next: {nextTopic.title}</span>}
-              {pages.length > 1 && (
-                <button className="linkbtn" onClick={() => goPage(at - 1)}>
-                  <Icon name="back" size={15} /> Previous part
-                </button>
-              )}
-              {hasPractice && nextTopic && (
-                <button className="linkbtn" onClick={toNext}>
-                  Next: {nextTopic.title} <Icon name="chevron" size={15} />
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="page-nav page-foot">
-              <button className="page-back" onClick={() => goPage(at - 1)} disabled={at === 0} aria-label="Previous part"><Icon name="back" size={20} /></button>
-              <Button3D onClick={() => goPage(at + 1)}>
-                Continue <span style={{ opacity: 0.75, fontWeight: 500 }}>· {at + 1}/{pages.length}</span> <Icon name="arrow" size={18} />
-              </Button3D>
-            </div>
-          )}
         </div>
       ) : (
         <TopicPractice topic={topic} doc={doc} />
       )}
 
+      {showTab === 'lesson' && (
+        <div className="lesson-foot">
+          <div className="row" style={{ gap: 10 }}>
+            {pages.length > 1 && <button className="page-back" onClick={() => goPage(at - 1)} disabled={at === 0} aria-label="Previous part"><Icon name="back" size={20} /></button>}
+            {!lastOne ? (
+              <Button3D onClick={() => goPage(at + 1)}>
+                Continue <span style={{ opacity: 0.75, fontWeight: 500 }}>· {at + 1}/{pages.length}</span> <Icon name="arrow" size={18} />
+              </Button3D>
+            ) : hasPractice ? (
+              <Button3D sheen onClick={() => setTab('practice')}>
+                <Icon name="pencil" size={18} /> Practise this lesson
+              </Button3D>
+            ) : nextTopic ? (
+              <Button3D sheen onClick={toNext}>
+                Next lesson <Icon name="arrow" size={18} />
+              </Button3D>
+            ) : (
+              <Button3D sheen variant="ok" onClick={toNext}>
+                <Icon name="check" size={18} stroke={3} /> Finish
+              </Button3D>
+            )}
+          </div>
+          {lastOne && nextTopic && (
+            <button className="linkbtn lesson-next" onClick={hasPractice ? toNext : undefined} disabled={!hasPractice}>
+              {hasPractice ? 'Skip to: ' : 'Up next: '}{nextTopic.title}
+            </button>
+          )}
+        </div>
+      )}
       {chapterDone && (
         <Celebration
           scene={{ kind: 'chapter', title: 'Chapter complete!', sub: unitTitle, cta: nextTopic ? `Next: ${nextUnit?.title ?? 'next chapter'}` : 'Back to lessons' }}
@@ -815,7 +809,7 @@ function TopicPractice({ topic, doc }: { topic: Topic; doc: LeraDoc }) {
       ? 'I didn’t find exercises under this heading, so I’ll write problems that fit the topic.'
       : done === n
         ? `You’ve solved all **${n}** exercises from this part of your notes. I can still bring fresh ones.`
-        : `I found **${n}** ${n === 1 ? 'exercise' : 'exercises'} in this part of your notes${done ? ` — ${done} solved` : ''}. Write every line; I read the working.`;
+        : `I found **${n}** ${n === 1 ? 'exercise' : 'exercises'} in this part of your notes${done ? `, ${done} solved` : ''}. Write every line; I read the working.`;
   const lastFor = (id: string) => [...attempts].reverse().find((a) => a.problemId === id);
   return (
     <div className="scroll">

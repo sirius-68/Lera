@@ -639,7 +639,7 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
   // list items that are nothing but their number: the equations were pictures, not text
   const emptyItems = paras.filter((p) => /^\(?\d{1,2}[.)]$/.test(p.text.trim())).length;
   if (emptyItems >= 3) {
-    warnings.push('The equations in this file are stored as pictures, so I couldn’t read them. A Word file — or a PDF exported straight from Word — will keep the maths.');
+    warnings.push('The equations in this file are stored as pictures, so I couldn’t read them. A Word file, or a PDF exported straight from Word, will keep the maths.');
   }
   const exerciseCount = kept.reduce((n, u) => n + u.topics.reduce((k, tp) => k + tp.exercises.length, 0), 0);
   if (kept.length > 0 && exerciseCount === 0) {

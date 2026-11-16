@@ -16,6 +16,8 @@ import { back, openOverlay, Route, setBackGuard } from '../store/nav';
 import { Button3D, Confetti, CountUp, LeraSays, Ring, haptic, toast } from '../ui/kit';
 import { CelebrationFlow, Scene } from '../ui/Celebrate';
 import { Icon } from '../ui/icons';
+import { MathField, MathFieldHandle } from '../ui/MathField';
+import type { Kind } from '../ui/mathrow';
 import { MathView, RichText, typeset } from '../ui/math';
 import { WeakCard } from './Main';
 
@@ -38,23 +40,23 @@ const chipTone = (s: Diagnosis['severity']): string => (s === 'gap' ? 'gap' : s 
 
 /* ───────────── the keyboard ───────────── */
 
-function Keyboard({ vars, onKey, onDelete, onEnter, onMove, ready, calc }: { vars: string[]; onKey: (s: string) => void; onDelete: () => void; onEnter: () => void; onMove: (d: -1 | 1) => void; ready: boolean; calc?: boolean }) {
+function Keyboard({ vars, onKey, onTpl, onDelete, onEnter, onMove, ready, calc }: { vars: string[]; onKey: (s: string) => void; onTpl: (kind: Kind, then?: string) => void; onDelete: () => void; onEnter: () => void; onMove: (d: -1 | 1) => void; ready: boolean; calc?: boolean }) {
   const [a, b] = [vars[0] ?? 'x', vars[1] ?? (vars[0] === 'y' ? 'x' : 'y')];
-  type Key = { k: string; ins?: string; tone?: string; label?: string };
+  type Key = { k: string; ins?: string; tone?: string; label?: string; tpl?: Kind; then?: string };
   // calculus swaps the inequality column for the functions it needs
   const calcRows: Key[][] = [
-    [{ k: a, tone: 'var' }, { k: 'e', tone: 'var' }, { k: '(' }, { k: ')' }, { k: 'x²', ins: '^2', label: 'squared' }, { k: '⌫', tone: 'fn', label: 'Delete' }],
-    [{ k: '7' }, { k: '8' }, { k: '9' }, { k: '+', tone: 'op' }, { k: 'sin', ins: 'sin(', tone: 'op' }, { k: 'xⁿ', ins: '^', label: 'to the power' }],
-    [{ k: '4' }, { k: '5' }, { k: '6' }, { k: '−', ins: '-', tone: 'op', label: 'minus' }, { k: 'cos', ins: 'cos(', tone: 'op' }, { k: '√', ins: 'sqrt(', label: 'square root' }],
-    [{ k: '1' }, { k: '2' }, { k: '3' }, { k: '×', ins: '*', tone: 'op', label: 'times' }, { k: 'ln', ins: 'ln(', tone: 'op' }, { k: '+C', ins: ' + C', tone: 'op', label: 'plus C' }],
-    [{ k: '0' }, { k: '.' }, { k: '=', tone: 'op' }, { k: '÷', ins: '/', tone: 'op', label: 'divided by' }, { k: 'π', ins: 'pi', tone: 'op', label: 'pi' }, { k: '↵', tone: 'go', label: 'Check this line' }],
+    [{ k: a, tone: 'var' }, { k: 'e', tone: 'var' }, { k: '(' }, { k: ')' }, { k: 'x²', tpl: 'pow', then: '2', label: 'squared' }, { k: '⌫', tone: 'fn', label: 'Delete' }],
+    [{ k: '7' }, { k: '8' }, { k: '9' }, { k: '+', tone: 'op' }, { k: 'sin', ins: 'sin(', tone: 'op' }, { k: 'xⁿ', tpl: 'pow', label: 'to the power' }],
+    [{ k: '4' }, { k: '5' }, { k: '6' }, { k: '−', ins: '-', tone: 'op', label: 'minus' }, { k: 'cos', ins: 'cos(', tone: 'op' }, { k: '√', tpl: 'sqrt', label: 'square root' }],
+    [{ k: '1' }, { k: '2' }, { k: '3' }, { k: '×', ins: '*', tone: 'op', label: 'times' }, { k: 'ln', ins: 'ln(', tone: 'op' }, { k: '+C', ins: '+C', tone: 'op', label: 'plus C' }],
+    [{ k: '0' }, { k: '.' }, { k: '=', tone: 'op' }, { k: '÷', tpl: 'frac', tone: 'op', label: 'fraction' }, { k: 'π', ins: 'pi', tone: 'op', label: 'pi' }, { k: '↵', tone: 'go', label: 'Check this line' }],
   ];
   const algebraRows: Key[][] = [
-    [{ k: a, tone: 'var' }, { k: b, tone: 'var' }, { k: '(' }, { k: ')' }, { k: 'x²', ins: '^2', label: 'squared' }, { k: '⌫', tone: 'fn', label: 'Delete' }],
-    [{ k: '7' }, { k: '8' }, { k: '9' }, { k: '+', tone: 'op' }, { k: '<', tone: 'op' }, { k: 'xⁿ', ins: '^', label: 'to the power' }],
-    [{ k: '4' }, { k: '5' }, { k: '6' }, { k: '−', ins: '-', tone: 'op', label: 'minus' }, { k: '>', tone: 'op' }, { k: '√', ins: 'sqrt(', label: 'square root' }],
+    [{ k: a, tone: 'var' }, { k: b, tone: 'var' }, { k: '(' }, { k: ')' }, { k: 'x²', tpl: 'pow', then: '2', label: 'squared' }, { k: '⌫', tone: 'fn', label: 'Delete' }],
+    [{ k: '7' }, { k: '8' }, { k: '9' }, { k: '+', tone: 'op' }, { k: '<', tone: 'op' }, { k: 'xⁿ', tpl: 'pow', label: 'to the power' }],
+    [{ k: '4' }, { k: '5' }, { k: '6' }, { k: '−', ins: '-', tone: 'op', label: 'minus' }, { k: '>', tone: 'op' }, { k: '√', tpl: 'sqrt', label: 'square root' }],
     [{ k: '1' }, { k: '2' }, { k: '3' }, { k: '×', ins: '*', tone: 'op', label: 'times' }, { k: '≤', ins: '<=', tone: 'op' }, { k: '±', tone: 'op' }],
-    [{ k: '0' }, { k: '.' }, { k: '=', tone: 'op' }, { k: '÷', ins: '/', tone: 'op', label: 'divided by' }, { k: '≥', ins: '>=', tone: 'op' }, { k: '↵', tone: 'go', label: 'Check this line' }],
+    [{ k: '0' }, { k: '.' }, { k: '=', tone: 'op' }, { k: '÷', tpl: 'frac', tone: 'op', label: 'fraction' }, { k: '≥', ins: '>=', tone: 'op' }, { k: '↵', tone: 'go', label: 'Check this line' }],
   ];
   const rows = calc ? calcRows : algebraRows;
   void b;
@@ -63,21 +65,25 @@ function Keyboard({ vars, onKey, onDelete, onEnter, onMove, ready, calc }: { var
       <div className="kbd-extra">
         <button onClick={() => onMove(-1)} aria-label="Move left"><Icon name="left" size={18} /></button>
         <button onClick={() => onMove(1)} aria-label="Move right"><Icon name="right" size={18} /></button>
+        <button className="tpl" onClick={() => onTpl('frac')} aria-label="Fraction"><span className="f"><i /><i /></span></button>
+        <button className="tpl" onClick={() => onTpl('pow')} aria-label="Power">x<sup><i /></sup></button>
+        <button className="tpl" onClick={() => onTpl('sqrt')} aria-label="Square root">√<i /></button>
         {calc ? (
           <>
-            <button onClick={() => onKey(`d/d${a}(`)}>d/d{a}</button>
-            <button onClick={() => onKey('∫ ')}>∫</button>
-            <button onClick={() => onKey(` d${a}`)}>d{a}</button>
+            <button className="tpl" onClick={() => onTpl('ddx')} aria-label="Derivative">d/d{a} <i /></button>
+            <button className="tpl" onClick={() => onTpl('int')} aria-label="Integral">∫ <i /></button>
+            <button className="tpl" onClick={() => onTpl('defint')} aria-label="Integral with limits">∫<sub><i /></sub><sup><i /></sup></button>
+            <button className="tpl" onClick={() => onTpl('lim')} aria-label="Limit">lim<sub><i /></sub></button>
             <button onClick={() => onKey('tan(')}>tan</button>
-            <button onClick={() => onKey('e^(')}>eˣ</button>
-            <button onClick={() => onKey(`lim ${a}→`)}>lim</button>
+            <button className="tpl" onClick={() => { onKey('e'); onTpl('pow'); }} aria-label="e to the power">e<sup><i /></sup></button>
             <button onClick={() => onKey('inf')}>∞</button>
             <button onClick={() => onKey('DNE')}>no limit</button>
           </>
         ) : (
           <>
+            <button className="tpl" onClick={() => onTpl('abs')} aria-label="Absolute value">|<i />|</button>
             <button onClick={() => onKey(' or ')}>or</button>
-            <button onClick={() => onKey(', ')}>,</button>
+            <button onClick={() => onKey(',')}>,</button>
             <button onClick={() => onKey('no solution')}>no solution</button>
             <button onClick={() => onKey('all real numbers')}>all reals</button>
           </>
@@ -95,6 +101,7 @@ function Keyboard({ vars, onKey, onDelete, onEnter, onMove, ready, calc }: { var
               haptic(4);
               if (key.k === '⌫') onDelete();
               else if (key.k === '↵') onEnter();
+              else if (key.tpl) onTpl(key.tpl, key.then);
               else onKey(key.ins ?? key.k);
             }}
           >
@@ -208,8 +215,12 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
   const [mode, setMode] = useState<'line' | 'end'>(() => getState().profile.checkMode ?? 'line');
   const [checkedCount, setCheckedCount] = useState(0);
   const calc = isCalc(problem.kind);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const caret = useRef<number | null>(null);
+  const fieldRef = useRef<MathFieldHandle | null>(null);
+  /** The final answer, given before any working was shown. */
+  const [answerFirst, setAnswerFirst] = useState<string | null>(null);
+  // asked once per problem: if the answer alone comes back a second time it is taken, so nobody gets stuck
+  const needsWorking = answerFirst === null;
+  const [gaps, setGaps] = useState(false);
   const scroller = useRef<HTMLDivElement | null>(null);
   const started = useRef(Date.now());
   const seen = useRef(new Map<string, Diagnosis>());
@@ -231,19 +242,12 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     if (isChecked(i) && l.status === 'wrong' && l.diag) seen.current.set(`${l.diag.code}:${l.diag.concept}`, l.diag);
   });
 
-  useLayoutEffect(() => {
-    if (caret.current !== null && inputRef.current) {
-      inputRef.current.setSelectionRange(caret.current, caret.current);
-      caret.current = null;
-    }
-  }, [input]);
-
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' });
   }, [lines.length, openDiag, hintOpen, finished, compare]);
 
   useEffect(() => {
-    if (!finished) inputRef.current?.focus({ preventScroll: true });
+    if (!finished) fieldRef.current?.focus();
   }, [finished, lines.length]);
 
   const marksNow = (): Diagnosis[] => {
@@ -260,47 +264,54 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     actions.record(problem, { ...a, marks: [...all.values()] }, { hintRung, seconds: (Date.now() - started.current) / 1000 });
   };
 
-  const insert = (s: string) => {
-    const el = inputRef.current;
-    const from = el?.selectionStart ?? input.length;
-    const to = el?.selectionEnd ?? input.length;
-    setInput(input.slice(0, from) + s + input.slice(to));
-    caret.current = from + s.length;
+  const insert = (t: string) => {
+    if (t === '+C') {
+      fieldRef.current?.insert('+');
+      fieldRef.current?.insert('C');
+    } else fieldRef.current?.insert(t);
     setNote(null);
   };
 
-  const del = () => {
-    const el = inputRef.current;
-    const from = el?.selectionStart ?? input.length;
-    const to = el?.selectionEnd ?? input.length;
-    if (from !== to) {
-      setInput(input.slice(0, from) + input.slice(to));
-      caret.current = from;
-    } else if (from > 0) {
-      setInput(input.slice(0, from - 1) + input.slice(from));
-      caret.current = from - 1;
-    } else if (!input && lines.length) {
-      // deleting on an empty line pulls the previous line back for editing
-      const prev = lines[lines.length - 1];
-      setLines(lines.slice(0, -1));
-      setCheckedCount((c) => Math.min(c, lines.length - 1));
-      setInput(prev);
-      caret.current = prev.length;
-      setOpenDiag(null);
+  /** Drop in a template (fraction, power, root, integral…); `then` fills its box and steps out, as for x². */
+  const tpl = (kind: Kind, then?: string) => {
+    const v = vars[0] ?? 'x';
+    fieldRef.current?.template(kind, v);
+    if (then) {
+      fieldRef.current?.insert(then);
+      fieldRef.current?.move(1);
     }
     setNote(null);
   };
 
-  const move = (d: -1 | 1) => {
-    const el = inputRef.current;
-    if (!el) return;
-    const pos = Math.max(0, Math.min(input.length, (el.selectionStart ?? input.length) + d));
-    el.setSelectionRange(pos, pos);
+  /** Deleting on an empty line pulls the previous line back for editing. */
+  const pullBack = () => {
+    if (!lines.length) return;
+    const prev = lines[lines.length - 1];
+    setLines(lines.slice(0, -1));
+    setCheckedCount((c) => Math.min(c, lines.length - 1));
+    fieldRef.current?.setText(prev);
+    setOpenDiag(null);
   };
 
+  const del = () => {
+    if (!fieldRef.current?.del()) pullBack();
+    setNote(null);
+  };
+
+  const move = (d: -1 | 1) => fieldRef.current?.move(d);
+
+
+  // the field keeps one Enter handler for its whole life; this always points at the current commit
+  const commitRef = useRef<() => void>(() => undefined);
   const commit = () => {
     const text = input.trim();
     if (!text || finished) return;
+    if (gaps) {
+      setNote('One of the boxes is still empty. Fill it in, or delete it.');
+      setShake((n) => n + 1);
+      haptic([12, 30, 12]);
+      return;
+    }
     const next = [...lines, text];
     const a = analyze(problem, next);
     const line = a.lines[a.lines.length - 1];
@@ -311,7 +322,19 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       haptic([12, 30, 12]);
       return;
     }
+    // The right answer with no working: accepted, but the working is the point. I can only find how someone
+    // thinks, and where it goes wrong, from the lines in between. So the answer is kept aside and the steps asked for.
+    if (a.verdict === 'solved' && next.length === 1 && needsWorking) {
+      setAnswerFirst(text);
+      fieldRef.current?.clear();
+      setInput('');
+      setMood('thumbsup');
+      haptic([10, 40, 16]);
+      setNote(null);
+      return;
+    }
     setLines(next);
+    fieldRef.current?.clear();
     setInput('');
     setHintOpen(false);
     if (mode === 'end') {
@@ -344,11 +367,13 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     } else {
       setOpenDiag(null);
       setMood(line.status === 'carried' ? 'thinking' : line.status === 'recovered' ? 'eureka' : 'happy');
-      if (line.status === 'carried') setNote('That follows from the line above — but that line was already off, so the mistake is carried along.');
+      if (line.status === 'carried') setNote('That follows from the line above, but that line was already off, so the mistake is carried along.');
       if (line.status === 'recovered') setNote('Back on track: this line is true to the original problem again.');
       setTimeout(() => setMood('idle'), 1100);
     }
   };
+
+  commitRef.current = commit;
 
   /** "When I finish" mode: mark every line written so far, all at once. */
   const checkAll = () => {
@@ -357,6 +382,14 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     setCheckedCount(lines.length);
     setHintOpen(false);
     const wrong = a.lines.filter((l) => l.status === 'wrong');
+    if (a.verdict === 'solved' && lines.length === 1 && needsWorking) {
+      // only the answer was written: keep it aside and ask for the working
+      setAnswerFirst(lines[0]);
+      setLines([]);
+      setCheckedCount(0);
+      setMood('thumbsup');
+      return;
+    }
     if (a.verdict === 'solved') {
       for (const l of wrong) if (l.diag) seen.current.set(`${l.diag.code}:${l.diag.concept}`, l.diag);
       setOpenDiag(wrong.length ? a.lines.findIndex((l) => l.status === 'wrong') : null);
@@ -369,11 +402,11 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       setMood('oops');
       haptic([14, 40, 14]);
       setTimeout(() => setMood('thinking'), 1400);
-      setNote(`${wrong.length === 1 ? 'One line doesn’t' : `${wrong.length} lines don’t`} follow. Tap a flagged line to see why — then write the corrected line underneath, or delete back to it.`);
+      setNote(`${wrong.length === 1 ? 'One line doesn’t' : `${wrong.length} lines don’t`} follow. Tap a flagged line to see why, then write the corrected line underneath, or delete back to it.`);
     } else {
       setOpenDiag(null);
       setMood('happy');
-      setNote(a.remaining ?? 'Every line follows — but it isn’t finished yet. Keep going.');
+      setNote(a.remaining ?? 'Every line follows, but it isn’t finished yet. Keep going.');
     }
   };
 
@@ -420,17 +453,6 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     });
   };
 
-  const onKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      commit();
-    } else if (e.key === 'Backspace' && !input && lines.length) {
-      e.preventDefault();
-      del();
-    }
-  };
-
-  const preview = input.trim() ? typeset(input) : null;
   const marks = marksNow();
   const strategy = analysis.marks.find((m) => m.severity === 'strategy');
   const hintText = hint ? (rung <= 1 ? hint.nudge : rung === 2 ? hint.method : 'Here is the next line. Read it, then write it yourself:') : '';
@@ -489,27 +511,30 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
           ))}
         </ol>
 
+        {answerFirst && !finished && (
+          <div className="answer-first">
+            <div className="row" style={{ gap: 8 }}>
+              <span className="chip ok"><Icon name="check" size={13} stroke={3.2} /> Right answer</span>
+              <MathView text={answerFirst} />
+            </div>
+            <p><b>Now show me how you got there.</b> Write your working, at least two lines, ending with the answer. The answer tells me you can do it. The steps show me how you think, and that is where I can help.</p>
+          </div>
+        )}
         {!finished && (
           <div className="entry" key={shake} data-shake={shake ? '' : undefined}>
             <span className="n">{lines.length + 1}</span>
             <div className="grow">
-              {preview && <div className="preview" dangerouslySetInnerHTML={{ __html: preview }} />}
-              <input
-                ref={inputRef}
-                className="mathin"
-                value={input}
-                inputMode="none"
-                autoCapitalize="off"
-                autoCorrect="off"
-                autoComplete="off"
-                spellCheck={false}
+              <MathField
+                ref={fieldRef}
+                label={`Line ${lines.length + 1} of your working`}
                 placeholder={lines.length ? (mode === 'end' ? 'Next line… then “Check my work”' : 'Next line…') : 'Write your first line…'}
-                aria-label={`Line ${lines.length + 1} of your working`}
-                onChange={(e: { target: { value: string } }) => {
-                  setInput(e.target.value);
+                onChange={(text, hasGaps) => {
+                  setInput(text);
+                  setGaps(hasGaps);
                   setNote(null);
                 }}
-                onKeyDown={onKeyDown}
+                onEnter={() => commitRef.current()}
+                onEmptyDelete={pullBack}
               />
             </div>
           </div>
@@ -546,7 +571,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
               <div className="solved-banner">
                 <span className="big-tick"><Icon name="check" size={26} stroke={3.2} /></span>
                 <div>
-                  <b>{marks.length ? 'Solved — with a detour' : rung >= 3 ? 'Solved, with the line shown' : 'Solved'}</b>
+                  <b>{marks.length ? 'Solved, with a detour' : rung >= 3 ? 'Solved, with the line shown' : 'Solved'}</b>
                   <p className="muted" style={{ fontSize: 14 }}>
                     {analysis.steps} {analysis.steps === 1 ? 'line' : 'lines'}
                     {analysis.approach ? ` · ${analysis.approach}` : ''}
@@ -618,11 +643,16 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
                 <Icon name="check" size={16} stroke={3} /> Check my work
               </button>
             )}
+            {(lines.length > 0 || !!input.trim()) && !(mode === 'end' && lines.length > checkedCount) && (
+              <button className="tool go" onClick={() => (input.trim() ? commit() : checkAll())}>
+                <Icon name="check" size={16} stroke={3} /> Done
+              </button>
+            )}
             <button className="tool" onClick={() => (lines.length || rung ? reveal() : finish(true))}>
               {lines.length || rung ? 'Show solution' : 'Skip'}
             </button>
           </div>
-          <Keyboard vars={vars} onKey={insert} onDelete={del} onEnter={commit} onMove={move} ready={!!input.trim()} calc={calc} />
+          <Keyboard vars={vars} onKey={insert} onTpl={tpl} onDelete={del} onEnter={commit} onMove={move} ready={!!input.trim()} calc={calc} />
         </div>
       )}
       {solved && <Confetti fire={1} />}
@@ -781,8 +811,8 @@ function Brief({ session, onStart }: { session: Session; onStart: () => void }) 
     session.reviews > 0
       ? `**${session.reviews}** of these ${session.reviews === 1 ? 'is' : 'are'} coming back from an earlier mistake. Let’s see if ${session.reviews === 1 ? 'it holds' : 'they hold'}.`
       : fromNotes > 0
-        ? `These come straight from your notes. Write every line — I read the working, not just the answer.`
-        : 'Fresh problems for this topic. Write every line — I read the working, not just the answer.';
+        ? `These come straight from your notes. Write every line, I read the working, not just the answer.`
+        : 'Fresh problems for this topic. Write every line, I read the working, not just the answer.';
   return (
     <>
       <div className="scroll center stagger" style={{ justifyContent: 'center', gap: 16, padding: '0 26px' }}>
@@ -864,7 +894,7 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
     : gap
       ? `One thing to tighten: **${CONCEPTS[gap.concept].title.toLowerCase()}**. I’ll bring it back tomorrow.`
       : solved > 0
-        ? 'Good work. The slips I marked are noted — nothing to review, just slow that line down.'
+        ? 'Good work. The slips I marked are noted, nothing to review, just slow that line down.'
         : 'That was a hard set. Have a look at the routes, and we’ll come back to these.';
   return (
     <>
@@ -902,7 +932,7 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
                   <span className="grow">
                     <b style={{ display: 'block', fontSize: 14.5 }}>{CONCEPTS[m.concept].title}</b>
                     <span className="muted" style={{ fontSize: 13 }}>
-                      {m.severity === 'gap' ? (due && due > today ? `Comes back ${due === addDays(today, 1) ? 'tomorrow' : `on ${due}`}` : 'In your review queue') : c?.rushing ? 'Keeps happening — worth a look' : 'Noted. No review needed.'}
+                      {m.severity === 'gap' ? (due && due > today ? `Comes back ${due === addDays(today, 1) ? 'tomorrow' : `on ${due}`}` : 'In your review queue') : c?.rushing ? 'Keeps happening, worth a look' : 'Noted. No review needed.'}
                     </span>
                   </span>
                   <Icon name="chevron" size={16} />
@@ -919,7 +949,7 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
         )}
         <p className="faint" style={{ fontSize: 13, textAlign: 'center', marginTop: 14 }}>{session.title}</p>
       </div>
-      <div className="ws-foot" style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+      <div className="ws-foot" style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}>
         {gap && (
           <Button3D onClick={() => openOverlay({ name: 'review', concept: gap.concept })}>
             <Icon name="book" size={18} /> Review it now · {CONCEPTS[gap.concept].minutes} min

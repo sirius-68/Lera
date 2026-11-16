@@ -199,7 +199,7 @@ export function SavedScreen() {
               <ol className="howto">
                 <li><span>1</span><div><b>Hold on any text</b> in a lesson to select it.</div></li>
                 <li><span>2</span><div>Tap a <b>colour</b> to highlight, <b>Note</b> to write your own words, or <b>Save</b> to keep the passage.</div></li>
-                <li><span>3</span><div>Answers from <b>Ask Lera</b> can be saved too — tap a message.</div></li>
+                <li><span>3</span><div>Answers from <b>Ask Lera</b> can be saved too, tap a message.</div></li>
               </ol>
               <button className="linkbtn" onClick={() => go({ name: 'lessons' })}>Open my lessons <Icon name="chevron" size={15} /></button>
             </div>

@@ -191,7 +191,7 @@ function readNumbering(xml: string | undefined): Record<string, 'bullet' | 'numb
 export async function readDocx(data: ArrayBuffer | Uint8Array, fileName: string): Promise<RawDoc> {
   const zip = await JSZip.loadAsync(data);
   const docXml = await zip.file('word/document.xml')?.async('string');
-  if (!docXml) throw new Error('This doesn’t look like a Word document — it has no document body.');
+  if (!docXml) throw new Error('This doesn’t look like a Word document, it has no document body.');
   const { styles, body } = readStyles(await zip.file('word/styles.xml')?.async('string'));
   const numbering = readNumbering(await zip.file('word/numbering.xml')?.async('string'));
 

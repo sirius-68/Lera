@@ -358,7 +358,7 @@ export function insights(state: Pick<AppState, 'attempts' | 'concepts'>): Insigh
     slipLines.forEach((i) => tally.set(i, (tally.get(i) ?? 0) + 1));
     const [line, count] = [...tally.entries()].sort((a, b) => b[1] - a[1])[0];
     if (count / slipLines.length >= 0.55 && line < ORDINAL.length) {
-      out.push({ tone: 'slip', text: `Your slips cluster on the **${ORDINAL[line]} line** of a problem — you speed up once you think you’ve seen it.` });
+      out.push({ tone: 'slip', text: `Your slips cluster on the **${ORDINAL[line]} line** of a problem, you speed up once you think you’ve seen it.` });
     }
   }
 
@@ -368,7 +368,7 @@ export function insights(state: Pick<AppState, 'attempts' | 'concepts'>): Insigh
   const total = [...approaches.values()].reduce((s, n) => s + n, 0);
   const top = [...approaches.entries()].sort((a, b) => b[1] - a[1])[0];
   if (top && total >= 3 && top[1] / total >= 0.6) {
-    out.push({ tone: 'strategy', text: `You reach for **${top[0]}** most of the time (${top[1]} of ${total}). It works — just make sure it’s a choice, not a habit.` });
+    out.push({ tone: 'strategy', text: `You reach for **${top[0]}** most of the time (${top[1]} of ${total}). It works, just make sure it’s a choice, not a habit.` });
   }
 
   // the weakest spot
@@ -384,13 +384,13 @@ export function insights(state: Pick<AppState, 'attempts' | 'concepts'>): Insigh
   const solved = attempts.filter((a) => a.verdict === 'solved' && a.cleanSteps > 0 && a.marks.length === 0);
   if (solved.length >= 3) {
     const ratio = solved.reduce((s, a) => s + a.steps / a.cleanSteps, 0) / solved.length;
-    if (ratio >= 1.6) out.push({ tone: 'strategy', text: `You write about **${ratio.toFixed(1)}× as many lines** as the shortest route. Nothing wrong with that — it’s also why your slips are easy to find.` });
+    if (ratio >= 1.6) out.push({ tone: 'strategy', text: `You write about **${ratio.toFixed(1)}× as many lines** as the shortest route. Nothing wrong with that, it’s also why your slips are easy to find.` });
     else if (ratio <= 0.8) out.push({ tone: 'slip', text: 'You skip lines when a step feels obvious. Most slips hide in exactly those skipped lines.' });
   }
   const hinted = attempts.filter((a) => a.hintRung > 0);
   if (hinted.length >= 2) {
     const avg = hinted.reduce((s, a) => s + a.hintRung, 0) / hinted.length;
-    if (avg <= 1.5) out.push({ tone: 'ok', text: 'When you’re stuck, a nudge is usually enough — you rarely need to be shown the line.' });
+    if (avg <= 1.5) out.push({ tone: 'ok', text: 'When you’re stuck, a nudge is usually enough, you rarely need to be shown the line.' });
   }
   const gaps = attempts.reduce((s, a) => s + a.marks.filter((m) => m.severity === 'gap').length, 0);
   const slips = attempts.reduce((s, a) => s + a.marks.filter((m) => m.severity === 'slip').length, 0);

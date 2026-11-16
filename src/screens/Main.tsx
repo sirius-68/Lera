@@ -1,3 +1,4 @@
+import '../styles/onb.css';
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { CONCEPTS } from '../engine/concepts';
@@ -93,7 +94,7 @@ export function HomeScreen() {
   const read = useStore((s) => s.read);
   const understood = useStore((s) => s.understood);
   const kept = useStore((s) => s.saved.length + s.notes.length + s.highlights.length);
-  const chatCount = useStore((s) => Object.values(s.chats).reduce((n, t) => n + t.length, 0));
+  const chatCount = useStore((s) => Object.values(s.chats).filter((t) => t.length).length);
   const lastTopicId = useStore((s) => s.lastTopicId);
   const state = { concepts, solved };
   const game = { attempts, read };
@@ -222,10 +223,10 @@ export function HomeScreen() {
               <b>{kept}</b>
               <span>Notebook</span>
             </button>
-            <button className="tile sky" onClick={() => openOverlay({ name: 'ask', topicId: last?.topic.id })}>
+            <button className="tile sky" onClick={() => openOverlay({ name: 'ask' })}>
               <span className="tile-ic"><Icon name="chat" size={22} /></span>
               <b>Ask Lera</b>
-              <span>{chatCount ? `${chatCount} messages kept` : 'Any question'}</span>
+              <span>{chatCount ? `${chatCount} saved ${chatCount === 1 ? 'chat' : 'chats'}` : 'Any question'}</span>
             </button>
             <button className="tile brand" onClick={() => go({ name: 'upload' })}>
               <span className="tile-ic"><Icon name="plus" size={22} /></span>
@@ -406,6 +407,7 @@ export function PracticeScreen() {
   const topics = docs.flatMap((d) => d.units.flatMap((u) => u.topics));
   const quick = (id: ConceptId) => go({ name: 'session', problems: practiceFor(id, 4, seedFrom(`${dayOf()}:${id}:${Date.now() % 991}`)), title: CONCEPTS[id].title });
   const shownSubject = mine.includes(subject) ? subject : mine[0];
+  const [tab, setTab] = useState<'review' | 'lessons' | 'ideas'>(queue.length ? 'review' : topics.length ? 'lessons' : 'ideas');
   const ideas = ALL_CONCEPTS.filter((id) => subjectOf(id) === shownSubject);
 
   return (
@@ -418,13 +420,32 @@ export function PracticeScreen() {
       </div>
       <div className="scroll">
         <div className="stagger" style={{ padding: '2px 20px 26px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <LeraSays
-            size={56}
-            mood={due.length ? 'idle' : 'proud'}
-            text={due.length ? `**${due.length}** ${due.length === 1 ? 'idea is' : 'ideas are'} ready to come back. A gap clears after two clean solves on different days.` : queue.length ? 'Nothing is due today. What you fixed is resting — it comes back when it’s about to fade.' : 'When I mark a gap in your working, it lands here and keeps coming back until it holds.'}
-          />
+          <div className="ob-ask" style={{ margin: 0 }}>
+            <Lera size={58} mood={due.length ? 'determined' : queue.length ? 'cool' : 'happy'} sleepAfter={30000} />
+            <div className="ob-bubble"><p style={{ margin: 0, fontSize: 15, color: 'var(--ink)' }}><RichText text={due.length ? `**${due.length}** ${due.length === 1 ? 'idea is' : 'ideas are'} ready to come back. A gap clears after two clean solves on different days.` : queue.length ? 'Nothing is due today. What you fixed is resting, it comes back when it’s about to fade.' : 'When I mark a gap in your working, it lands here and keeps coming back until it holds.'} /></p></div>
+          </div>
 
-          {due.length > 0 && (
+          <Seg options={[{ id: 'review', label: `Review${due.length ? ` · ${due.length}` : ''}` }, { id: 'lessons', label: 'My lessons' }, { id: 'ideas', label: 'Any topic' }]} value={tab} onChange={setTab} />
+
+          {tab === 'review' && queue.length === 0 && (
+            <div className="center" style={{ gap: 10, padding: '26px 10px' }}>
+              <Lera size={84} mood="thumbsup" interactive={false} />
+              <b style={{ fontSize: 17 }}>Nothing to review</b>
+              <p className="muted" style={{ fontSize: 14, textAlign: 'center' }}>When I find a gap in your working, it shows up here until it holds.</p>
+              <Button3D small variant="secondary" onClick={() => setTab(topics.length ? 'lessons' : 'ideas')}>Practise something</Button3D>
+            </div>
+          )}
+          {tab === 'lessons' && topics.length === 0 && (
+            <div className="center" style={{ gap: 10, padding: '26px 10px' }}>
+              <Lera size={84} mood="reading" interactive={false} />
+              <b style={{ fontSize: 17 }}>No notes yet</b>
+              <p className="muted" style={{ fontSize: 14, textAlign: 'center' }}>Upload your notes and each lesson gets its own practice.</p>
+              <Button3D small onClick={() => go({ name: 'upload' })}><Icon name="upload" size={16} /> Upload notes</Button3D>
+            </div>
+          )}
+
+
+          {tab === 'review' && due.length > 0 && (
             <section className="col" style={{ gap: 10 }}>
               <span className="label">Due now</span>
               {due.map((q) => (
@@ -445,7 +466,7 @@ export function PracticeScreen() {
             </section>
           )}
 
-          {later.length > 0 && (
+          {tab === 'review' && later.length > 0 && (
             <section className="col" style={{ gap: 8 }}>
               <span className="label">Coming back later</span>
               {later.map((q) => (
@@ -458,9 +479,8 @@ export function PracticeScreen() {
             </section>
           )}
 
-          {topics.length > 0 && (
+          {tab === 'lessons' && topics.length > 0 && (
             <section className="col" style={{ gap: 8 }}>
-              <span className="label">By lesson</span>
               {topics.map((t) => (
                 <button key={t.id} className="noticed" style={{ borderTop: 0 }} onClick={() => go({ name: 'session', topicId: t.id })}>
                   <span className={`dot ${topicStatus(t, state)}`} />
@@ -474,8 +494,7 @@ export function PracticeScreen() {
             </section>
           )}
 
-          <section className="col" style={{ gap: 10 }}>
-            <span className="label">Any idea, any time</span>
+          {tab === 'ideas' && <section className="col" style={{ gap: 10 }}>
             {mine.length > 1 && <Seg options={mine.map((s) => ({ id: s, label: SUBJECT_LABEL[s] }))} value={shownSubject} onChange={setSubject} />}
             <div className="idea-grid">
               {ideas.map((id) => (
@@ -484,7 +503,7 @@ export function PracticeScreen() {
                 </button>
               ))}
             </div>
-          </section>
+          </section>}
         </div>
       </div>
       <TabBar current="practice" />
@@ -594,7 +613,7 @@ export function ProgressScreen() {
                 </span>
               </div>
               <Signature attempts={attempts} />
-              <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.45 }}>A <b>gap</b> is a rule you don’t have yet — it gets a review. A <b>slip</b> is a rule you have but fumbled — it just gets noticed.</p>
+              <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.45 }}>A <b>gap</b> is a rule you don’t have yet, it gets a review. A <b>slip</b> is a rule you have but fumbled, it just gets noticed.</p>
             </section>
 
             {notes.length > 0 && (

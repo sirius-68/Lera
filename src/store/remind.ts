@@ -40,7 +40,7 @@ export async function enableReminders(studyTime?: string, name?: string): Promis
           {
             id: REMINDER_ID,
             title: name ? `${name}, two minutes of maths?` : 'Two minutes of maths?',
-            body: 'One checked problem keeps your streak alive — and brings back an idea before it fades.',
+            body: 'One checked problem keeps your streak alive, and brings back an idea before it fades.',
             schedule: { on: { hour: at.hour, minute: at.minute }, allowWhileIdle: true },
           },
         ],

@@ -29,7 +29,7 @@ export function SettingsScreen() {
     } catch {
       try {
         await navigator.clipboard.writeText(json);
-        toast('Progress copied — paste it into a file to keep it.');
+        toast('Progress copied, paste it into a file to keep it.');
       } catch {
         toast('Export isn’t available here.');
       }

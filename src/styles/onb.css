@@ -384,3 +384,14 @@
 .ob-hero .wordmark { color: var(--brand); }
 .ob-hero .splash-tag { color: var(--ink-2); opacity: 1; }
 .ob-hero .splash-mark { filter: drop-shadow(0 14px 22px rgba(76, 66, 214, 0.22)); }
+
+/* plan page: she stands in front of the card, clear of the heading */
+.ob-peek { height: auto; overflow: visible; margin: 14px 0 -20px; position: relative; z-index: 2; }
+.plan.peeked { padding-top: 22px; }
+
+.auth-steps { display: flex; justify-content: center; gap: 6px; margin: -2px 0 4px; }
+.auth-steps i { width: 26px; height: 5px; border-radius: 99px; background: #e6e4f0; transition: background 0.3s; }
+.auth-steps i.on, .auth-steps i.done { background: var(--brand); }
+.auth-field.code input { letter-spacing: 0.4em; font-weight: 700; font-size: 19px; }
+.auth-local { font-size: 13.5px; line-height: 1.45; text-align: center; padding: 10px 12px; border-radius: 14px; background: #fff6e0; color: #6b5310; }
+.auth-local b { font-size: 17px; letter-spacing: 0.18em; color: #3b2c00; }

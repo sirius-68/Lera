@@ -4,7 +4,7 @@ import { useStore } from '../store';
 import { badges, levelOf, longestStreak, monthGrid, totalXp, weekStrip, xpByDay } from '../store/game';
 import { dayOf, streak } from '../store/learner';
 import { back, go } from '../store/nav';
-import { canPinWidget, hasWidget, pinWidget, setWidgetTestMode, widgetTestMode } from '../store/widget';
+import { canPinWidget, hasWidget, pinWidget } from '../store/widget';
 import { Button3D, CountUp, Ring, haptic, toast } from '../ui/kit';
 import { Icon } from '../ui/icons';
 
@@ -139,7 +139,7 @@ export function StreakScreen() {
           {attempts.length === 0 && (
             <div className="center" style={{ gap: 8, paddingTop: 4 }}>
               <Lera size={72} mood="curious" />
-              <p className="muted" style={{ maxWidth: 270, lineHeight: 1.5 }}>Nothing here yet — your first solved problem lights the flame and earns your first badge.</p>
+              <p className="muted" style={{ maxWidth: 270, lineHeight: 1.5 }}>Nothing here yet, your first solved problem lights the flame and earns your first badge.</p>
             </div>
           )}
         </div>
@@ -178,7 +178,6 @@ export function WidgetTile({ w, days, live }: { w: (typeof WIDGETS)[number]; day
 
 function WidgetCard({ days }: { days: number }) {
   const inApp = hasWidget();
-  const [test, setTest] = useState(widgetTestMode);
   const [at, setAt] = useState(0);
   // the big one fast-forwards through the ladder, so the whole story plays in half a minute
   useEffect(() => {
@@ -211,21 +210,6 @@ function WidgetCard({ days }: { days: number }) {
             <Button3D small variant="secondary" style={{ flex: 1 }} onClick={() => add(false)}><Icon name="plus" size={17} /> Small</Button3D>
             <Button3D small variant="secondary" style={{ flex: 1 }} onClick={() => add(true)}><Icon name="plus" size={17} /> Wide</Button3D>
           </div>
-          <button
-            className={`option ${test ? 'on' : ''}`}
-            onClick={() => {
-              haptic(5);
-              setWidgetTestMode(!test);
-              setTest(!test);
-              toast(!test ? 'Test mode on: a new mood every minute after you leave the app' : 'Test mode off: moods follow real hours and days', 3800);
-            }}
-          >
-            <span className="grow" style={{ textAlign: 'left' }}>
-              <b>Test mode</b>
-              <span className="sub">For trying it out: a new mood every minute after you leave the app, instead of real hours and days.</span>
-            </span>
-            <span className="radio" />
-          </button>
         </>
       ) : (
         <p className="faint" style={{ fontSize: 13 }}>In the Android app: long-press your home screen, choose Widgets, then Lera.</p>

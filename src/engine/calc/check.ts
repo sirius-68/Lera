@@ -176,7 +176,7 @@ function finished(p: Prep, s: Side): { final: boolean; remaining?: string } {
     return { final: false, remaining: what };
   }
   if (p.mode === 'integral' && !mentions(e, 'C') && !mentions(e, 'K') && !mentions(e, 'c')) {
-    return { final: false, remaining: 'Nearly. An integral without limits always ends with **+ C** — add it to finish.' };
+    return { final: false, remaining: 'Nearly. An integral without limits always ends with **+ C**, add it to finish.' };
   }
   if (p.mode === 'definite' && has(e, p.v)) return { final: false, remaining: `That’s the antiderivative. Now put in the limits: (value at ${numText(p.hi as number)}) − (value at ${numText(p.lo as number)}).` };
   if ((p.mode === 'definite' || p.mode === 'limit') && e.t !== 'n' && !isTidyNumber(e)) return { final: false, remaining: 'Work this out to a single number.' };
@@ -196,24 +196,24 @@ function isTidyNumber(e: E): boolean {
 /* ───────────── naming the mistake ───────────── */
 
 const D_FLAWS: { flaw: Flaw; concept: ConceptId; severity: Diagnosis['severity']; title: string; message: string }[] = [
-  { flaw: 'power-keep', concept: 'power-rule', severity: 'gap', title: 'The power has to drop by one.', message: 'You brought the power down in front — good — but left the old power on top. The power rule has two moves: bring the power down, **then make the power one smaller**. So $x^3$ becomes $3x^2$, not $3x^3$.' },
-  { flaw: 'power-nocoef', concept: 'power-rule', severity: 'gap', title: 'The old power comes down in front.', message: 'You made the power one smaller — good — but forgot to **bring the old power down as a multiplier** first. So $x^3$ becomes $3x^2$, not $x^2$.' },
-  { flaw: 'const-kept', concept: 'power-rule', severity: 'gap', title: 'A number on its own turns into 0.', message: 'A derivative measures how fast something changes. A plain number never changes, so its derivative is **0** — it simply disappears from the answer.' },
+  { flaw: 'power-keep', concept: 'power-rule', severity: 'gap', title: 'The power has to drop by one.', message: 'You brought the power down in front, good, but left the old power on top. The power rule has two moves: bring the power down, **then make the power one smaller**. So $x^3$ becomes $3x^2$, not $3x^3$.' },
+  { flaw: 'power-nocoef', concept: 'power-rule', severity: 'gap', title: 'The old power comes down in front.', message: 'You made the power one smaller, good, but forgot to **bring the old power down as a multiplier** first. So $x^3$ becomes $3x^2$, not $x^2$.' },
+  { flaw: 'const-kept', concept: 'power-rule', severity: 'gap', title: 'A number on its own turns into 0.', message: 'A derivative measures how fast something changes. A plain number never changes, so its derivative is **0**, it simply disappears from the answer.' },
   { flaw: 'product-naive', concept: 'product-rule', severity: 'gap', title: 'Two things multiplied need the product rule.', message: 'You differentiated each part and multiplied the results. That feels natural, but it isn’t how products work. Use: **(first)′ × second + first × (second)′**. Each part takes one turn being differentiated while the other waits.' },
-  { flaw: 'product-first', concept: 'product-rule', severity: 'gap', title: 'Half of the product rule is missing.', message: 'You differentiated the first part and kept the second — that is only half. Add the other half too: **first × (second)′**.' },
+  { flaw: 'product-first', concept: 'product-rule', severity: 'gap', title: 'Half of the product rule is missing.', message: 'You differentiated the first part and kept the second, that is only half. Add the other half too: **first × (second)′**.' },
   { flaw: 'quotient-naive', concept: 'quotient-rule', severity: 'gap', title: 'A fraction needs the quotient rule.', message: 'You differentiated the top and the bottom separately. For a fraction use: **(top′ × bottom − top × bottom′) ÷ bottom²**.' },
   { flaw: 'quotient-sign', concept: 'quotient-rule', severity: 'slip', title: 'The quotient rule is the right way round… backwards.', message: 'The two halves on top are swapped, which flips the sign. It always starts with **top′ × bottom**, then subtracts **top × bottom′**. (“Low d-high minus high d-low.”)' },
   { flaw: 'quotient-nosquare', concept: 'quotient-rule', severity: 'slip', title: 'The bottom gets squared.', message: 'The top of your answer is right. In the quotient rule the bottom is **squared**: divide by bottom², not just bottom.' },
-  { flaw: 'chain-missing', concept: 'chain-rule', severity: 'gap', title: 'Multiply by the derivative of the inside.', message: 'There is a function inside another function here. You differentiated the outside — good — but then you must **multiply by the derivative of the inside**. That extra step is the chain rule.' },
-  { flaw: 'trig-sign', concept: 'trig-derivatives', severity: 'slip', title: 'Check the sign on that trig derivative.', message: 'The derivative of $sin(x)$ is $cos(x)$ — no minus. The derivative of $cos(x)$ is $-sin(x)$ — with a minus. Only **cos picks up the minus sign**.' },
-  { flaw: 'exp-power', concept: 'exp-log-derivatives', severity: 'gap', title: 'The power rule doesn’t work when x is in the power.', message: 'The power rule is for $x^n$ — x at the bottom, a number on top. Here x is **in the power**. For $e^x$ the derivative is just $e^x$ again (times the derivative of the power, if the power is more than plain x).' },
+  { flaw: 'chain-missing', concept: 'chain-rule', severity: 'gap', title: 'Multiply by the derivative of the inside.', message: 'There is a function inside another function here. You differentiated the outside, good, but then you must **multiply by the derivative of the inside**. That extra step is the chain rule.' },
+  { flaw: 'trig-sign', concept: 'trig-derivatives', severity: 'slip', title: 'Check the sign on that trig derivative.', message: 'The derivative of $sin(x)$ is $cos(x)$, no minus. The derivative of $cos(x)$ is $-sin(x)$, with a minus. Only **cos picks up the minus sign**.' },
+  { flaw: 'exp-power', concept: 'exp-log-derivatives', severity: 'gap', title: 'The power rule doesn’t work when x is in the power.', message: 'The power rule is for $x^n$, x at the bottom, a number on top. Here x is **in the power**. For $e^x$ the derivative is just $e^x$ again (times the derivative of the power, if the power is more than plain x).' },
 ];
 
 const I_FLAWS: { flaw: IntFlaw; concept: ConceptId; severity: Diagnosis['severity']; title: string; message: string }[] = [
-  { flaw: 'no-divide', concept: 'antiderivatives', severity: 'gap', title: 'Divide by the new power.', message: 'You added 1 to the power — good. The second move is to **divide by that new power**. So $∫ x^2 dx$ is $x^3/3$, not $x^3$. Check: differentiate $x^3/3$ and you get $x^2$ back.' },
+  { flaw: 'no-divide', concept: 'antiderivatives', severity: 'gap', title: 'Divide by the new power.', message: 'You added 1 to the power, good. The second move is to **divide by that new power**. So $∫ x^2 dx$ is $x^3/3$, not $x^3$. Check: differentiate $x^3/3$ and you get $x^2$ back.' },
   { flaw: 'divide-old', concept: 'antiderivatives', severity: 'slip', title: 'Divide by the new power, not the old one.', message: 'Add 1 to the power first, **then** divide by the number you just made. For $x^2$: the new power is 3, so divide by 3.' },
   { flaw: 'trig-sign', concept: 'antiderivatives', severity: 'slip', title: 'The sign on that trig integral is flipped.', message: 'Integrating runs the derivative table backwards: $∫ cos(x) dx = sin(x)$ (no minus) and $∫ sin(x) dx = -cos(x)$ (with a minus). Differentiate your answer to check it.' },
-  { flaw: 'inner-ignored', concept: 'u-substitution', severity: 'gap', title: 'The inside needs dealing with too.', message: 'There is something more than plain x inside. When you integrate the outside you have to **divide by the derivative of the inside** (that’s what substitution does). Check: differentiate your answer — the chain rule gives an extra number you didn’t want.' },
+  { flaw: 'inner-ignored', concept: 'u-substitution', severity: 'gap', title: 'The inside needs dealing with too.', message: 'There is something more than plain x inside. When you integrate the outside you have to **divide by the derivative of the inside** (that’s what substitution does). Check: differentiate your answer, the chain rule gives an extra number you didn’t want.' },
 ];
 
 const fixText = (p: Prep): string | undefined => {
@@ -246,9 +246,9 @@ function diagnose(p: Prep, problem: Problem, s: Side): Diagnosis {
         const wrong = diff(p.body, v, f.flaw, used);
         if (used.hit && equiv(wrong, T, v) === false && equiv(e, wrong, v) === true) return { code: f.flaw, concept: f.concept, severity: f.severity, title: f.title, message: f.message, fix };
       }
-      if (equiv(e, p.body, v) === true) return { code: 'not-differentiated', concept: problem.concepts[0] ?? 'power-rule', severity: 'notation', title: 'That’s still the original function.', message: 'This line equals the function you started with — nothing has been differentiated yet.', fix };
-      if (equiv(e, neg(T), v) === true) return { code: 'sign-flip', concept: 'signed-arithmetic', severity: 'slip', title: 'Everything is right except the sign.', message: 'Your answer is the exact opposite of the derivative — a minus sign was dropped or added somewhere. Trace the signs through each step.', fix };
-      if (equiv(diff(e, v), p.body, v) === true) return { code: 'integrated-instead', concept: problem.concepts[0] ?? 'power-rule', severity: 'gap', title: 'That’s the integral, not the derivative.', message: 'You went the wrong direction: you raised the power and divided. Differentiating does the opposite — **bring the power down, then lower it by one**.', fix };
+      if (equiv(e, p.body, v) === true) return { code: 'not-differentiated', concept: problem.concepts[0] ?? 'power-rule', severity: 'notation', title: 'That’s still the original function.', message: 'This line equals the function you started with, nothing has been differentiated yet.', fix };
+      if (equiv(e, neg(T), v) === true) return { code: 'sign-flip', concept: 'signed-arithmetic', severity: 'slip', title: 'Everything is right except the sign.', message: 'Your answer is the exact opposite of the derivative, a minus sign was dropped or added somewhere. Trace the signs through each step.', fix };
+      if (equiv(diff(e, v), p.body, v) === true) return { code: 'integrated-instead', concept: problem.concepts[0] ?? 'power-rule', severity: 'gap', title: 'That’s the integral, not the derivative.', message: 'You went the wrong direction: you raised the power and divided. Differentiating does the opposite, **bring the power down, then lower it by one**.', fix };
       const k = constantRatio(e, T, v);
       if (k !== null) return { code: 'coefficient', concept: 'arithmetic', severity: 'slip', title: 'Right shape, wrong number in front.', message: `The x-part of your answer is right, but the number in front is off by a factor of ${numText(k)}. Redo the multiplying.`, fix };
       return unknown(p, problem, 'This isn’t the derivative. Go through it one piece at a time and check which rule each piece needs: power, product, quotient or chain.');
@@ -261,7 +261,7 @@ function diagnose(p: Prep, problem: Problem, s: Side): Diagnosis {
       if (equiv(e, diff(p.body, v), v) === true) return { code: 'differentiated-instead', concept: 'antiderivatives', severity: 'gap', title: 'That’s the derivative, not the integral.', message: 'You went the wrong direction. Integrating is differentiating **backwards**: add 1 to the power, then divide by the new power.', fix };
       if (equiv(diff(e, v), neg(p.body), v) === true) return { code: 'sign-flip', concept: 'signed-arithmetic', severity: 'slip', title: 'Everything is right except the sign.', message: 'Differentiate your answer and you get the integrand with the opposite sign. One minus sign is wrong.', fix };
       const k = constantRatio(diff(e, v), p.body, v);
-      if (k !== null) return { code: 'int-coefficient', concept: 'antiderivatives', severity: 'slip', title: 'Right shape, wrong number in front.', message: `Here’s a check that always works: **differentiate your answer** — you should get back exactly what was inside the integral. Yours comes back ${numText(k)} times that, so the number in front needs fixing.`, fix };
+      if (k !== null) return { code: 'int-coefficient', concept: 'antiderivatives', severity: 'slip', title: 'Right shape, wrong number in front.', message: `Here’s a check that always works: **differentiate your answer**, you should get back exactly what was inside the integral. Yours comes back ${numText(k)} times that, so the number in front needs fixing.`, fix };
       return unknown(p, problem, 'Differentiate your answer: you should get back exactly what is inside the integral. Here you don’t, so one of the terms has gone wrong.');
     }
     if (p.mode === 'definite') {
@@ -274,7 +274,7 @@ function diagnose(p: Prep, problem: Problem, s: Side): Diagnosis {
           const at = (x: number): number => ev(F.F, { [v]: x });
           const top = at(p.hi as number);
           const bottom = at(p.lo as number);
-          if (closeNum(val, top) && Math.abs(bottom) > 1e-9) return { code: 'forgot-lower', concept: 'definite-integrals', severity: 'gap', title: 'Subtract the value at the bottom limit.', message: 'You put the top limit in — good — and stopped. You also have to put the bottom limit in and **subtract** it.', fix };
+          if (closeNum(val, top) && Math.abs(bottom) > 1e-9) return { code: 'forgot-lower', concept: 'definite-integrals', severity: 'gap', title: 'Subtract the value at the bottom limit.', message: 'You put the top limit in, good, and stopped. You also have to put the bottom limit in and **subtract** it.', fix };
           if (closeNum(val, top + bottom) && Math.abs(bottom) > 1e-9) return { code: 'added-limits', concept: 'definite-integrals', severity: 'slip', title: 'Subtract, don’t add.', message: 'You worked out both ends correctly, then added them. A definite integral is **top minus bottom**.', fix };
         }
         const g = (x: number): number => ev(p.body, { [v]: x });
@@ -298,13 +298,13 @@ function diagnose(p: Prep, problem: Problem, s: Side): Diagnosis {
         }
       }
       if (zeroOverZero && (val === 0 || s.special === 'dne' || (val !== null && !Number.isFinite(val)))) {
-        return { code: 'zero-over-zero', concept: 'limits', severity: 'gap', title: '0/0 is a signal, not an answer.', message: `Putting $${v} = ${numText(to)}$ straight in gives 0 on top and 0 underneath. That doesn’t mean “0” or “no limit” — it means **there is a common factor hiding**. Factor the top and bottom, cancel it, then substitute.`, fix };
+        return { code: 'zero-over-zero', concept: 'limits', severity: 'gap', title: '0/0 is a signal, not an answer.', message: `Putting $${v} = ${numText(to)}$ straight in gives 0 on top and 0 underneath. That doesn’t mean “0” or “no limit”, it means **there is a common factor hiding**. Factor the top and bottom, cancel it, then substitute.`, fix };
       }
       if (!Number.isFinite(to) && val !== null && Number.isFinite(L) && (val === 0 || !Number.isFinite(val))) {
-        return { code: 'infinity-compare', concept: 'limits', severity: 'gap', title: 'Compare the biggest powers.', message: 'When x gets huge, only the **highest power** on the top and on the bottom matters — everything else is small change. Divide their coefficients.', fix };
+        return { code: 'infinity-compare', concept: 'limits', severity: 'gap', title: 'Compare the biggest powers.', message: 'When x gets huge, only the **highest power** on the top and on the bottom matters, everything else is small change. Divide their coefficients.', fix };
       }
       if (val !== null && Number.isFinite(plug) && !closeNum(plug, L) && closeNum(val, plug)) {
-        return { code: 'plugged-in', concept: 'limits', severity: 'gap', title: 'A limit is where it’s heading, not where it is.', message: 'You used the value **at** the point. A limit asks what the expression gets close to as x gets *near* the point — and here those are different.', fix };
+        return { code: 'plugged-in', concept: 'limits', severity: 'gap', title: 'A limit is where it’s heading, not where it is.', message: 'You used the value **at** the point. A limit asks what the expression gets close to as x gets *near* the point, and here those are different.', fix };
       }
       return unknown(p, problem, `That isn’t what this expression heads towards as $${v}$ gets close to ${numText(to)}. Try a few values very near ${numText(to)} and watch where the results go.`);
     }
@@ -419,7 +419,7 @@ function derivativeSteps(p: Prep): SolutionStep[] {
     const w = mul(...parts.slice(1));
     const line = add(mul(D(u, v), w), mul(u, D(w, v)));
     steps.push({ tag: 'calc', line: toText(outsideConst(consts.length ? mul(...consts, line) : line)), why: 'Two things multiplied → **product rule**: (first)′ × second + first × (second)′. Each part takes a turn being differentiated while the other one waits.' });
-    steps.push({ tag: 'final', line: final, why: 'Now work out each small derivative and tidy up.' });
+    steps.push({ tag: 'final', line: final, why: 'Now do the two small derivatives one at a time, write them in, and collect what can be collected.' });
   } else if (shape === 'quotient' && core.t === '/') {
     const line = div(add(mul(D(core.n, v), core.d), neg(mul(core.n, D(core.d, v)))), pow(core.d, N(2)));
     steps.push({ tag: 'calc', line: toText(outsideConst(line)), why: 'A fraction → **quotient rule**: (top′ × bottom − top × bottom′) ÷ bottom². Always start with the top’s derivative.' });
@@ -436,7 +436,7 @@ function derivativeSteps(p: Prep): SolutionStep[] {
       const dOuter = subst(simp(diff(asBlock, blockName)), blockName, inner);
       steps.push({ tag: 'calc', line: toText(outsideConst(mul(dOuter, D(inner, v)))), why: `A function inside a function → **chain rule**. Treat $${toText(inner)}$ as one block: differentiate the outside and leave the block alone, then multiply by the derivative of the block.` });
     }
-    steps.push({ tag: 'final', line: final, why: 'Finish the inside’s derivative and multiply through.' });
+    steps.push({ tag: 'final', line: final, why: 'Work out the derivative of the inside block, then multiply everything together.' });
   } else if (shape === 'sum') {
     steps.push({ tag: 'final', line: final, why: 'Go **one term at a time**. For each power of x: bring the power down in front, then make the power one smaller. A number on its own becomes 0.' });
   } else {
@@ -467,7 +467,7 @@ function replaceNode(e: E, target: E, by: E): E {
 
 function basicWhy(core: E): string {
   if (core.t === '^' && core.e.t === 'n') return '**Power rule**: bring the power down in front, then make the power one smaller.';
-  if (core.t === '^') return 'For $e^x$ the derivative is $e^x$ again — it is the one function that is its own derivative.';
+  if (core.t === '^') return 'For $e^x$ the derivative is $e^x$ again, it is the one function that is its own derivative.';
   if (core.t === 'f') {
     const facts: Record<string, string> = { sin: 'The derivative of sin is cos.', cos: 'The derivative of cos is −sin (cos picks up a minus).', tan: 'The derivative of tan is sec².', ln: 'The derivative of ln x is 1/x.', sqrt: '√x is x to the power ½, so the power rule gives 1/(2√x).' };
     return facts[core.name] ?? 'This one comes straight from the table of standard derivatives.';
@@ -500,9 +500,9 @@ function definiteSteps(p: Prep): SolutionStep[] {
   const top = nice(ev(F.F, { [p.v]: p.hi as number }));
   const bottom = nice(ev(F.F, { [p.v]: p.lo as number }));
   const wrap = (x: number): string => (x < 0 ? `(${numText(x)})` : numText(x));
-  const steps: SolutionStep[] = [{ tag: 'calc', line: toText(F.F), why: 'First find the antiderivative — forget the limits for a moment. (No + C needed: it would cancel in the next step.)' }];
+  const steps: SolutionStep[] = [{ tag: 'calc', line: toText(F.F), why: 'First find the antiderivative, forget the limits for a moment. (No + C needed: it would cancel in the next step.)' }];
   if (Number.isFinite(top) && Number.isFinite(bottom)) steps.push({ tag: 'calc', line: `${numText(top)} - ${wrap(bottom)}`, why: `Put the top limit (${numText(p.hi as number)}) in, then subtract what you get from the bottom limit (${numText(p.lo as number)}). **Top minus bottom**, never the other way round.` });
-  steps.push({ tag: 'final', line: value, why: 'Tidy up to a single number.' });
+  steps.push({ tag: 'final', line: value, why: 'Do the subtraction. The answer to a definite integral is one number.' });
   return steps;
 }
 
@@ -554,7 +554,7 @@ function limitSteps(p: Prep): SolutionStep[] {
       if (did) {
         const reduced = simp(div(polyToExpr(nn, v), polyToExpr(dd, v)));
         steps.push({ tag: 'calc', line: `lim ${v}→${numText(to)} (${toText(reduced)})`, why: `Putting $${v} = ${numText(to)}$ in gives 0/0. That is a signal that top and bottom share the factor $(${toText(simp(add(V(v), N(-to))))})$. Factor it out of both and cancel.` });
-        steps.push({ tag: 'final', line: answer, why: 'With the troublemaker cancelled, substitute.' });
+        steps.push({ tag: 'final', line: answer, why: `The factor that caused the 0/0 is gone, so nothing breaks now. Put $${v} = ${numText(to)}$ into what is left and work it out.` });
         return steps;
       }
     }
@@ -567,7 +567,7 @@ function limitSteps(p: Prep): SolutionStep[] {
     if (zz) {
       const lh = simp(div(diff(p.body.n, v), diff(p.body.d, v)));
       steps.push({ tag: 'calc', line: `lim ${v}→${numText(to)} (${toText(lh)})`, why: 'Substituting gives 0/0. **L’Hôpital’s rule**: differentiate the top and the bottom separately (not as a quotient), then try the limit again.' });
-      steps.push({ tag: 'final', line: answer, why: 'Now substitute.' });
+      steps.push({ tag: 'final', line: answer, why: `Now put $${v} = ${numText(to)}$ into the new top and bottom. This time it gives a real number.` });
       return steps;
     }
   }

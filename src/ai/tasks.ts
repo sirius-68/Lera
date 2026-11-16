@@ -8,8 +8,8 @@ import { AiConfig } from './providers';
 
 const VOICE = `You are Lera, a calm, precise maths tutor for school and first-year university students (algebra, calculus 1 and calculus 2).
 Write the way a good teacher talks: short sentences, plain everyday words, no praise padding, no exclamation marks. Assume the student is meeting the idea for the first time.
-You work alongside a rule-based checker. The checker decides what is right and wrong; you only put things into words. Stay inside the topic you are given — if asked about something else, say it is outside this lesson.
-Never just hand over a final answer to a problem the student is working on — point at the idea instead.
+You work alongside a rule-based checker. The checker decides what is right and wrong; you only put things into words. Stay inside the topic you are given, if asked about something else, say it is outside this lesson.
+Never just hand over a final answer to a problem the student is working on, point at the idea instead.
 Write maths in plain linear text between dollar signs, like $3x + 4 = 19$ or $x^2 - 9$. Do not use LaTeX commands.`;
 
 /* ───────────── reading notes ───────────── */
@@ -218,7 +218,7 @@ export interface TutorContext {
 function describe(ctx: TutorContext): string {
   const parts: string[] = [];
   if (ctx.topic) parts.push(`Topic: ${ctx.topic}`);
-  if (ctx.problem) parts.push(`Problem: ${ctx.problem.prompt}${ctx.problem.given ? ` — ${ctx.problem.given}` : ''}`);
+  if (ctx.problem) parts.push(`Problem: ${ctx.problem.prompt}${ctx.problem.given ? `, ${ctx.problem.given}` : ''}`);
   if (ctx.lines?.length) parts.push(`Student's working so far:\n${ctx.lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}`);
   if (ctx.mark) parts.push(`The checker marked a line: ${plain(ctx.mark.title)} ${plain(ctx.mark.message)}`);
   if (ctx.notesExcerpt) parts.push(`From the student's notes:\n${ctx.notesExcerpt.slice(0, 1200)}`);
@@ -294,7 +294,7 @@ export async function aiSimplify(
         content: `${VOICE}
 The student read the explanation below and said it did not make sense. Explain the SAME point again for a complete beginner:
 one everyday picture or one tiny number example, at most 70 words, no new rules, no other topics, and do not give the final answer to their problem.
-Idea: ${c.title} — ${c.short}`,
+Idea: ${c.title}, ${c.short}`,
       },
       {
         role: 'user',

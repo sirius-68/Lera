@@ -6,7 +6,7 @@ import './styles/v2.css';
 import { App } from './App';
 import { getState, onChange } from './store';
 import { go } from './store/nav';
-import { syncWidget, takeWidgetAction } from './store/widget';
+import { setWidgetTestMode, syncWidget, takeWidgetAction } from './store/widget';
 
 /*
  * The on-screen keyboard must never cover what is being typed.
@@ -50,6 +50,8 @@ const followWidget = () => {
   const s = getState();
   if (takeWidgetAction() === 'practice' && s.profile.onboarded && !(s.profile.email && s.profile.signedIn === false)) go({ name: 'practice' });
 };
+// the widget always runs on real time (an earlier test build could leave a fast-forward mode switched on)
+setWidgetTestMode(false);
 onChange(() => pushWidget());
 pushWidget(true);
 setTimeout(followWidget, 900);
