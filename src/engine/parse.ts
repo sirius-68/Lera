@@ -201,7 +201,7 @@ class Parser {
         const right = this.power();
         if (t.k === 'num') {
           // `x 2` / `(x+1)3` is almost always a typo for a power or a product
-          if (left.t === 'num') throw new ParseError('Two numbers side by side — is a sign missing between them?', t.pos);
+          if (left.t === 'num') throw new ParseError('Two numbers side by side, is a sign missing between them?', t.pos);
           throw new ParseError('Put the number in front (3x), or use ^ for a power (x^3).', t.pos);
         }
         left = this.times(left, right);
@@ -275,7 +275,7 @@ class Parser {
       this.expect('|');
       return { t: 'abs', arg: inner };
     }
-    if (t.k === 'end') throw new ParseError('This line stops halfway — something is missing at the end.', t.pos);
+    if (t.k === 'end') throw new ParseError('This line stops halfway, something is missing at the end.', t.pos);
     if (t.k === 'op' && t.s === ')') throw new ParseError('There’s a closing bracket with no opening one.', t.pos);
     if (t.k === 'op' && (t.s === '*' || t.s === '/' || t.s === '^'))
       throw new ParseError(`“${t.s}” needs something before it.`, t.pos);
@@ -420,8 +420,3 @@ export function lineToLatex(input: string): string | null {
   return r.ok ? statementToLatex(r.st) : null;
 }
 
-/** Parse something that must be a plain expression (no relation). */
-export function parseExpr(input: string): Node | null {
-  const r = parseLine(input);
-  return r.ok && r.st.kind === 'expr' ? r.st.expr : null;
-}

@@ -1,17 +1,24 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { aiCheckOpen, aiDiagnose } from '../ai/tasks';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { aiCheckOpen, aiDiagnose, aiSimplify } from '../ai/tasks';
 import { aiReady } from '../ai/providers';
 import { analyze, cleanPath, hintLadder, HintLadder } from '../engine/analyze';
+import { isCalc } from '../engine/calc/check';
 import { CONCEPTS } from '../engine/concepts';
+import { PLAIN } from '../engine/concepts-calc';
 import { AttemptAnalysis, CheckedLine, Diagnosis, Problem } from '../engine/types';
 import { Lera, Mood } from '../mascot/Lera';
 import { actions, getState, useStore } from '../store';
-import { addDays, buildSession, dayOf, findTopic, Session } from '../store/learner';
-import { back, openOverlay, Route } from '../store/nav';
-import { Button3D, Confetti, CountUp, LeraSays, haptic, toast } from '../ui/kit';
+import { levelOf, totalXp, weekStrip, xpByDay } from '../store/game';
+import { addDays, buildSession, dayOf, findTopic, Session, streak } from '../store/learner';
+import { weaknesses } from '../store/weakness';
+import { back, openOverlay, Route, setBackGuard } from '../store/nav';
+import { Button3D, Confetti, CountUp, LeraSays, Ring, haptic, toast } from '../ui/kit';
+import { CelebrationFlow, Scene } from '../ui/Celebrate';
 import { Icon } from '../ui/icons';
-import { MathView, RichText, typeset } from '../ui/math';
+import { MathField, MathFieldHandle } from '../ui/MathField';
+import type { Kind } from '../ui/mathrow';
+import { MathView, RichText } from '../ui/math';
+import { WeakCard } from './Main';
 
 interface Result {
   problem: Problem;
@@ -32,24 +39,54 @@ const chipTone = (s: Diagnosis['severity']): string => (s === 'gap' ? 'gap' : s 
 
 /* ───────────── the keyboard ───────────── */
 
-function Keyboard({ vars, onKey, onDelete, onEnter, onMove, ready }: { vars: string[]; onKey: (s: string) => void; onDelete: () => void; onEnter: () => void; onMove: (d: -1 | 1) => void; ready: boolean }) {
+function Keyboard({ vars, onKey, onTpl, onDelete, onEnter, onMove, ready, calc }: { vars: string[]; onKey: (s: string) => void; onTpl: (kind: Kind, then?: string) => void; onDelete: () => void; onEnter: () => void; onMove: (d: -1 | 1) => void; ready: boolean; calc?: boolean }) {
   const [a, b] = [vars[0] ?? 'x', vars[1] ?? (vars[0] === 'y' ? 'x' : 'y')];
-  const rows: { k: string; ins?: string; tone?: string; label?: string }[][] = [
-    [{ k: a, tone: 'var' }, { k: b, tone: 'var' }, { k: '(' }, { k: ')' }, { k: 'x²', ins: '^2', label: 'squared' }, { k: '⌫', tone: 'fn', label: 'Delete' }],
-    [{ k: '7' }, { k: '8' }, { k: '9' }, { k: '+', tone: 'op' }, { k: '<', tone: 'op' }, { k: 'xⁿ', ins: '^', label: 'to the power' }],
-    [{ k: '4' }, { k: '5' }, { k: '6' }, { k: '−', ins: '-', tone: 'op', label: 'minus' }, { k: '>', tone: 'op' }, { k: '√', ins: 'sqrt(', label: 'square root' }],
-    [{ k: '1' }, { k: '2' }, { k: '3' }, { k: '×', ins: '*', tone: 'op', label: 'times' }, { k: '≤', ins: '<=', tone: 'op' }, { k: '±', tone: 'op' }],
-    [{ k: '0' }, { k: '.' }, { k: '=', tone: 'op' }, { k: '÷', ins: '/', tone: 'op', label: 'divided by' }, { k: '≥', ins: '>=', tone: 'op' }, { k: '↵', tone: 'go', label: 'Check this line' }],
+  type Key = { k: string; ins?: string; tone?: string; label?: string; tpl?: Kind; then?: string };
+  // calculus swaps the inequality column for the functions it needs
+  const calcRows: Key[][] = [
+    [{ k: a, tone: 'var' }, { k: 'e', tone: 'var' }, { k: '(' }, { k: ')' }, { k: 'x²', tpl: 'pow', then: '2', label: 'squared' }, { k: '⌫', tone: 'fn', label: 'Delete' }],
+    [{ k: '7' }, { k: '8' }, { k: '9' }, { k: '+', tone: 'op' }, { k: 'sin', ins: 'sin(', tone: 'op' }, { k: 'xⁿ', tpl: 'pow', label: 'to the power' }],
+    [{ k: '4' }, { k: '5' }, { k: '6' }, { k: '−', ins: '-', tone: 'op', label: 'minus' }, { k: 'cos', ins: 'cos(', tone: 'op' }, { k: '√', tpl: 'sqrt', label: 'square root' }],
+    [{ k: '1' }, { k: '2' }, { k: '3' }, { k: '×', ins: '*', tone: 'op', label: 'times' }, { k: 'ln', ins: 'ln(', tone: 'op' }, { k: '+C', ins: '+C', tone: 'op', label: 'plus C' }],
+    [{ k: '0' }, { k: '.' }, { k: '=', tone: 'op' }, { k: '÷', tpl: 'frac', tone: 'op', label: 'fraction' }, { k: 'π', ins: 'pi', tone: 'op', label: 'pi' }, { k: '↵', tone: 'go', label: 'Check this line' }],
   ];
+  const algebraRows: Key[][] = [
+    [{ k: a, tone: 'var' }, { k: b, tone: 'var' }, { k: '(' }, { k: ')' }, { k: 'x²', tpl: 'pow', then: '2', label: 'squared' }, { k: '⌫', tone: 'fn', label: 'Delete' }],
+    [{ k: '7' }, { k: '8' }, { k: '9' }, { k: '+', tone: 'op' }, { k: '<', tone: 'op' }, { k: 'xⁿ', tpl: 'pow', label: 'to the power' }],
+    [{ k: '4' }, { k: '5' }, { k: '6' }, { k: '−', ins: '-', tone: 'op', label: 'minus' }, { k: '>', tone: 'op' }, { k: '√', tpl: 'sqrt', label: 'square root' }],
+    [{ k: '1' }, { k: '2' }, { k: '3' }, { k: '×', ins: '*', tone: 'op', label: 'times' }, { k: '≤', ins: '<=', tone: 'op' }, { k: '±', tone: 'op' }],
+    [{ k: '0' }, { k: '.' }, { k: '=', tone: 'op' }, { k: '÷', tpl: 'frac', tone: 'op', label: 'fraction' }, { k: '≥', ins: '>=', tone: 'op' }, { k: '↵', tone: 'go', label: 'Check this line' }],
+  ];
+  const rows = calc ? calcRows : algebraRows;
+  void b;
   return (
     <div className="kbd" aria-label="Maths keyboard">
       <div className="kbd-extra">
         <button onClick={() => onMove(-1)} aria-label="Move left"><Icon name="left" size={18} /></button>
         <button onClick={() => onMove(1)} aria-label="Move right"><Icon name="right" size={18} /></button>
-        <button onClick={() => onKey(' or ')}>or</button>
-        <button onClick={() => onKey(', ')}>,</button>
-        <button onClick={() => onKey('no solution')}>no solution</button>
-        <button onClick={() => onKey('all real numbers')}>all reals</button>
+        <button className="tpl" onClick={() => onTpl('frac')} aria-label="Fraction"><span className="f"><i /><i /></span></button>
+        <button className="tpl" onClick={() => onTpl('pow')} aria-label="Power">x<i className="hi" /></button>
+        <button className="tpl" onClick={() => onTpl('sqrt')} aria-label="Square root">√<i /></button>
+        {calc ? (
+          <>
+            <button className="tpl" onClick={() => onTpl('ddx')} aria-label="Derivative">d/d{a}<i /></button>
+            <button className="tpl" onClick={() => onTpl('int')} aria-label="Integral"><svg viewBox="0 0 10 28" aria-hidden="true"><path d="M8.6 2.2c-2.3-.9-3.1.7-3.3 3.2L4.7 22.6c-.2 2.5-1 4.1-3.3 3.2" /></svg><i /></button>
+            <button className="tpl" onClick={() => onTpl('defint')} aria-label="Integral with limits"><svg viewBox="0 0 10 28" aria-hidden="true"><path d="M8.6 2.2c-2.3-.9-3.1.7-3.3 3.2L4.7 22.6c-.2 2.5-1 4.1-3.3 3.2" /></svg><span className="st"><i /><i /></span><i /></button>
+            <button className="tpl" onClick={() => onTpl('lim')} aria-label="Limit">lim<i className="lo" /></button>
+            <button onClick={() => onKey('tan(')}>tan</button>
+            <button className="tpl" onClick={() => { onKey('e'); onTpl('pow'); }} aria-label="e to the power">e<i className="hi" /></button>
+            <button onClick={() => onKey('inf')}>∞</button>
+            <button onClick={() => onKey('DNE')}>no limit</button>
+          </>
+        ) : (
+          <>
+            <button className="tpl" onClick={() => onTpl('abs')} aria-label="Absolute value">|<i />|</button>
+            <button onClick={() => onKey(' or ')}>or</button>
+            <button onClick={() => onKey(',')}>,</button>
+            <button onClick={() => onKey('no solution')}>no solution</button>
+            <button onClick={() => onKey('all real numbers')}>all reals</button>
+          </>
+        )}
       </div>
       <div className="kbd-grid">
         {rows.flat().map((key) => (
@@ -63,6 +100,7 @@ function Keyboard({ vars, onKey, onDelete, onEnter, onMove, ready }: { vars: str
               haptic(4);
               if (key.k === '⌫') onDelete();
               else if (key.k === '↵') onEnter();
+              else if (key.tpl) onTpl(key.tpl, key.then);
               else onKey(key.ins ?? key.k);
             }}
           >
@@ -76,7 +114,8 @@ function Keyboard({ vars, onKey, onDelete, onEnter, onMove, ready }: { vars: str
 
 /* ───────────── one line of working ───────────── */
 
-function Mark({ line }: { line: CheckedLine }) {
+function Mark({ line, pending }: { line: CheckedLine; pending?: boolean }) {
+  if (pending) return <span className="mark wait" aria-label="Not checked yet" />;
   if (line.status === 'ok' || line.status === 'recovered') {
     return (
       <span className="mark ok" aria-label="Follows">
@@ -89,8 +128,17 @@ function Mark({ line }: { line: CheckedLine }) {
   return <span className="mark none" aria-label="Not checked" />;
 }
 
-function DiagnosisCard({ diag, onReview, onFix, fixShown, aiNote }: { diag: Diagnosis; onReview: () => void; onFix: () => void; fixShown: boolean; aiNote?: string }) {
+function DiagnosisCard({ diag, onReview, onFix, fixShown, aiNote, onSense }: { diag: Diagnosis; onReview: () => void; onFix: () => void; fixShown: boolean; aiNote?: string; onSense: (ok: boolean) => Promise<string | null> }) {
   const concept = CONCEPTS[diag.concept];
+  const [sense, setSense] = useState<'yes' | 'no' | null>(null);
+  const [simpler, setSimpler] = useState<string | null>(null);
+  const answer = (ok: boolean) => {
+    haptic(5);
+    setSense(ok ? 'yes' : 'no');
+    onSense(ok)
+      .then((text) => text && setSimpler(text))
+      .catch(() => undefined);
+  };
   return (
     <div className={`diag ${chipTone(diag.severity)}`} role="note">
       <div className="row" style={{ gap: 8 }}>
@@ -98,6 +146,29 @@ function DiagnosisCard({ diag, onReview, onFix, fixShown, aiNote }: { diag: Diag
         <b className="grow" style={{ fontSize: 14.5, lineHeight: 1.3 }}><RichText text={diag.title} /></b>
       </div>
       <p style={{ fontSize: 14.5, lineHeight: 1.5, marginTop: 8 }}><RichText text={aiNote ?? diag.message} /></p>
+      {diag.severity !== 'strategy' && (
+        <div className="sense" data-state={sense ?? 'ask'}>
+          {sense === null && (
+            <>
+              <span>Did that make sense?</span>
+              <button onClick={() => answer(true)}>Yes</button>
+              <button onClick={() => answer(false)}>Not really</button>
+            </>
+          )}
+          {sense === 'yes' && <span className="sense-ok"><Icon name="check" size={14} stroke={3} /> Good. Fix the line and carry on.</span>}
+          {sense === 'no' && (
+            <div className="plainer">
+              <span className="label">In plain words</span>
+              <p><RichText text={simpler ?? PLAIN[diag.concept]} /></p>
+              <button className="review-link" onClick={onReview}>
+                <Icon name="play" size={14} fill />
+                <span>Walk me through an example</span>
+                <Icon name="chevron" size={15} />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       {fixShown && diag.fix && (
         <p className="fixline">
           <span className="faint" style={{ fontSize: 12.5 }}>This line should read</span>
@@ -139,37 +210,43 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
   const [compare, setCompare] = useState(false);
   const [shake, setShake] = useState(0);
   const [aiNotes, setAiNotes] = useState<Record<string, string>>({});
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const caret = useRef<number | null>(null);
+  // 'line' marks each line as it lands; 'end' holds every mark back until the learner asks
+  const [mode, setMode] = useState<'line' | 'end'>(() => getState().profile.checkMode ?? 'line');
+  const [checkedCount, setCheckedCount] = useState(0);
+  const calc = isCalc(problem.kind);
+  const fieldRef = useRef<MathFieldHandle | null>(null);
+  /** The final answer, given before any working was shown. */
+  const [answerFirst, setAnswerFirst] = useState<string | null>(null);
+  // asked once per problem: if the answer alone comes back a second time it is taken, so nobody gets stuck
+  const needsWorking = answerFirst === null;
+  const [gaps, setGaps] = useState(false);
   const scroller = useRef<HTMLDivElement | null>(null);
   const started = useRef(Date.now());
   const seen = useRef(new Map<string, Diagnosis>());
   const recorded = useRef(false);
 
   const analysis = useMemo(() => analyze(problem, lines), [problem, lines]);
-  const solved = analysis.verdict === 'solved';
+  const isChecked = (i: number): boolean => mode === 'line' || i < checkedCount;
+  const allChecked = mode === 'line' || checkedCount >= lines.length;
+  const solved = analysis.verdict === 'solved' && allChecked;
   const finished = solved || revealed;
   const clean = useMemo(() => cleanPath(problem), [problem]);
   const vars = useMemo(() => {
+    if (isCalc(problem.kind)) return [problem.variable ?? 'x'];
     const found = [...new Set((problem.given.match(/[a-z]/gi) ?? []).filter((c) => !/[e]/i.test(c) || problem.given.includes('e')))];
     return (problem.variable ? [problem.variable, ...found.filter((v) => v !== problem.variable)] : found).slice(0, 2);
   }, [problem]);
 
-  for (const l of analysis.lines) if (l.status === 'wrong' && l.diag) seen.current.set(`${l.diag.code}:${l.diag.concept}`, l.diag);
-
-  useLayoutEffect(() => {
-    if (caret.current !== null && inputRef.current) {
-      inputRef.current.setSelectionRange(caret.current, caret.current);
-      caret.current = null;
-    }
-  }, [input]);
+  analysis.lines.forEach((l, i) => {
+    if (isChecked(i) && l.status === 'wrong' && l.diag) seen.current.set(`${l.diag.code}:${l.diag.concept}`, l.diag);
+  });
 
   useEffect(() => {
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' });
   }, [lines.length, openDiag, hintOpen, finished, compare]);
 
   useEffect(() => {
-    if (!finished) inputRef.current?.focus({ preventScroll: true });
+    if (!finished) fieldRef.current?.focus();
   }, [finished, lines.length]);
 
   const marksNow = (): Diagnosis[] => {
@@ -186,46 +263,55 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     actions.record(problem, { ...a, marks: [...all.values()] }, { hintRung, seconds: (Date.now() - started.current) / 1000 });
   };
 
-  const insert = (s: string) => {
-    const el = inputRef.current;
-    const from = el?.selectionStart ?? input.length;
-    const to = el?.selectionEnd ?? input.length;
-    setInput(input.slice(0, from) + s + input.slice(to));
-    caret.current = from + s.length;
+  const insert = (t: string) => {
+    if (t === '+C') {
+      fieldRef.current?.insert('+');
+      fieldRef.current?.insert('C');
+    } else fieldRef.current?.insert(t);
     setNote(null);
   };
 
-  const del = () => {
-    const el = inputRef.current;
-    const from = el?.selectionStart ?? input.length;
-    const to = el?.selectionEnd ?? input.length;
-    if (from !== to) {
-      setInput(input.slice(0, from) + input.slice(to));
-      caret.current = from;
-    } else if (from > 0) {
-      setInput(input.slice(0, from - 1) + input.slice(from));
-      caret.current = from - 1;
-    } else if (!input && lines.length) {
-      // deleting on an empty line pulls the previous line back for editing
-      const prev = lines[lines.length - 1];
-      setLines(lines.slice(0, -1));
-      setInput(prev);
-      caret.current = prev.length;
-      setOpenDiag(null);
+  /** Drop in a template (fraction, power, root, integral…); `then` fills its box and steps out, as for x². */
+  const tpl = (kind: Kind, then?: string) => {
+    const v = vars[0] ?? 'x';
+    fieldRef.current?.template(kind, v);
+    if (then) {
+      fieldRef.current?.insert(then);
+      fieldRef.current?.move(1);
     }
     setNote(null);
   };
 
-  const move = (d: -1 | 1) => {
-    const el = inputRef.current;
-    if (!el) return;
-    const pos = Math.max(0, Math.min(input.length, (el.selectionStart ?? input.length) + d));
-    el.setSelectionRange(pos, pos);
+  /** Deleting on an empty line pulls the previous line back for editing. */
+  const pullBack = () => {
+    if (!lines.length) return;
+    const prev = lines[lines.length - 1];
+    setLines(lines.slice(0, -1));
+    setCheckedCount((c) => Math.min(c, lines.length - 1));
+    fieldRef.current?.setText(prev);
+    setOpenDiag(null);
   };
 
+  const del = () => {
+    if (!fieldRef.current?.del()) pullBack();
+    setNote(null);
+  };
+
+  const move = (d: -1 | 1) => fieldRef.current?.move(d);
+
+
+  // the field keeps one Enter handler for its whole life; this always points at the current commit
+  const commitRef = useRef<() => void>(() => undefined);
   const commit = () => {
-    const text = input.trim();
+    // "= 6" carries on from the line above: the sign is dropped, the rest is the line
+    const text = input.trim().replace(/^=\s*(?=[^=]*$)/, '');
     if (!text || finished) return;
+    if (gaps) {
+      setNote('One of the boxes is still empty. Fill it in, or delete it.');
+      setShake((n) => n + 1);
+      haptic([12, 30, 12]);
+      return;
+    }
     const next = [...lines, text];
     const a = analyze(problem, next);
     const line = a.lines[a.lines.length - 1];
@@ -236,16 +322,36 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       haptic([12, 30, 12]);
       return;
     }
+    // The right answer with no working: accepted, but the working is the point. I can only find how someone
+    // thinks, and where it goes wrong, from the lines in between. So the answer is kept aside and the steps asked for.
+    if (a.verdict === 'solved' && next.length === 1 && needsWorking) {
+      setAnswerFirst(text);
+      actions.track('answer_only');
+      fieldRef.current?.clear();
+      setInput('');
+      setMood('thumbsup');
+      haptic([10, 40, 16]);
+      setNote(null);
+      return;
+    }
     setLines(next);
+    fieldRef.current?.clear();
     setInput('');
     setHintOpen(false);
+    if (mode === 'end') {
+      // nothing is marked yet: the learner finishes first, then asks
+      setNote(null);
+      setOpenDiag(null);
+      setMood('calculating'); // she reads along but keeps quiet until asked
+      return;
+    }
     setNote(line.status === 'unchecked' ? line.note ?? 'I can’t compare this line with the one above, so I’ve left it unmarked.' : null);
     const idx = next.length - 1;
     if (line.status === 'wrong') {
       setOpenDiag(idx);
-      setMood('oops');
+      setMood(line.diag?.severity === 'gap' ? 'shocked' : 'oops');
       haptic([14, 40, 14]);
-      setTimeout(() => setMood('thinking'), 1400);
+      setTimeout(() => setMood('thinking'), 1700);
       const st = getState();
       // the rules couldn't name it: ask the model for a second opinion in words, if one is connected
       if (line.diag?.code === 'unknown' && aiReady(st.ai)) {
@@ -261,11 +367,59 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       record(a, rung);
     } else {
       setOpenDiag(null);
-      setMood(line.status === 'carried' ? 'thinking' : 'happy');
-      if (line.status === 'carried') setNote('That follows from the line above — but that line was already off, so the mistake is carried along.');
+      setMood(line.status === 'carried' ? 'thinking' : line.status === 'recovered' ? 'eureka' : 'happy');
+      if (line.status === 'carried') setNote('That follows from the line above, but that line was already off, so the mistake is carried along.');
       if (line.status === 'recovered') setNote('Back on track: this line is true to the original problem again.');
       setTimeout(() => setMood('idle'), 1100);
     }
+  };
+
+  commitRef.current = commit;
+
+  /** "When I finish" mode: mark every line written so far, all at once. */
+  const checkAll = () => {
+    if (!lines.length || finished) return;
+    const a = analysis;
+    setCheckedCount(lines.length);
+    setHintOpen(false);
+    const wrong = a.lines.filter((l) => l.status === 'wrong');
+    if (a.verdict === 'solved' && lines.length === 1 && needsWorking) {
+      // only the answer was written: keep it aside and ask for the working
+      setAnswerFirst(lines[0]);
+      actions.track('answer_only');
+      setLines([]);
+      setCheckedCount(0);
+      setMood('thumbsup');
+      return;
+    }
+    if (a.verdict === 'solved') {
+      for (const l of wrong) if (l.diag) seen.current.set(`${l.diag.code}:${l.diag.concept}`, l.diag);
+      setOpenDiag(wrong.length ? a.lines.findIndex((l) => l.status === 'wrong') : null);
+      setNote(null);
+      setMood('celebrate');
+      haptic([10, 50, 20]);
+      record(a, rung);
+    } else if (wrong.length) {
+      setOpenDiag(a.lines.findIndex((l) => l.status === 'wrong'));
+      setMood('oops');
+      haptic([14, 40, 14]);
+      setTimeout(() => setMood('thinking'), 1400);
+      setNote(`${wrong.length === 1 ? 'One line doesn’t' : `${wrong.length} lines don’t`} follow. Tap a flagged line to see why, then write the corrected line underneath, or delete back to it.`);
+    } else {
+      setOpenDiag(null);
+      setMood('happy');
+      setNote(a.remaining ?? 'Every line follows, but it isn’t finished yet. Keep going.');
+    }
+  };
+
+  const switchMode = () => {
+    const nextMode = mode === 'line' ? 'end' : 'line';
+    haptic(5);
+    if (nextMode === 'line') checkAll();
+    else setCheckedCount(lines.length);
+    setMode(nextMode);
+    actions.setProfile({ checkMode: nextMode });
+    toast(nextMode === 'end' ? 'I’ll wait until you ask before marking anything' : 'Marking each line as you write it');
   };
 
   const askHint = () => {
@@ -275,12 +429,14 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       return;
     }
     setHint(ladder);
+    actions.track('hint', { rung: Math.min(3, hintOpen ? rung + 1 : Math.max(1, rung)) });
     setRung((r) => Math.min(3, hintOpen ? r + 1 : Math.max(1, r)));
     setHintOpen(true);
-    setMood('thinking');
+    setMood('eureka');
   };
 
   const reveal = () => {
+    actions.track('reveal');
     setRevealed(true);
     setHintOpen(false);
     setRung(3);
@@ -301,17 +457,6 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     });
   };
 
-  const onKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      commit();
-    } else if (e.key === 'Backspace' && !input && lines.length) {
-      e.preventDefault();
-      del();
-    }
-  };
-
-  const preview = input.trim() ? typeset(input) : null;
   const marks = marksNow();
   const strategy = analysis.marks.find((m) => m.severity === 'strategy');
   const hintText = hint ? (rung <= 1 ? hint.nudge : rung === 2 ? hint.method : 'Here is the next line. Read it, then write it yourself:') : '';
@@ -331,24 +476,41 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
           <div className="given"><MathView text={problem.given} block /></div>
         </div>
 
+        {answerFirst && !finished && (
+          <div className="answer-first">
+            <div className="row" style={{ gap: 8 }}>
+              <span className="chip ok"><Icon name="check" size={13} stroke={3.2} /> Right answer</span>
+              <MathView text={answerFirst} />
+            </div>
+            <p><b>Now show me how you got there.</b> Write your working, at least two lines, ending with the answer. The answer tells me you can do it. The steps show me how you think, and that is where I can help.</p>
+          </div>
+        )}
         <ol className="lines">
           {analysis.lines.map((line, i) => (
-            <li key={`${i}:${line.text}`} className={`line ${line.status}`} data-final={line.isFinal && solved && i === analysis.lines.length - 1 ? '' : undefined}>
+            <li key={`${i}:${line.text}`} className={`line ${isChecked(i) ? line.status : 'pending'}`} data-final={line.isFinal && solved && i === analysis.lines.length - 1 ? '' : undefined}>
               <button
                 className="line-row"
-                onClick={() => line.status === 'wrong' && setOpenDiag(openDiag === i ? null : i)}
-                aria-expanded={line.status === 'wrong' ? openDiag === i : undefined}
-                disabled={line.status !== 'wrong'}
+                onClick={() => isChecked(i) && line.status === 'wrong' && setOpenDiag(openDiag === i ? null : i)}
+                aria-expanded={isChecked(i) && line.status === 'wrong' ? openDiag === i : undefined}
+                disabled={!isChecked(i) || line.status !== 'wrong'}
               >
                 <span className="n">{i + 1}</span>
                 <span className="grow" style={{ textAlign: 'left' }}>
                   {line.latex ? <MathView latex={line.latex} block /> : <MathView text={line.text} block />}
                 </span>
-                <Mark line={line} />
+                <Mark line={line} pending={!isChecked(i)} />
               </button>
-              {line.status === 'wrong' && line.diag && openDiag === i && (
+              {isChecked(i) && line.status === 'wrong' && line.diag && openDiag === i && (
                 <DiagnosisCard
                   diag={line.diag}
+                  onSense={async (ok) => {
+                    const d = line.diag as Diagnosis;
+                    actions.setUnderstood(d.concept, ok);
+                    const st = getState();
+                    if (ok || !aiReady(st.ai)) return null;
+                    // a connected model rewords the same point more simply; the engine's verdict stays the authority
+                    return aiSimplify(st.ai, { concept: d.concept, title: d.title, message: d.message, plain: PLAIN[d.concept], problem, line: line.text, fix: d.fix });
+                  }}
                   aiNote={aiNotes[line.text]}
                   fixShown={!!fixShown[i]}
                   onFix={() => {
@@ -363,26 +525,20 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
         </ol>
 
         {!finished && (
-          <div className="entry" key={shake} data-shake={shake ? '' : undefined}>
+          <div className="entry" data-shake={shake ? (shake % 2 ? 'a' : 'b') : undefined}>
             <span className="n">{lines.length + 1}</span>
             <div className="grow">
-              {preview && <div className="preview" dangerouslySetInnerHTML={{ __html: preview }} />}
-              <input
-                ref={inputRef}
-                className="mathin"
-                value={input}
-                inputMode="none"
-                autoCapitalize="off"
-                autoCorrect="off"
-                autoComplete="off"
-                spellCheck={false}
-                placeholder={lines.length ? 'Next line…' : 'Write your first line…'}
-                aria-label={`Line ${lines.length + 1} of your working`}
-                onChange={(e: { target: { value: string } }) => {
-                  setInput(e.target.value);
+              <MathField
+                ref={fieldRef}
+                label={`Line ${lines.length + 1} of your working`}
+                placeholder={lines.length ? (mode === 'end' ? 'Next line… then “Check my work”' : 'Next line…') : 'Write your first line…'}
+                onChange={(text, hasGaps) => {
+                  setInput(text);
+                  setGaps(hasGaps);
                   setNote(null);
                 }}
-                onKeyDown={onKeyDown}
+                onEnter={() => commitRef.current()}
+                onEmptyDelete={pullBack}
               />
             </div>
           </div>
@@ -419,7 +575,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
               <div className="solved-banner">
                 <span className="big-tick"><Icon name="check" size={26} stroke={3.2} /></span>
                 <div>
-                  <b>{marks.length ? 'Solved — with a detour' : rung >= 3 ? 'Solved, with the line shown' : 'Solved'}</b>
+                  <b>{marks.length ? 'Solved, with a detour' : rung >= 3 ? 'Solved, with the line shown' : 'Solved'}</b>
                   <p className="muted" style={{ fontSize: 14 }}>
                     {analysis.steps} {analysis.steps === 1 ? 'line' : 'lines'}
                     {analysis.approach ? ` · ${analysis.approach}` : ''}
@@ -482,12 +638,25 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
             <button className="tool" onClick={askHint}>
               <Icon name="bulb" size={18} /> Hint{rung ? ` ${rung}/3` : ''}
             </button>
+            <button className="tool" onClick={switchMode} aria-label="Change when your working is checked">
+              <Icon name={mode === 'end' ? 'clock' : 'check'} size={16} stroke={2.6} /> {mode === 'end' ? 'At the end' : 'As I go'}
+            </button>
             <span className="grow" />
+            {mode === 'end' && lines.length > checkedCount && (
+              <button className="tool go" onClick={checkAll}>
+                <Icon name="check" size={16} stroke={3} /> Check my work
+              </button>
+            )}
+            {(lines.length > 0 || !!input.trim()) && !(mode === 'end' && lines.length > checkedCount) && (
+              <button className="tool go" onClick={() => (input.trim() ? commit() : checkAll())}>
+                <Icon name="check" size={16} stroke={3} /> Done
+              </button>
+            )}
             <button className="tool" onClick={() => (lines.length || rung ? reveal() : finish(true))}>
               {lines.length || rung ? 'Show solution' : 'Skip'}
             </button>
           </div>
-          <Keyboard vars={vars} onKey={insert} onDelete={del} onEnter={commit} onMove={move} ready={!!input.trim()} />
+          <Keyboard vars={vars} onKey={insert} onTpl={tpl} onDelete={del} onEnter={commit} onMove={move} ready={!!input.trim()} calc={calc} />
         </div>
       )}
       {solved && <Confetti fire={1} />}
@@ -563,6 +732,18 @@ export function SessionScreen({ route }: { route: Extract<Route, { name: 'sessio
   const total = session.problems.length;
   const problem = session.problems[index];
 
+  // the phone's back button asks before throwing away a session that is under way
+  useEffect(() => {
+    setBackGuard(() => {
+      if (phase === 'solve' && results.length + 1 < total && !leaving) {
+        setLeaving(true);
+        return true;
+      }
+      return false;
+    });
+    return () => setBackGuard(null);
+  }, [phase, results.length, total, leaving]);
+
   if (total === 0) {
     return (
       <div className="screen" data-dir="1">
@@ -634,8 +815,8 @@ function Brief({ session, onStart }: { session: Session; onStart: () => void }) 
     session.reviews > 0
       ? `**${session.reviews}** of these ${session.reviews === 1 ? 'is' : 'are'} coming back from an earlier mistake. Let’s see if ${session.reviews === 1 ? 'it holds' : 'they hold'}.`
       : fromNotes > 0
-        ? `These come straight from your notes. Write every line — I read the working, not just the answer.`
-        : 'Fresh problems for this topic. Write every line — I read the working, not just the answer.';
+        ? `These come straight from your notes. Write every line, I read the working, not just the answer.`
+        : 'Fresh problems for this topic. Write every line, I read the working, not just the answer.';
   return (
     <>
       <div className="scroll center stagger" style={{ justifyContent: 'center', gap: 16, padding: '0 26px' }}>
@@ -668,12 +849,61 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
   const gap = list.find((m) => m.severity === 'gap');
   const today = dayOf();
   const allClean = done.length > 0 && clean === done.length;
+  const attempts = useStore((s) => s.attempts);
+  const read = useStore((s) => s.read);
+  const docs = useStore((s) => s.docs);
+  const understood = useStore((s) => s.understood);
+  const goal = useStore((s) => s.profile.dailyXp) || 30;
+  const xpToday = xpByDay({ attempts, read }).get(today) ?? 0;
+  // what this session was worth, by the same rules as the log
+  const earned = done.reduce((sum, r) => sum + (r.verdict === 'solved' ? 10 + (r.marks.filter((m) => m.severity !== 'strategy').length === 0 && r.hintRung < 3 ? 5 : 0) + (r.problem.source === 'review' ? 5 : 0) + (r.hintRung === 0 ? 2 : 0) : 2), 0);
+  const lv = levelOf(totalXp({ attempts, read }));
+  const days = streak(attempts);
+  const touched = new Set(list.map((m) => m.concept));
+  const weak = weaknesses({ attempts, concepts, docs, understood }).filter((w) => (w.concept && touched.has(w.concept)) || w.kind === 'lesson').slice(0, 2);
+  const [party, setParty] = useState(true);
+  useEffect(() => {
+    actions.track('session_end', { solved, total: results.length, seconds: Math.round(seconds) });
+    // once, when the summary first shows
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const scenes = useMemo<Scene[]>(() => {
+    if (solved === 0) return [];
+    const out: Scene[] = [
+      {
+        kind: 'done',
+        title: allClean ? 'Flawless session!' : 'Session complete!',
+        sub: allClean ? 'Every line followed from the one before.' : undefined,
+        stats: [
+          { label: 'XP earned', value: earned, tone: 'xp' },
+          { label: 'Solved', value: solved, of: results.length, tone: 'score' },
+        ],
+      },
+    ];
+    const solvedToday = attempts.filter((a) => a.day === today).length;
+    if (days > 0 && solvedToday <= done.length) {
+      out.push({
+        kind: 'streak',
+        value: days,
+        title: days === 1 ? 'Your streak starts today' : `${days} days in a row!`,
+        sub: days === 1 ? 'Come back tomorrow to make it two.' : 'You showed up again. That is how it sticks.',
+        week: weekStrip({ attempts, read }).map((d) => d.active),
+      });
+    }
+    if (xpToday >= goal && xpToday - earned < goal) out.push({ kind: 'goal', value: xpToday, title: 'Daily goal reached!', sub: 'Anything more today is a bonus.' });
+    const before = levelOf(Math.max(0, totalXp({ attempts, read }) - earned));
+    if (before.level < lv.level) out.push({ kind: 'level', value: lv.level, title: `Level ${lv.level} · ${lv.title}`, sub: 'A new level, earned one checked line at a time.' });
+    return out;
+    // the scenes are fixed the moment the session ends
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  if (party && scenes.length > 0) return <CelebrationFlow scenes={scenes} onDone={() => setParty(false)} />;
   const text = allClean
     ? 'Every line followed from the one before. That’s what solid looks like.'
     : gap
       ? `One thing to tighten: **${CONCEPTS[gap.concept].title.toLowerCase()}**. I’ll bring it back tomorrow.`
       : solved > 0
-        ? 'Good work. The slips I marked are noted — nothing to review, just slow that line down.'
+        ? 'Good work. The slips I marked are noted, nothing to review, just slow that line down.'
         : 'That was a hard set. Have a look at the routes, and we’ll come back to these.';
   return (
     <>
@@ -681,7 +911,20 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
         <div className="center" style={{ padding: '6px 0 4px' }}>
           <LeraSays stack size={112} mood={allClean || solved === done.length ? 'celebrate' : 'proud'} text={text} />
         </div>
-        <div className="row" style={{ gap: 10, marginTop: 14 }}>
+        <div className="reward">
+          <div className="reward-xp">
+            <span className="reward-plus">+<CountUp to={earned} /></span>
+            <span>XP</span>
+          </div>
+          <div className="reward-side">
+            <span className={`streakpill ${days > 0 ? 'lit' : ''}`}><Icon name="flame" size={16} fill /> Day {Math.max(1, days)}</span>
+            <span className="faint" style={{ fontSize: 12.5 }}>Level {lv.level} · {lv.title}</span>
+          </div>
+          <Ring value={Math.min(1, xpToday / goal)} size={58} stroke={7} color="var(--flame)">
+            <span style={{ fontSize: 11, fontWeight: 700 }}>{xpToday >= goal ? 'Goal!' : `${xpToday}/${goal}`}</span>
+          </Ring>
+        </div>
+        <div className="row" style={{ gap: 10, marginTop: 12 }}>
           <div className="stat grow"><b><CountUp to={solved} />/{results.length}</b><span>solved</span></div>
           <div className="stat grow"><b><CountUp to={clean} /></b><span>clean</span></div>
           <div className="stat grow"><b><CountUp to={Math.max(1, Math.round(seconds / 60))} /></b><span>min</span></div>
@@ -698,7 +941,7 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
                   <span className="grow">
                     <b style={{ display: 'block', fontSize: 14.5 }}>{CONCEPTS[m.concept].title}</b>
                     <span className="muted" style={{ fontSize: 13 }}>
-                      {m.severity === 'gap' ? (due && due > today ? `Comes back ${due === addDays(today, 1) ? 'tomorrow' : `on ${due}`}` : 'In your review queue') : c?.rushing ? 'Keeps happening — worth a look' : 'Noted. No review needed.'}
+                      {m.severity === 'gap' ? (due && due > today ? `Comes back ${due === addDays(today, 1) ? 'tomorrow' : `on ${due}`}` : 'In your review queue') : c?.rushing ? 'Keeps happening, worth a look' : 'Noted. No review needed.'}
                     </span>
                   </span>
                   <Icon name="chevron" size={16} />
@@ -707,9 +950,15 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
             })}
           </div>
         )}
+        {weak.length > 0 && (
+          <div className="col" style={{ gap: 10, marginTop: 14 }}>
+            <span className="label">Worth going back to</span>
+            {weak.map((w) => <WeakCard key={w.id} w={w} />)}
+          </div>
+        )}
         <p className="faint" style={{ fontSize: 13, textAlign: 'center', marginTop: 14 }}>{session.title}</p>
       </div>
-      <div className="ws-foot" style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'center' }}>
+      <div className="ws-foot" style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}>
         {gap && (
           <Button3D onClick={() => openOverlay({ name: 'review', concept: gap.concept })}>
             <Icon name="book" size={18} /> Review it now · {CONCEPTS[gap.concept].minutes} min

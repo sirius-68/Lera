@@ -1,0 +1,8 @@
+{
+  "appId": "com.sirius68.lera",
+  "appName": "Lera",
+  "webDir": "dist",
+  "android": {
+    "adjustMarginsForEdgeToEdge": "disable"
+  }
+}

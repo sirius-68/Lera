@@ -1,5 +1,5 @@
 import katex from 'katex';
-import { lineToLatex } from '../engine/parse';
+import { AS_WRITTEN, mathLatex, writtenLatex } from '../engine/latex';
 import { prettyInline } from '../ingest/text';
 
 const cache = new Map<string, string | null>();
@@ -11,7 +11,8 @@ export function typeset(text: string, display = false): string | null {
   if (hit !== undefined) return hit;
   let html: string | null = null;
   try {
-    const latex = lineToLatex(text);
+    // a formula quoted from a document is set the way the document wrote it; anything it cannot place falls back to the engine
+    const latex = text.startsWith(AS_WRITTEN) ? writtenLatex(text.slice(1)) ?? mathLatex(text.slice(1)) : mathLatex(text);
     if (latex) html = katex.renderToString(latex, { displayMode: display, throwOnError: false, output: 'html', strict: 'ignore' });
   } catch {
     html = null;

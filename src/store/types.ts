@@ -1,5 +1,5 @@
 import { AiConfig } from '../ai/providers';
-import { ConceptId, LineStatus, ProblemKind, Severity, Verdict } from '../engine/types';
+import { ConceptId, LineStatus, ProblemKind, Severity, Subject, Verdict } from '../engine/types';
 import { LeraDoc } from '../ingest/types';
 
 export interface Profile {
@@ -9,10 +9,24 @@ export interface Profile {
   language: string;
   /** Answers from the onboarding quiz, in order. */
   goal?: string;
+  /** School, university, self-taught, returning — from onboarding. */
+  stage?: string;
+  /** 'morning' | 'afternoon' | 'evening' | 'night': when reminders should land. */
+  studyTime?: string;
+  /** False after signing out: the app then asks for the password before showing anything. */
+  signedIn?: boolean;
   struggle?: string;
   explainStyle?: string;
   frequency?: string;
   focusMinutes: number;
+  /** What the learner is studying; decides which ideas are offered for practice. */
+  subjects: Subject[];
+  /** How maths feels right now, from onboarding: 0 (lost) … 3 (confident). */
+  feel?: number;
+  /** XP to earn each day. */
+  dailyXp: number;
+  /** 'line' marks each line as it is written; 'end' waits until the learner asks. */
+  checkMode: 'line' | 'end';
   notifications: boolean;
   plan: 'none' | 'trial';
   trialStarted?: string;
@@ -51,6 +65,27 @@ export interface SavedItem {
   topicTitle: string;
   text: string;
   createdAt: string;
+  /** Pinned items sit at the top of the notebook. */
+  pinned?: boolean;
+}
+
+/**
+ * Something done in the app that the attempt log doesn't already record. Kept short (see store/insights.ts).
+ * `d` carries at most a few small values: a topic or concept id, a count, a label.
+ */
+export interface LearnEvent {
+  at: string;
+  t: 'open' | 'onboarded' | 'lesson' | 'session_start' | 'session_end' | 'hint' | 'reveal' | 'answer_only' | 'ask' | 'sense' | 'widget' | 'celebrate' | 'upload';
+  d?: Record<string, string | number | boolean>;
+}
+
+/** One message in a conversation with Lera. */
+export interface ChatMsg {
+  id: string;
+  role: 'user' | 'assistant';
+  text: string;
+  via?: 'ai' | 'local' | 'error';
+  at: string;
 }
 
 /** What Lera knows about one concept for one learner. */
@@ -125,4 +160,10 @@ export interface AppState {
   solved: Record<string, string>;
   /** topicIds whose lesson has been opened */
   read: Record<string, string>;
+  /** conceptId → the learner said the explanation made sense (day) or didn't ('no') */
+  understood: Record<string, string>;
+  /** Conversations with Lera, one thread per lesson (and 'general' for everything else). */
+  chats: Record<string, ChatMsg[]>;
+  /** What else was done in the app, newest last, for the learner model. */
+  events: LearnEvent[];
 }

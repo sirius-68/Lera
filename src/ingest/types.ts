@@ -11,7 +11,15 @@ export interface RawPara {
   scale?: number;
   /** The paragraph is an equation on its own line. */
   math?: boolean;
+  /** A formula that runs over several rows, one per entry: an expression, then "= …", "= …". */
+  rows?: string[];
+  /** Words set beside the formula on the same row. */
+  caption?: string;
+  /** A picture or drawing sits here in the file. */
+  figure?: boolean;
   page?: number;
+  /** Left edge on the page, in points (PDF only) — tells nested contents lines apart. */
+  x?: number;
 }
 
 export interface RawDoc {
@@ -20,15 +28,20 @@ export interface RawDoc {
   title?: string;
   pages?: number;
   paras: RawPara[];
+  /** How chapter and section headings were found, and how many front/back pages were left out. */
+  tocVia?: 'outline' | 'contents' | 'numbering' | 'type';
+  skippedPages?: number;
 }
 
 export type Block =
   | { t: 'h'; text: string }
   | { t: 'p'; text: string }
-  | { t: 'math'; text: string }
+  | { t: 'math'; text: string; steps?: string[]; caption?: string }
   | { t: 'list'; ordered: boolean; items: string[] }
   | { t: 'example'; title: string; lines: string[] }
-  | { t: 'note'; label: string; text: string };
+  | { t: 'note'; label: string; text: string }
+  /** A graph rebuilt from the functions the notes name. `text` is the caption. */
+  | { t: 'graph'; text: string; fns: string[] };
 
 export interface Topic {
   id: string;
@@ -57,6 +70,8 @@ export interface LeraDoc {
   /** How the structure was produced. */
   via: 'local' | 'ai';
   warnings: string[];
+  tocVia?: RawDoc['tocVia'];
+  skippedPages?: number;
 }
 
 export interface IngestProgress {

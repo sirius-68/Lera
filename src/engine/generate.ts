@@ -44,6 +44,10 @@ export const PROMPTS: Record<ProblemKind, string> = {
   factor: 'Factorise',
   evaluate: 'Work out',
   system: 'Solve the system',
+  derivative: 'Differentiate',
+  integral: 'Integrate',
+  definite: 'Evaluate the integral',
+  limit: 'Find the limit',
   open: 'Work through this',
 };
 
@@ -56,7 +60,7 @@ interface Draft {
 }
 
 /** Each concept can produce problems that exercise exactly that idea. */
-const MAKERS: Record<ConceptId, ((r: R) => Draft)[]> = {
+const ALGEBRA_MAKERS: Partial<Record<ConceptId, ((r: R) => Draft)[]>> = {
   'inverse-operations': [
     (r) => {
       const x = nz(r, -9, 9);
@@ -267,15 +271,126 @@ const MAKERS: Record<ConceptId, ((r: R) => Draft)[]> = {
 
 let counter = 0;
 
+/** x^n, written without a ^1 */
+const xp = (n: number): string => (n === 1 ? 'x' : `x^${n}`);
+const D = (body: string, level: 1 | 2 | 3 = 1): Draft => ({ kind: 'derivative', given: `d/dx(${body})`, level });
+const I = (body: string, level: 1 | 2 | 3 = 1): Draft => ({ kind: 'integral', given: `∫ ${body} dx`, level });
+
+/** Calculus 1 and 2. Coefficients are chosen so the answers stay in whole numbers or small fractions. */
+const CALC_MAKERS: Partial<Record<ConceptId, ((r: R) => Draft)[]>> = {
+  limits: [
+    (r) => {
+      const a = int(r, 2, 7);
+      return { kind: 'limit', given: `lim x→${a} (x^2 - ${a * a})/(x - ${a})`, level: 1 };
+    },
+    (r) => {
+      const a = int(r, 1, 4);
+      return { kind: 'limit', given: `lim x→${a} (x^2 ${plus(int(r, 1, 5))}x ${plus(nz(r, -6, 6))})`, level: 1 };
+    },
+    (r) => {
+      const a = int(r, 1, 5);
+      const k = int(r, 1, 6);
+      // (x − a)(x + k) over (x − a)
+      return { kind: 'limit', given: `lim x→${a} (x^2 ${plus(k - a)}x - ${a * k})/(x - ${a})`.replace('+ 0x ', ''), level: 2 };
+    },
+    (r) => {
+      const q = int(r, 1, 4);
+      return { kind: 'limit', given: `lim x→inf (${q * int(r, 1, 5)}x^2 ${plus(nz(r, -5, 5))}x)/(${co(q)}x^2 ${plus(int(r, 1, 7))})`, level: 2 };
+    },
+    (r) => ({ kind: 'limit', given: `lim x→0 sin(${int(r, 2, 6)}x)/x`, level: 3 }),
+  ],
+  'power-rule': [
+    (r) => D(`${co(int(r, 2, 6))}${xp(int(r, 2, 5))}`, 1),
+    (r) => D(`${co(int(r, 1, 5))}${xp(int(r, 2, 4))} ${plus(nz(r, -7, 7))}x ${plus(nz(r, -9, 9))}`, 1),
+    (r) => D(`x^${int(r, 4, 6)} ${plus(nz(r, -4, 4))}x^${int(r, 2, 3)} ${plus(nz(r, -8, 8))}`, 2),
+    (r) => D(`${int(r, 2, 6)}/x^${int(r, 1, 3)}`.replace('x^1', 'x'), 3),
+  ],
+  'product-rule': [
+    (r) => D(`${xp(int(r, 1, 4))} ${pick(r, ['sin(x)', 'cos(x)', 'e^x'])}`, 1),
+    (r) => D(`(${co(int(r, 1, 4))}x ${plus(nz(r, -5, 5))})(x^2 ${plus(nz(r, -6, 6))})`, 2),
+    (r) => D(`${xp(int(r, 2, 4))} ln(x)`, 2),
+    (r) => D(`e^x ${pick(r, ['sin(x)', 'cos(x)'])}`, 3),
+  ],
+  'quotient-rule': [
+    (r) => D(`(${co(int(r, 1, 5))}x ${plus(nz(r, -6, 6))})/(x ${plus(nz(r, -5, 5))})`, 1),
+    (r) => D(`x^2/(x ${plus(nz(r, -5, 5))})`, 2),
+    (r) => D(`${pick(r, ['sin(x)', 'e^x', 'cos(x)'])}/${xp(int(r, 1, 2))}`, 3),
+  ],
+  'chain-rule': [
+    (r) => D(`(${co(int(r, 2, 5))}x ${plus(nz(r, -6, 6))})^${int(r, 2, 5)}`, 1),
+    (r) => D(`${pick(r, ['sin', 'cos'])}(${int(r, 2, 7)}x)`, 1),
+    (r) => D(`(x^2 ${plus(nz(r, -6, 6))})^${int(r, 2, 4)}`, 2),
+    (r) => D(`e^(${int(r, 2, 6)}x)`, 2),
+    (r) => D(`ln(x^2 ${plus(int(r, 1, 8))})`, 3),
+    (r) => D(`sin(x^${int(r, 2, 3)})`, 3),
+  ],
+  'trig-derivatives': [
+    (r) => D(`${co(int(r, 1, 6))}sin(x) ${plus(nz(r, -6, 6))}cos(x)`.replace(/ 1cos/, ' cos'), 1),
+    (r) => D(`${xp(int(r, 2, 4))} ${plus(nz(r, -5, 5))}cos(x)`.replace(/ 1cos/, ' cos'), 1),
+    (r) => D(`${co(int(r, 2, 5))}tan(x) ${plus(nz(r, -5, 5))}sin(x)`.replace(/ 1sin/, ' sin'), 2),
+  ],
+  'exp-log-derivatives': [
+    (r) => D(`${co(int(r, 2, 6))}e^x ${plus(nz(r, -4, 4))}${xp(int(r, 2, 3))}`.replace(/ 1x/, ' x'), 1),
+    (r) => D(`${co(int(r, 2, 6))}ln(x) ${plus(nz(r, -5, 5))}x`, 1),
+    (r) => D(`e^(${int(r, 2, 6)}x) ${plus(nz(r, -5, 5))}x`, 2),
+  ],
+  antiderivatives: [
+    (r) => {
+      const n = int(r, 1, 4);
+      return I(`${co((n + 1) * int(r, 1, 3))}${xp(n)}`, 1);
+    },
+    (r) => I(`(${co(3 * int(r, 1, 3))}x^2 ${plus(2 * nz(r, -4, 4))}x ${plus(nz(r, -7, 7))})`, 1),
+    (r) => I(`(${co(int(r, 2, 6))}${pick(r, ['cos(x)', 'sin(x)'])} ${plus(2 * nz(r, -4, 4))}x)`, 2),
+    (r) => I(`(${co(int(r, 2, 6))}e^x ${plus(3 * nz(r, -3, 3))}x^2)`, 2),
+    (r) => I(`${int(r, 2, 6)}/x`, 3),
+  ],
+  'constant-of-integration': [
+    (r) => I(`${2 * int(r, 1, 6)}x`, 1),
+    (r) => I(`${int(r, 2, 9)}`, 1),
+    (r) => I(`${co(3 * int(r, 1, 3))}x^2`, 1),
+    (r) => I(pick(r, ['cos(x)', 'e^x', 'sin(x)']), 2),
+  ],
+  'u-substitution': [
+    (r) => I(`${pick(r, ['cos', 'sin'])}(${int(r, 2, 6)}x)`, 1),
+    (r) => I(`e^(${int(r, 2, 6)}x)`, 1),
+    (r) => I(`(${co(int(r, 2, 4))}x ${plus(nz(r, -5, 5))})^${int(r, 2, 4)}`, 2),
+    (r) => I(`2x(x^2 ${plus(nz(r, -6, 6))})^${int(r, 2, 4)}`, 2),
+    (r) => I(`x ${pick(r, ['cos', 'sin'])}(x^2)`, 3),
+    (r) => I(`${pick(r, ['cos(x) sin(x)^2', 'sin(x) cos(x)^3', 'x e^(x^2)'])}`, 3),
+  ],
+  'integration-by-parts': [
+    (r) => I(`${co(int(r, 1, 4))}x e^x`, 1),
+    (r) => I(`x ${pick(r, ['cos(x)', 'sin(x)'])}`, 1),
+    (r) => I(`x e^(${int(r, 2, 4)}x)`, 2),
+    (r) => I(pick(r, ['ln(x)', 'x ln(x)']), 2),
+    (r) => I(`x^2 ${pick(r, ['e^x', 'sin(x)'])}`, 3),
+  ],
+  'definite-integrals': [
+    (r) => {
+      const n = int(r, 1, 3);
+      return { kind: 'definite', given: `∫[0, ${int(r, 1, 3)}] ${co((n + 1) * int(r, 1, 2))}${xp(n)} dx`, level: 1 };
+    },
+    (r) => {
+      const a = int(r, 0, 2);
+      return { kind: 'definite', given: `∫[${a}, ${a + int(r, 1, 3)}] (2x ${plus(nz(r, -4, 4))}) dx`, level: 1 };
+    },
+    (r) => ({ kind: 'definite', given: `∫[1, ${int(r, 2, 4)}] (3x^2 ${plus(2 * nz(r, -3, 3))}x) dx`, level: 2 }),
+    (r) => ({ kind: 'definite', given: `∫[0, ${pick(r, ['pi', 'pi/2'])}] ${pick(r, ['sin(x)', 'cos(x)'])} dx`, level: 3 }),
+  ],
+};
+
+const MAKERS = { ...ALGEBRA_MAKERS, ...CALC_MAKERS } as Record<ConceptId, ((r: R) => Draft)[]>;
+
 function build(d: Draft, concept: ConceptId, source: Problem['source']): Problem {
   counter++;
-  const given = d.given.replace(/\+ -/g, '- ').replace(/\s+/g, ' ').replace(/ 1x/g, ' x').trim();
+  const given = d.given.replace(/\+ -/g, '- ').replace(/\s+/g, ' ').replace(/ 1x/g, ' x').replace(/\((-?)1x/g, '($1x').trim();
   return {
     id: `g-${concept}-${seedFrom(given)}-${counter}`,
     kind: d.kind,
     prompt: d.prompt ?? PROMPTS[d.kind],
     given,
     subs: d.subs,
+    variable: d.kind === 'derivative' || d.kind === 'integral' || d.kind === 'definite' || d.kind === 'limit' ? 'x' : undefined,
     concepts: [concept],
     source,
     level: d.level ?? 1,

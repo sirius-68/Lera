@@ -190,6 +190,8 @@ let toastMsg: { text: string; id: number } | null = null;
 const toastSubs = new Set<() => void>();
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
+export { leraReact } from '../mascot/Lera';
+
 export function toast(text: string, ms = 2400): void {
   toastMsg = { text, id: Date.now() };
   toastSubs.forEach((l) => l());
@@ -382,21 +384,3 @@ export function LeraSays({ text, mood = 'idle', size = 56, stack, solid, sleepAf
   );
 }
 
-export function Dots({ count, active }: { count: number; active: number }) {
-  return (
-    <div style={{ display: 'flex', gap: 8, justifyContent: 'center', padding: '10px 0' }} aria-hidden="true">
-      {Array.from({ length: count }).map((_, i) => (
-        <i
-          key={i}
-          style={{
-            width: i === active ? 24 : 8,
-            height: 8,
-            borderRadius: 4,
-            background: i === active ? 'var(--brand)' : '#d0d0dd',
-            transition: 'all 0.35s var(--spring)',
-          }}
-        />
-      ))}
-    </div>
-  );
-}

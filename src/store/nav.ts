@@ -10,6 +10,8 @@ export type Route =
   | { name: 'session'; topicId?: string; problems?: Problem[]; title?: string }
   | { name: 'progress' }
   | { name: 'settings' }
+  | { name: 'streak' }
+  | { name: 'saved'; topicId?: string }
   | { name: 'upload' };
 
 export type Overlay =
@@ -27,11 +29,47 @@ const TABS = ['home', 'lessons', 'practice', 'progress'];
 
 let nav: NavState = { stack: [{ name: 'home' }], dir: 0, overlay: null };
 const listeners = new Set<() => void>();
-const emit = () => listeners.forEach((l) => l());
+
+/*
+ * The phone's own back button (and the browser's) walks the same stack as the arrows on screen.
+ * Every pushed screen or open sheet has one entry in the browser history; "back" pops both.
+ */
+let pushed = 0;
+let skipPop = 0;
+let guard: (() => boolean) | null = null;
+const canHistory = typeof window !== 'undefined' && typeof history !== 'undefined';
+
+function syncHistory(): void {
+  if (!canHistory) return;
+  const want = nav.stack.length - 1 + (nav.overlay ? 1 : 0);
+  try {
+    while (pushed < want) {
+      history.pushState({ lera: pushed + 1 }, '');
+      pushed++;
+    }
+    if (pushed > want) {
+      skipPop++;
+      history.go(want - pushed);
+      pushed = want;
+    }
+  } catch {
+    /* sandboxed pages can refuse history; the on-screen arrows still work */
+  }
+}
+
+const emit = () => {
+  syncHistory();
+  listeners.forEach((l) => l());
+};
+
+/** A screen can ask to be consulted before "back" leaves it (a practice session in progress, say). Return true to stay. */
+export const setBackGuard = (fn: (() => boolean) | null): void => {
+  guard = fn;
+};
 
 export const go = (route: Route): void => {
   // the four tabs replace each other; everything else is pushed on top
-  if (TABS.includes(route.name)) nav = { ...nav, stack: [route], dir: 0 };
+  if (TABS.includes(route.name)) nav = { ...nav, stack: [route], dir: 0, overlay: null };
   else nav = { ...nav, stack: [...nav.stack, route], dir: 1 };
   emit();
 };
@@ -41,7 +79,7 @@ export const replace = (route: Route): void => {
   emit();
 };
 
-export const back = (): void => {
+function pop(): void {
   if (nav.overlay) {
     nav = { ...nav, overlay: null };
   } else if (nav.stack.length > 1) {
@@ -49,8 +87,29 @@ export const back = (): void => {
   } else if (nav.stack[0].name !== 'home') {
     nav = { ...nav, stack: [{ name: 'home' }], dir: -1 };
   }
+}
+
+export const back = (): void => {
+  pop();
   emit();
 };
+
+if (canHistory) {
+  window.addEventListener('popstate', () => {
+    if (skipPop > 0) {
+      skipPop--;
+      return;
+    }
+    // the system took one history entry away; follow it, unless the screen wants to stay
+    pushed = Math.max(0, pushed - 1);
+    if (!nav.overlay && guard && guard()) {
+      syncHistory();
+      return;
+    }
+    pop();
+    emit();
+  });
+}
 
 export const resetNav = (): void => {
   nav = { stack: [{ name: 'home' }], dir: 0, overlay: null };

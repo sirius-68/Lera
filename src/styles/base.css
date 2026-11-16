@@ -27,7 +27,8 @@
   --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --font: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  /* headings use the same family as everything else, set heavier — one voice across the app */
+  --serif: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
 }

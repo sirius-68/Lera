@@ -57,7 +57,7 @@ export function UploadPicker({ onPick, onSkip, compact }: { onPick: (s: Source) 
       {!compact && <img src={uploadImg} alt="" style={{ width: 210, height: 210, objectFit: 'contain', mixBlendMode: 'multiply' }} />}
       <h2 style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.2 }}>Upload your notes</h2>
       <p className="muted" style={{ fontSize: 15.5, lineHeight: 1.5, maxWidth: 300 }}>
-        A PDF or Word file with your algebra notes. Lera turns it into lessons and puts every exercise it finds under Practice.
+        A PDF or Word file with your algebra or calculus notes. Lera turns it into lessons, rebuilds its graphs and puts every exercise it finds under Practice.
       </p>
       <div
         className={`drop ${over ? 'over' : ''}`}
@@ -169,6 +169,15 @@ export function Processing({ source, onDone, onCancel }: { source: Source; onDon
             </div>
           ))}
         </div>
+        {(doc.tocVia === 'outline' || doc.tocVia === 'contents') && (
+          <p className="found">
+            <Icon name="check" size={16} stroke={3} />
+            <span>
+              Chapters and sections taken from {doc.tocVia === 'outline' ? 'the file’s own table of contents' : 'the printed contents page'}
+              {doc.skippedPages ? ` · ${doc.skippedPages} ${doc.skippedPages === 1 ? 'page' : 'pages'} of cover and front matter left out` : ''}.
+            </span>
+          </p>
+        )}
         {doc.warnings.map((w) => (
           <p key={w} className="warn">
             <Icon name="alert" size={17} /> <span>{w}</span>
@@ -180,8 +189,9 @@ export function Processing({ source, onDone, onCancel }: { source: Source; onDon
           </p>
         )}
         <Button3D sheen onClick={() => onDone(doc)}>
-          Continue
+          Start at the beginning <Icon name="arrow" size={18} />
         </Button3D>
+        {doc.units[0]?.topics[0] && <span className="faint" style={{ fontSize: 13, textAlign: 'center' }}>{doc.units[0].title} · {doc.units[0].topics[0].title}</span>}
       </div>
     );
   }
@@ -226,7 +236,9 @@ export function UploadScreen() {
             onCancel={() => setSource(null)}
             onDone={(doc) => {
               actions.addDoc(doc);
-              replace({ name: 'lessons' });
+              // a new book opens on its first chapter's first lesson
+              const first = doc.units[0]?.topics[0];
+              replace(first ? { name: 'lesson', topicId: first.id } : { name: 'lessons' });
             }}
           />
         ) : (

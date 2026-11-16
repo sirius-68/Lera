@@ -37,7 +37,7 @@ export const PROVIDERS: Record<Exclude<ProviderId, 'none'>, ProviderPreset> = {
     defaultModel: 'openai/gpt-oss-120b',
     keyUrl: 'https://console.groq.com/keys',
     needsKey: true,
-    note: 'Free plan with daily limits. Very fast replies — good for hints and “explain this”.',
+    note: 'Free plan with daily limits. Very fast replies, good for hints and “explain this”.',
   },
   openrouter: {
     id: 'openrouter',

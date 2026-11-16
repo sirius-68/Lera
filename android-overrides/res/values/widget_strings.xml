@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_name">Lera streak</string>
+    <string name="widget_wide_name">Lera streak, with your week</string>
+    <string name="widget_description">Your streak, and how Lera feels about it right now.</string>
+    <string name="widget_wide_description">Your streak, this week\'s days, and Lera.</string>
+    <string name="widget_lera">Lera. Tap her.</string>
+    <string name="widget_default_line">Let\'s solve one?</string>
+</resources>

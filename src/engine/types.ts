@@ -19,7 +19,23 @@ export type ConceptId =
   | 'order-of-operations'
   | 'quadratic-formula'
   | 'systems'
-  | 'simplest-form';
+  | 'simplest-form'
+  // calculus 1
+  | 'limits'
+  | 'power-rule'
+  | 'product-rule'
+  | 'quotient-rule'
+  | 'chain-rule'
+  | 'trig-derivatives'
+  | 'exp-log-derivatives'
+  // calculus 2
+  | 'antiderivatives'
+  | 'constant-of-integration'
+  | 'u-substitution'
+  | 'integration-by-parts'
+  | 'definite-integrals';
+
+export type Subject = 'algebra' | 'calc1' | 'calc2';
 
 export type ProblemKind =
   | 'linear'
@@ -31,6 +47,10 @@ export type ProblemKind =
   | 'factor'
   | 'evaluate'
   | 'system'
+  | 'derivative'
+  | 'integral'
+  | 'definite'
+  | 'limit'
   | 'open';
 
 export interface Problem {
@@ -76,7 +96,7 @@ export interface Diagnosis {
 export type LineStatus =
   | 'ok' //          follows from the line above, and still true to the problem
   | 'wrong' //       does not follow from the line above
-  | 'carried' //     follows from the line above — but that line was already off
+  | 'carried' //     follows from the line above, but that line was already off
   | 'recovered' //   doesn't follow from the (wrong) line above, yet is correct again
   | 'unreadable' //  couldn't be parsed
   | 'unchecked'; //  parsed, but not something that can be compared
@@ -111,7 +131,7 @@ export interface AttemptAnalysis {
 
 export type StepTag =
   | 'clear-fractions' | 'expand' | 'collect' | 'move' | 'divide' | 'standard-form' | 'factor' | 'common-factor'
-  | 'zero-product' | 'sqrt' | 'formula' | 'substitute' | 'evaluate' | 'cancel' | 'system' | 'final';
+  | 'zero-product' | 'sqrt' | 'formula' | 'substitute' | 'evaluate' | 'cancel' | 'system' | 'calc' | 'final';
 
 export interface SolutionStep {
   line: string;

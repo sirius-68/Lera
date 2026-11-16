@@ -1,12 +1,16 @@
 import { useEffect } from 'react';
 import { HomeScreen, LessonsScreen, PracticeScreen, ProgressScreen } from './screens/Main';
 import { LessonScreen } from './screens/Lesson';
+import { AuthGate } from './screens/Auth';
 import { Onboarding } from './screens/Onboarding';
 import { AskSheet, ReviewSheet } from './screens/Overlays';
 import { SessionScreen } from './screens/Session';
+import { SavedScreen } from './screens/Saved';
 import { SettingsScreen } from './screens/Settings';
+import { StreakScreen } from './screens/Streak';
 import { UploadScreen } from './screens/Upload';
-import { useStore } from './store';
+import { useHydrated, useStore } from './store';
+import { Lera } from './mascot/Lera';
 import { back, Route, useNav } from './store/nav';
 import { Confirmer, Toaster } from './ui/kit';
 
@@ -28,11 +32,16 @@ function Screen({ route, dir }: { route: Route; dir: number }) {
       return <SettingsScreen />;
     case 'upload':
       return <UploadScreen />;
+    case 'streak':
+      return <StreakScreen />;
+    case 'saved':
+      return <SavedScreen />;
   }
 }
 
 export function App() {
   const onboarded = useStore((s) => s.profile.onboarded);
+  const lockedOut = useStore((s) => !!s.profile.email && s.profile.signedIn === false);
   const { stack, dir, overlay } = useNav();
 
   useEffect(() => {
@@ -43,10 +52,30 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [overlay, stack]);
 
+  const ready = useHydrated();
+  if (!ready) {
+    // the notes are being read back from the device: a blink, on all but the largest books
+    return (
+      <div className="app">
+        <div className="boot"><Lera size={84} mood="idle" interactive={false} /></div>
+      </div>
+    );
+  }
+
   if (!onboarded) {
     return (
       <div className="app">
         <Onboarding />
+        <Toaster />
+      </div>
+    );
+  }
+
+  if (lockedOut) {
+    // signed out: nothing of the app is shown until the password is given again
+    return (
+      <div className="app">
+        <AuthGate />
         <Toaster />
       </div>
     );

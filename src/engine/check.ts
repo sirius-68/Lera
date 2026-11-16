@@ -329,7 +329,7 @@ export function finalForm(prep: Prepared, st: Statement): FinalCheck {
           final: false,
           remaining:
             s.reason === 'number'
-              ? 'Almost — work out that last number.'
+              ? 'Almost, work out that last number.'
               : `${v} isn’t on its own yet. Keep going until the line reads ${v} = a number.`,
         };
     }
@@ -344,7 +344,7 @@ export function finalForm(prep: Prepared, st: Statement): FinalCheck {
         return {
           final: false,
           remaining:
-            s.reason === 'number' ? 'Almost — work out that last number.' : `Get ${v} on its own on one side.`,
+            s.reason === 'number' ? 'Almost, work out that last number.' : `Get ${v} on its own on one side.`,
         };
     }
     return { final: true };

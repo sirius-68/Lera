@@ -305,7 +305,7 @@ const exponentRule: NodeRule = (n) => {
           'signed-arithmetic',
           'gap',
           'A negative squared is positive.',
-          `${m(n)} is ${m(pow(n.base, n.exp))} — two negatives multiplied — so the result is positive.`,
+          `${m(n)} is ${m(pow(n.base, n.exp))}, two negatives multiplied, so the result is positive.`,
         ),
     });
   }
@@ -668,7 +668,7 @@ function* coefficientCandidates(prev: Statement): Generator<Candidate> {
           'inverse-operations',
           'gap',
           'Undo multiplying by dividing.',
-          `In ${m(term)} the ${m(lit(a))} multiplies ${m(x)}. Subtracting it doesn’t undo that — divide both sides by ${m(lit(a))} instead.`,
+          `In ${m(term)} the ${m(lit(a))} multiplies ${m(x)}. Subtracting it doesn’t undo that, divide both sides by ${m(lit(a))} instead.`,
         ),
     };
     yield {
@@ -771,7 +771,7 @@ function* clearingCandidates(prev: Statement): Generator<Candidate> {
             'clearing-fractions',
             'gap',
             'Multiply every term when clearing a fraction.',
-            `Multiplying by ${m(lit(k))} to remove the fraction has to hit every term on both sides — including the ones that weren’t fractions.`,
+            `Multiplying by ${m(lit(k))} to remove the fraction has to hit every term on both sides, including the ones that weren’t fractions.`,
           ),
       };
     }
@@ -828,7 +828,7 @@ function rootsDiagnosis(prep: Prepared, prev: Statement, cur: Statement): Draft 
         'dividing-by-variable',
         'gap',
         `Dividing by ${v} threw away ${v} = 0.`,
-        `Dividing both sides by ${m(v)} is only safe when ${m(v)} can’t be zero — and here ${m(`${v} = 0`)} was a solution. Bring everything to one side and factor instead.`,
+        `Dividing both sides by ${m(v)} is only safe when ${m(v)} can’t be zero, and here ${m(`${v} = 0`)} was a solution. Bring everything to one side and factor instead.`,
       );
     }
     return d(
@@ -864,7 +864,7 @@ function rootsDiagnosis(prep: Prepared, prev: Statement, cur: Statement): Draft 
         'factoring',
         'gap',
         'Check the signs inside the brackets.',
-        `Multiply your brackets back out and compare with the line above — the middle term comes out with the opposite sign. Swap the signs in the brackets.`,
+        `Multiply your brackets back out and compare with the line above, the middle term comes out with the opposite sign. Swap the signs in the brackets.`,
       );
     }
     return d(
@@ -898,7 +898,7 @@ function factoringDiagnosis(prev: Node, cur: Node): Draft | null {
       'factoring',
       'gap',
       'Check the signs inside the brackets.',
-      `Your brackets multiply back to ${m(back)}. The numbers are right but the middle term has the wrong sign — flip the signs in the brackets.`,
+      `Your brackets multiply back to ${m(back)}. The numbers are right but the middle term has the wrong sign, flip the signs in the brackets.`,
     );
   }
   if (fEq(a[0], b[0]) && !fEq(a[1], b[1])) {
@@ -1001,6 +1001,10 @@ const KIND_CONCEPT: Record<ProblemKind, ConceptId> = {
   factor: 'factoring',
   evaluate: 'order-of-operations',
   system: 'systems',
+  derivative: 'power-rule',
+  integral: 'antiderivatives',
+  definite: 'definite-integrals',
+  limit: 'limits',
   open: 'arithmetic',
 };
 
@@ -1155,7 +1159,7 @@ export function diagnose(prep: Prepared, prev: Statement, cur: Statement): Diagn
         involvesNegatives ? 'signed-arithmetic' : 'arithmetic',
         'slip',
         'One number slipped.',
-        `You wrote ${m(fix.was)} where it should be ${m(lit(fix.shouldBe))}. The method is fine — it’s just the calculation.`,
+        `You wrote ${m(fix.was)} where it should be ${m(lit(fix.shouldBe))}. The method is fine, it’s just the calculation.`,
       ),
       fixedText,
     );

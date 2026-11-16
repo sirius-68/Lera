@@ -3,6 +3,7 @@ import { Prepared, exprChain, finalForm, prepare, relate } from './check';
 import { diagnose, hasProductOfSums } from './diagnose';
 import { parseLine } from './parse';
 import { nextStep, solutionSteps } from './steps';
+import { calcAnalyze, calcAnswer, calcHint, calcPath, isCalc } from './calc/check';
 import { AttemptAnalysis, CheckedLine, ConceptId, Diagnosis, Problem, SolutionStep, StepTag } from './types';
 
 /**
@@ -13,6 +14,7 @@ import { AttemptAnalysis, CheckedLine, ConceptId, Diagnosis, Problem, SolutionSt
  * mistake is marked once instead of on every line after it.
  */
 export function analyze(problem: Problem, rawLines: string[]): AttemptAnalysis {
+  if (isCalc(problem.kind)) return calcAnalyze(problem, rawLines);
   const prep = prepare(problem);
   const texts = rawLines.map((l) => l.trim()).filter((l) => l.length > 0);
   if (!prep) {
@@ -113,7 +115,7 @@ export function analyze(problem: Problem, rawLines: string[]): AttemptAnalysis {
       concept: problem.concepts[0] ?? 'simplest-form',
       severity: 'strategy',
       title: 'Right answer, long road.',
-      message: `You got there in ${steps} lines; it can be done in ${cleanSteps}. Nothing was wrong — there’s just a shorter route worth seeing.`,
+      message: `You got there in ${steps} lines; it can be done in ${cleanSteps}. Nothing was wrong, there’s just a shorter route worth seeing.`,
     });
   }
 
@@ -204,18 +206,19 @@ const NUDGE: Record<StepTag, string> = {
   'clear-fractions': 'The fractions are making this harder than it needs to be. What could you multiply everything by to get rid of them?',
   expand: 'There are brackets in the way. What does the number outside do to each term inside?',
   collect: 'Some terms on the same side are the same kind. What happens if you combine them?',
-  move: 'You want the unknown on one side and plain numbers on the other. Which term could you move — and what happens to its sign?',
+  move: 'You want the unknown on one side and plain numbers on the other. Which term could you move, and what happens to its sign?',
   divide: 'The unknown is being multiplied by a number. What undoes multiplying?',
   'standard-form': 'Quadratics are easiest when one side is zero. What would you move across?',
   factor: 'Can you write this as two brackets multiplied together?',
   'common-factor': 'Look at what every term has in common. Can you take it outside a bracket?',
   'zero-product': 'If two things multiply to make zero, what must be true about one of them?',
-  sqrt: 'What undoes squaring — and how many answers does it give?',
+  sqrt: 'What undoes squaring, and how many answers does it give?',
   formula: 'This one won’t split into neat brackets. Which formula works for every quadratic?',
   substitute: 'Start by swapping each letter for its value. Use brackets around negatives.',
   evaluate: 'Which operation has to happen first here?',
   cancel: 'Is there a factor that appears on both the top and the bottom?',
   system: 'Could you add or subtract the two equations so that one letter disappears?',
+  calc: 'Which rule fits the shape of this one?',
   final: 'You’re nearly there. What does the last line need to look like?',
 };
 
@@ -249,6 +252,10 @@ const TAG_CONCEPT: Partial<Record<StepTag, ConceptId>> = {
 
 /** Three rungs of help for wherever the student currently is. */
 export function hintLadder(problem: Problem, rawLines: string[]): HintLadder | null {
+  if (isCalc(problem.kind)) {
+    const h = calcHint(problem, rawLines);
+    return h ? { nudge: h.nudge, method: h.method, line: h.line, tag: 'calc', concept: h.concept } : null;
+  }
   const prep = prepare(problem);
   if (!prep) return null;
   const a = analyze(problem, rawLines);
@@ -267,12 +274,14 @@ export function hintLadder(problem: Problem, rawLines: string[]): HintLadder | n
 
 /** The clean path for a problem, for the "your route vs a clean route" comparison. */
 export function cleanPath(problem: Problem): SolutionStep[] {
+  if (isCalc(problem.kind)) return calcPath(problem);
   const prep = prepare(problem);
   return prep ? solutionSteps(prep) : [];
 }
 
 /** Final answer as text, when the engine can work it out. */
 export function answerOf(problem: Problem): string | null {
+  if (isCalc(problem.kind)) return calcAnswer(problem);
   const path = cleanPath(problem);
   return path.length ? path[path.length - 1].line : null;
 }

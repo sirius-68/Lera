@@ -8,7 +8,6 @@
 .wordmark { font-family: var(--serif); font-size: 64px; font-weight: 700; letter-spacing: -0.02em; margin-top: 6px; animation: rise 0.7s 0.35s var(--ease) both; }
 .splash-tag { font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.8; animation: fade 0.8s 0.9s both; max-width: 260px; text-align: center; line-height: 1.6; }
 .splash-mark { filter: drop-shadow(0 14px 22px rgba(20, 14, 90, 0.35)); }
-.splash-mark .lera rect:first-of-type { fill: #7d75ff; }
 .slide-img { width: 78%; max-width: 290px; max-height: 38vh; object-fit: contain; animation: pop 0.6s var(--spring) both; }
 .option {
   display: flex; align-items: center; gap: 12px; width: 100%;
@@ -186,7 +185,9 @@
 .review-link:active { transform: scale(0.96); background: var(--tint-2); }
 .review-link .faint { font-weight: 500; color: #8a85c9; }
 .entry { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 16px; background: #fff; border: 2px solid var(--brand); box-shadow: 0 0 0 4px var(--tint); animation: rise 0.3s var(--ease) both; }
-.entry[data-shake] { animation: wobble 0.42s var(--ease); }
+.entry[data-shake='a'] { animation: wobble 0.42s var(--ease); }
+.entry[data-shake='b'] { animation: wobble-b 0.42s var(--ease); }
+@keyframes wobble-b { 0%, 100% { transform: none; } 20% { transform: translateX(-6px); } 50% { transform: translateX(5px); } 80% { transform: translateX(-2px); } }
 .preview { font-size: 19px; min-height: 28px; padding-bottom: 2px; overflow-x: auto; scrollbar-width: none; }
 .mathin { width: 100%; border: 0; outline: none; background: transparent; padding: 4px 0; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 16px; color: var(--ink-2); caret-color: var(--brand); }
 .mathin::placeholder { font-family: var(--font); color: var(--ink-3); }

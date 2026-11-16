@@ -231,7 +231,7 @@ function equationSteps(prep: Prepared, st: Statement, isIneq: boolean): Solution
     if (!isolated) out.push({ line: `${v}^2 = ${fText(kVal)}`, why: `Get ${v}² on its own.`, tag: 'move' });
     out.push({
       line: rootsLine(v, roots),
-      why: 'Take the square root of both sides — a square has a positive and a negative root.',
+      why: 'Take the square root of both sides, a square has a positive and a negative root.',
       tag: 'sqrt',
     });
     return out;

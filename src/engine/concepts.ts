@@ -1,3 +1,4 @@
+import { CALC_CONCEPTS } from './concepts-calc';
 import { ConceptId, SolutionStep } from './types';
 
 /**
@@ -23,13 +24,13 @@ export interface Concept {
   keywords: string[];
 }
 
-export const CONCEPTS: Record<ConceptId, Concept> = {
+const ALGEBRA_CONCEPTS: Partial<Record<ConceptId, Concept>> = {
   'inverse-operations': {
     id: 'inverse-operations',
     title: 'Moving terms across the equals sign',
     short: 'A term changes sign when it crosses over, because you do the opposite to both sides.',
     explain: [
-      'An equation is a balance. Whatever you do to one side, you do to the other — that is the only rule, and “moving” a term is shorthand for it.',
+      'An equation is a balance. Whatever you do to one side, you do to the other, that is the only rule, and “moving” a term is shorthand for it.',
       'To get rid of $+ 4$ on the left you subtract 4 from both sides. The left loses its 4; the right gains a $- 4$. It looks as if the 4 jumped across and changed sign.',
       'So: added terms arrive subtracted, subtracted terms arrive added. And a number that multiplies the unknown is undone by dividing, not by subtracting.',
     ],
@@ -50,7 +51,7 @@ export const CONCEPTS: Record<ConceptId, Concept> = {
     title: 'Doing the same to every term',
     short: 'Dividing or multiplying an equation applies to every term on both sides.',
     explain: [
-      'When you divide an equation by 2, you are dividing the whole left side and the whole right side — which means every term in them.',
+      'When you divide an equation by 2, you are dividing the whole left side and the whole right side, which means every term in them.',
       'It is tempting to divide only the term you care about. $2x + 6 = 10$ divided by 2 is $x + 3 = 5$, not $x + 6 = 5$.',
       'A safe habit: move the plain numbers away first, so that when you divide there is only one term on each side.',
     ],
@@ -69,7 +70,7 @@ export const CONCEPTS: Record<ConceptId, Concept> = {
   distributive: {
     id: 'distributive',
     title: 'Multiplying out brackets',
-    short: 'The term outside multiplies every term inside — and a negative outside flips every sign.',
+    short: 'The term outside multiplies every term inside, and a negative outside flips every sign.',
     explain: [
       'A number in front of a bracket multiplies everything in it: $3(x + 2)$ means three lots of $x$ and three lots of 2, so $3x + 6$.',
       'A minus sign in front of a bracket is a hidden $-1$. It multiplies every term too, so every sign inside flips: $-(x - 5)$ is $-x + 5$.',
@@ -93,7 +94,7 @@ export const CONCEPTS: Record<ConceptId, Concept> = {
     short: 'Only terms with exactly the same letters and powers can be added together.',
     explain: [
       'Like terms have the same letters raised to the same powers: $3x$ and $5x$ are alike; $3x$ and $5$ are not; $3x$ and $5x^2$ are not.',
-      'To add like terms, add the numbers in front and keep the letter part exactly as it is: $3x + 5x = 8x$. The power does not change — that only happens when you multiply.',
+      'To add like terms, add the numbers in front and keep the letter part exactly as it is: $3x + 5x = 8x$. The power does not change, that only happens when you multiply.',
       'Unlike terms simply stay next to each other. $2x + 3$ is already as simple as it gets.',
     ],
     trap: { wrong: '2x + 3  →  5x', right: '2x + 3  stays  2x + 3', note: 'A number and an x-term are different kinds of thing.' },
@@ -154,7 +155,7 @@ export const CONCEPTS: Record<ConceptId, Concept> = {
     title: 'Laws of exponents',
     short: 'Multiplying powers adds exponents; a power of a power multiplies them.',
     explain: [
-      'An exponent counts how many times something is multiplied. $x^2 * x^3$ is two x’s times three x’s — five in all — so $x^5$. Multiplying adds the exponents.',
+      'An exponent counts how many times something is multiplied. $x^2 * x^3$ is two x’s times three x’s, five in all, so $x^5$. Multiplying adds the exponents.',
       'A power of a power repeats the whole thing: $(x^2)^3$ is $x^2 * x^2 * x^2 = x^6$. That multiplies the exponents.',
       'A power outside a bracket applies to everything inside, numbers included: $(2x)^3 = 8x^3$. Dividing powers subtracts: $x^5 / x^2 = x^3$.',
     ],
@@ -177,7 +178,7 @@ export const CONCEPTS: Record<ConceptId, Concept> = {
     explain: [
       'Two brackets side by side are multiplied. Each term of the first meets each term of the second: $(x + 3)(x - 2)$ makes four products.',
       'Squaring a bracket means multiplying it by itself: $(x + 3)^2 = (x + 3)(x + 3) = x^2 + 6x + 9$. The middle term comes from the two cross products.',
-      'The classic shortcut that does not work is squaring each term on its own. $(x + 3)^2$ is not $x^2 + 9$ — try $x = 1$: 16 against 10.',
+      'The classic shortcut that does not work is squaring each term on its own. $(x + 3)^2$ is not $x^2 + 9$, try $x = 1$: 16 against 10.',
     ],
     trap: { wrong: '(x + 3)^2  →  x^2 + 9', right: '(x + 3)^2  →  x^2 + 6x + 9', note: 'The cross terms 3x and 3x are missing.' },
     example: {
@@ -198,7 +199,7 @@ export const CONCEPTS: Record<ConceptId, Concept> = {
     explain: [
       'Factorising is expanding in reverse. For $x^2 + bx + c$ you want two numbers that multiply to $c$ and add to $b$; they go in the brackets.',
       'Signs carry the information. If $c$ is positive the two numbers share a sign (the sign of $b$). If $c$ is negative they have opposite signs.',
-      'Always check by multiplying the brackets back out. And look for a common factor first — $2x^2 + 6x$ is $2x(x + 3)$ before anything else.',
+      'Always check by multiplying the brackets back out. And look for a common factor first, $2x^2 + 6x$ is $2x(x + 3)$ before anything else.',
     ],
     trap: { wrong: 'x^2 - 5x + 6  →  (x + 2)(x + 3)', right: 'x^2 - 5x + 6  →  (x - 2)(x - 3)', note: 'They must add to −5, so both are negative.' },
     example: {
@@ -214,7 +215,7 @@ export const CONCEPTS: Record<ConceptId, Concept> = {
   'zero-product': {
     id: 'zero-product',
     title: 'Solutions from factors',
-    short: 'If a product is zero, one of the factors is zero — so each bracket gives a solution.',
+    short: 'If a product is zero, one of the factors is zero, so each bracket gives a solution.',
     explain: [
       'If two things multiply to give zero, at least one of them must be zero. That is why we factorise quadratics: it turns one hard equation into two easy ones.',
       'From $(x - 2)(x + 5) = 0$ you get $x - 2 = 0$ or $x + 5 = 0$, so $x = 2$ or $x = -5$. The solution has the opposite sign to the number in the bracket.',
@@ -247,7 +248,7 @@ export const CONCEPTS: Record<ConceptId, Concept> = {
       given: '2x^2 = 50',
       steps: [
         { line: 'x^2 = 25', why: 'Divide both sides by 2.' },
-        { line: 'x = ±5', why: 'Take the square root — both signs.' },
+        { line: 'x = ±5', why: 'Take the square root, both signs.' },
       ],
     },
     minutes: 2,
@@ -259,7 +260,7 @@ export const CONCEPTS: Record<ConceptId, Concept> = {
     short: 'Dividing both sides by x throws away the solution x = 0.',
     explain: [
       'Dividing both sides by something is only safe if that thing cannot be zero. An unknown might be.',
-      '$x^2 = 3x$ looks as if it simplifies to $x = 3$ — but $x = 0$ also works in the original, and dividing by $x$ deleted it.',
+      '$x^2 = 3x$ looks as if it simplifies to $x = 3$, but $x = 0$ also works in the original, and dividing by $x$ deleted it.',
       'Instead, bring everything to one side and factorise: $x^2 - 3x = 0$, so $x(x - 3) = 0$, so $x = 0$ or $x = 3$.',
     ],
     trap: { wrong: 'x^2 = 3x  →  x = 3', right: 'x^2 = 3x  →  x = 0 or x = 3', note: 'Check: 0² = 3·0 is true.' },
@@ -388,7 +389,7 @@ export const CONCEPTS: Record<ConceptId, Concept> = {
     explain: [
       'Two equations with two unknowns are solved by getting rid of one unknown. Either add or subtract the equations so a letter cancels, or rearrange one and substitute it into the other.',
       'Once one letter is found, put it back into either original equation to find the second.',
-      'Always check the pair in both equations — it takes ten seconds and catches almost every slip.',
+      'Always check the pair in both equations, it takes ten seconds and catches almost every slip.',
     ],
     example: {
       prompt: 'Solve the system',
@@ -419,6 +420,8 @@ export const CONCEPTS: Record<ConceptId, Concept> = {
     keywords: ['simplest form', 'lowest terms'],
   },
 };
+
+export const CONCEPTS = { ...ALGEBRA_CONCEPTS, ...CALC_CONCEPTS } as Record<ConceptId, Concept>;
 
 export function conceptsForText(text: string): ConceptId[] {
   const t = text.toLowerCase();

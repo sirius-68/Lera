@@ -1,4 +1,6 @@
+import { Glyph, markInlineFractions, stackFractions, stripCancelMarks, tidyMathRow } from './layout2d';
 import { cleanText } from './text';
+import { TocEntry, applyBookStructure } from './toc';
 import { RawDoc, RawPara } from './types';
 
 /**
@@ -22,22 +24,22 @@ interface PdfPage {
   getTextContent(): Promise<{ items: unknown[] }>;
   getViewport(o: { scale: number }): { width: number; height: number };
 }
+interface OutlineItem {
+  title?: string;
+  dest?: unknown;
+  items?: OutlineItem[];
+}
 interface PdfDocument {
   numPages: number;
   getPage(n: number): Promise<PdfPage>;
+  getOutline?: () => Promise<OutlineItem[] | null>;
+  getDestination?: (name: string) => Promise<unknown[] | null>;
+  getPageIndex?: (ref: unknown) => Promise<number>;
+  getMetadata?: () => Promise<{ info?: { Title?: string } }>;
   destroy?: () => Promise<void> | void;
 }
 export interface PdfModule {
   getDocument(src: unknown): { promise: Promise<PdfDocument> };
-}
-
-interface Glyph {
-  str: string;
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  font: string;
 }
 
 interface Line {
@@ -50,6 +52,10 @@ interface Line {
   page: number;
   pageHeight: number;
   pageWidth: number;
+  /** Words set beside a formula on the same row, across a wide gap: "a(b + c) = ab + ac     Distributing over addition". */
+  caption?: string;
+  /** The row contains a rebuilt fraction. */
+  frac?: boolean;
 }
 
 function mode<T>(entries: [T, number][]): T | undefined {
@@ -86,40 +92,100 @@ function buildLines(glyphs: Glyph[], page: number, pageWidth: number, pageHeight
   }
 
   const lines: Line[] = [];
-  for (const row of rows) {
+  for (const rawRow of rows) {
+    const rawInked = rawRow.filter((g) => g.str.trim());
+    if (rawInked.length === 0) continue;
+    const dom = mode(rawInked.map((g): [number, number] => [round(g.h), g.str.trim().length])) ?? rawInked[0].h;
+    const baseline = mode(rawInked.filter((g) => round(g.h) === dom).map((g): [number, number] => [round(g.y, 0.25), g.str.length])) ?? rawInked[0].y;
+    rawRow.sort((a, b) => a.x - b.x);
+    // brackets and dots a symbol font reports as letters
+    const row = tidyMathRow(rawRow, dom, baseline, mode(rawInked.map((g): [string, number] => [g.font, g.str.length])) ?? '');
     const inked = row.filter((g) => g.str.trim());
     if (inked.length === 0) continue;
-    const dom = mode(inked.map((g): [number, number] => [round(g.h), g.str.trim().length])) ?? inked[0].h;
-    const baseline = mode(inked.filter((g) => round(g.h) === dom).map((g): [number, number] => [round(g.y, 0.25), g.str.length])) ?? inked[0].y;
-    row.sort((a, b) => a.x - b.x);
     let text = '';
     let prevEnd: number | null = null;
+    let breakAt = -1;
+    let hasFrac = false;
+    let inkEnd: number | null = null;
+    // a raised (or lowered) run can be split over several glyphs: "n", "−1" → ^(n−1)
+    type Script = { kind: '^' | '_'; s: string };
+    let script = null as Script | null;
+    const flush = () => {
+      if (!script) return;
+      const t = script.s.trim();
+      if (t) text += script.kind === '^' ? (/^[\w]$/.test(t) ? `^${t}` : `^(${t})`) : `_${t}`;
+      script = null;
+    };
     for (const g of row) {
-      let s = g.str;
+      const s = g.str;
       if (!s.trim()) {
+        if (script) {
+          // a space set at the raised baseline ends the exponent; one on the main baseline is just a space
+          flush();
+        }
         if (text && !text.endsWith(' ')) text += ' ';
         prevEnd = g.x + g.w;
         continue;
       }
-      const small = g.h > 0 && g.h < 0.82 * dom;
-      const raised = g.y > baseline + 0.18 * dom;
-      const lowered = g.y < baseline - 0.12 * dom;
-      if (small && raised && s.trim().length <= 4) {
-        const t = s.trim();
-        s = /^[\w]$/.test(t) ? `^${t}` : `^(${t})`;
-        text = text.replace(/\s+$/, '');
-      } else if (small && lowered && s.trim().length <= 3) {
-        s = `_${s.trim()}`;
-        text = text.replace(/\s+$/, '');
-      } else if (prevEnd !== null && g.x - prevEnd > 0.2 * dom && !text.endsWith(' ') && !s.startsWith(' ')) {
-        text += ' ';
+      // a wide gap in a row: a formula on the left and its name on the right
+      if (inkEnd !== null && breakAt < 0 && text.trim() && g.x - inkEnd > 2.4 * dom) {
+        flush();
+        breakAt = text.length;
       }
+      if (g.frac) {
+        flush();
+        hasFrac = true;
+        const before = text.trimEnd();
+        // "12 · 1/2" where the dot's glyph was not reported: the gap it left is still there
+        if (prevEnd !== null && /\d$/.test(before) && g.x - prevEnd > 0.45 * dom && g.x - prevEnd < 2.4 * dom) text = `${before} · `;
+        else if (text && !/[\s(]$/.test(text)) text += ' ';
+        text += g.str;
+        prevEnd = g.x + g.w;
+        inkEnd = prevEnd;
+        continue;
+      }
+      inkEnd = g.x + g.w;
+      const rise = g.y - baseline;
+      // exporters disagree about superscript size (Word ≈ 65%, LaTeX ≈ 70%, browsers ≈ 83%), and some
+      // keep the full size and only lift the glyph — so go by the lift, with size as supporting evidence
+      const smaller = g.h > 0 && g.h < 0.93 * dom;
+      const attached = prevEnd !== null && g.x - prevEnd < 0.25 * dom && /[\w)\]}]$/.test(text.trimEnd()) && !text.endsWith(' ');
+      const short = s.trim().length <= 6 && !/\s/.test(s.trim());
+      const raised: boolean = short && (attached || !!script) && ((smaller && rise > 0.15 * dom) || rise > 0.28 * dom);
+      const lowered: boolean = short && (attached || !!script) && smaller && rise < -0.1 * dom && s.trim().length <= 3;
+      if (raised || lowered) {
+        const kind: '^' | '_' = raised ? '^' : '_';
+        if (script && script.kind !== kind) flush();
+        if (!script) script = { kind, s: '' };
+        script.s += s.trim();
+        prevEnd = g.x + g.w;
+        continue;
+      }
+      flush();
+      if (prevEnd !== null && g.x - prevEnd > 0.2 * dom && !text.endsWith(' ') && !s.startsWith(' ')) text += ' ';
       text += s;
       prevEnd = g.x + g.w;
     }
-    const clean = cleanText(text);
+    flush();
+    let caption: string | undefined;
+    if (breakAt > 0) {
+      const left = text.slice(0, breakAt).trim();
+      const right = text.slice(breakAt).trim();
+      if (/=/.test(left) && !/[A-Za-z]{4,}/.test(left) && (right.match(/[A-Za-z]{3,}/g) ?? []).length >= 2 && !/=/.test(right)) {
+        text = left;
+        caption = cleanText(right);
+      } else if (/^(\d{1,4}|[ivxlc]{1,7})$/.test(right) && /[A-Za-z]{2,}/.test(left) && !/=/.test(left)) {
+        // a contents line set with a tab instead of dots: write the dots in, so it reads like any other
+        text = `${left} ..... ${right}`;
+      }
+    }
+    // a fraction keeps a space from what follows it, so "1/2x" is never read as 1/(2x)
+    if (hasFrac || row !== rawRow) text = text.replace(/\s*·\s*/g, ' · ').replace(/\s+\)/g, ')').replace(/\(\s+/g, '(');
+    const clean = cleanText(text.replace(/(\d\/\d+)(?=[A-Za-z(])/g, '$1 '));
     if (!clean) continue;
     lines.push({
+      caption,
+      frac: hasFrac || undefined,
       text: clean,
       x0: Math.min(...inked.map((g) => g.x)),
       x1: Math.max(...inked.map((g) => g.x + g.w)),
@@ -134,24 +200,39 @@ function buildLines(glyphs: Glyph[], page: number, pageWidth: number, pageHeight
   return lines;
 }
 
+/** Dot leaders and a page number at the end of a line. */
+const TOC_TAIL = /[.·…_]{3,}\s*(\d{1,4}|[ivxlc]{1,7})$/;
 const BULLET = /^([•▪◦●○■□➢➤✓–—-]|\(?[a-zA-Z0-9]{1,2}[.)])\s+/;
 const PAGE_NO = /^(page\s+)?\d{1,4}(\s*(of|\/)\s*\d{1,4})?$/i;
 
+/**
+ * Running heads and feet: the book's or chapter's name and the page number, repeated at the edge of page after page.
+ * A line counts when it is the first or last on its page, sits in the outer margin, and the same words (numbers
+ * aside) hold that place on at least three pages. Chapter heads change with the chapter, so "most pages" is too strict.
+ */
 function stripFurniture(lines: Line[], pages: number): Line[] {
-  const edge = (l: Line) => l.y > l.pageHeight * 0.92 || l.y < l.pageHeight * 0.08;
+  const first = new Map<number, Line>();
+  const last = new Map<number, Line>();
+  for (const l of lines) {
+    if (!first.has(l.page) || l.y > (first.get(l.page) as Line).y) first.set(l.page, l);
+    if (!last.has(l.page) || l.y < (last.get(l.page) as Line).y) last.set(l.page, l);
+  }
+  const edge = (l: Line) => (l === first.get(l.page) && l.y > l.pageHeight * 0.9) || (l === last.get(l.page) && l.y < l.pageHeight * 0.1);
+  const keyOf = (l: Line) => l.text.replace(/\d+/g, '#').toLowerCase();
   const seen = new Map<string, Set<number>>();
   for (const l of lines) {
     if (!edge(l)) continue;
-    const key = l.text.replace(/\d+/g, '#').toLowerCase();
+    const key = keyOf(l);
     if (!seen.has(key)) seen.set(key, new Set());
     seen.get(key)!.add(l.page);
   }
+  const need = pages >= 8 ? 3 : Math.max(3, Math.ceil(pages * 0.5));
   const repeated = new Set<string>();
-  for (const [key, set] of seen) if (pages >= 3 && set.size >= Math.max(3, Math.ceil(pages * 0.5))) repeated.add(key);
+  for (const [key, set] of seen) if (pages >= 3 && set.size >= need) repeated.add(key);
   return lines.filter((l) => {
     if (!edge(l)) return true;
     if (PAGE_NO.test(l.text)) return false;
-    return !repeated.has(l.text.replace(/\d+/g, '#').toLowerCase());
+    return !repeated.has(keyOf(l));
   });
 }
 
@@ -165,11 +246,15 @@ function assemble(lines: Line[]): RawPara[] {
 
   interface Draft {
     parts: Line[];
+    /** Maths set on rows of its own, away from the margin. */
+    display?: boolean;
   }
   const drafts: Draft[] = [];
   let cur: Draft | null = null;
 
   const looksMath = (t: string) => /[=+−\-*/^<>≤≥]/.test(t) && (t.match(/[A-Za-z]{3,}/g) ?? []).length === 0;
+  // a formula on a row of its own: set in from the margin, stopping well short of the right edge
+  const isDisplay = (l: Line) => round(l.size) <= body * 1.12 && l.x0 > left + 1.2 * body && (!!l.caption || l.x1 < right - 0.12 * width) && looksMath(l.text) && !BULLET.test(l.text);
   let lastNumber: number | null = null;
 
   for (const line of lines) {
@@ -209,8 +294,17 @@ function assemble(lines: Line[]): RawPara[] {
       const numbered = /^\(?(\d{1,2})[.)]\s/.exec(line.text);
       if (numbered) lastNumber = Number(numbered[1]);
     }
+    // a contents line ("Title ..... 25") is always a paragraph of its own
+    if (prev && (TOC_TAIL.test(prev.text) || TOC_TAIL.test(line.text))) split = true;
+    // rows of working stay together when each begins with the sign that carries on from the row above;
+    // anything else next to a displayed formula starts afresh
+    const shown = isDisplay(line);
+    if (prev && (shown || cur!.display)) {
+      const carries = shown && !!cur!.display && !line.caption && !prev.caption && prev.page === line.page && prev.y - line.y < 6 * Math.max(prev.size, line.size) && /^[=≈<>≤≥]/.test(line.text);
+      split = !carries;
+    }
     if (split || !cur) {
-      cur = { parts: [line] };
+      cur = { parts: [line], display: shown || undefined };
       drafts.push(cur);
     } else {
       cur.parts.push(line);
@@ -233,7 +327,15 @@ function assemble(lines: Line[]): RawPara[] {
       else text += ' ' + part.text;
     }
     const size = round(dft.parts[0].size);
-    const para: RawPara = { text, scale: size / body, page: dft.parts[0].page };
+    // a fraction inside a sentence is typeset where it stands
+    if (!dft.display && dft.parts.some((l) => l.frac)) text = markInlineFractions(text);
+    const para: RawPara = { text, scale: size / body, page: dft.parts[0].page, x: dft.parts[0].x0 };
+    if (dft.display) {
+      para.math = true;
+      if (dft.parts.length > 1) para.rows = dft.parts.map((l) => l.text);
+      if (dft.parts[0].caption) para.caption = dft.parts[0].caption;
+      return para;
+    }
     if (titleSize !== null && size === titleSize) para.level = 0;
     else {
       const rank = headingSizes.indexOf(size);
@@ -260,6 +362,53 @@ function assemble(lines: Line[]): RawPara[] {
   });
 }
 
+/** The two steps between glyphs and paragraphs, for tests. */
+export const pdfInternals = { buildLines, assemble };
+
+
+async function pageLines(doc: PdfDocument, n: number): Promise<Line[]> {
+  const page = await doc.getPage(n);
+  const vp = page.getViewport({ scale: 1 });
+  const content = await page.getTextContent();
+  const glyphs: Glyph[] = [];
+  for (const raw of content.items) {
+    const it = raw as Partial<TextItem>;
+    if (typeof it.str !== 'string' || !it.transform) continue;
+    const h = it.height || Math.hypot(it.transform[2], it.transform[3]);
+    glyphs.push({ str: it.str, x: it.transform[4], y: it.transform[5], w: it.width ?? 0, h, font: it.fontName ?? '' });
+  }
+  return buildLines(stripCancelMarks(stackFractions(glyphs)), n, vp.width, vp.height);
+}
+
+/** The file's own bookmarks, flattened: what a PDF app shows as its table of contents. */
+async function readOutline(doc: PdfDocument): Promise<TocEntry[]> {
+  const out: TocEntry[] = [];
+  try {
+    const top = await doc.getOutline?.();
+    if (!top) return out;
+    const walk = async (items: OutlineItem[], level: number): Promise<void> => {
+      for (const it of items) {
+        if (out.length > 3000) return;
+        let page: number | undefined;
+        try {
+          let dest = it.dest;
+          if (typeof dest === 'string') dest = (await doc.getDestination?.(dest)) ?? undefined;
+          if (Array.isArray(dest) && dest[0] && doc.getPageIndex) page = (await doc.getPageIndex(dest[0])) + 1;
+        } catch {
+          page = undefined;
+        }
+        const title = (it.title ?? '').replace(/\s+/g, ' ').trim();
+        if (title) out.push({ title, level, page });
+        if (it.items?.length && level < 4) await walk(it.items, level + 1);
+      }
+    };
+    await walk(top, 1);
+  } catch {
+    return [];
+  }
+  return out;
+}
+
 export async function readPdfWith(
   pdfjs: PdfModule,
   data: Uint8Array,
@@ -268,19 +417,20 @@ export async function readPdfWith(
 ): Promise<RawDoc> {
   const doc = await pdfjs.getDocument({ data, useSystemFonts: true, isEvalSupported: false, verbosity: 0 }).promise;
   let lines: Line[] = [];
+  let outline: TocEntry[] = [];
+  let metaTitle: string | undefined;
   try {
+    outline = await readOutline(doc);
+    try {
+      const t = (await doc.getMetadata?.())?.info?.Title?.trim();
+      if (t && t.length >= 3 && t.length <= 120 && !/\.(pdf|docx?|tex|indd)$/i.test(t) && !/^(untitled|microsoft word|document\d*)/i.test(t)) metaTitle = t;
+    } catch {
+      metaTitle = undefined;
+    }
     for (let n = 1; n <= doc.numPages; n++) {
-      const page = await doc.getPage(n);
-      const vp = page.getViewport({ scale: 1 });
-      const content = await page.getTextContent();
-      const glyphs: Glyph[] = [];
-      for (const raw of content.items) {
-        const it = raw as Partial<TextItem>;
-        if (typeof it.str !== 'string' || !it.transform) continue;
-        const h = it.height || Math.hypot(it.transform[2], it.transform[3]);
-        glyphs.push({ str: it.str, x: it.transform[4], y: it.transform[5], w: it.width ?? 0, h, font: it.fontName ?? '' });
-      }
-      lines.push(...buildLines(glyphs, n, vp.width, vp.height));
+      lines.push(...(await pageLines(doc, n)));
+      // let the screen repaint between pages of a long book
+      if (n % 12 === 0) await new Promise((r) => setTimeout(r, 0));
       onProgress?.(n / doc.numPages);
     }
   } finally {
@@ -288,10 +438,11 @@ export async function readPdfWith(
   }
   const pages = doc.numPages;
   lines = stripFurniture(lines, pages);
-  const paras = assemble(lines);
+  const structured = applyBookStructure(assemble(lines), outline, pages);
+  const paras = structured.paras;
   if (paras.length === 0) {
     throw new Error('I couldn’t find any selectable text in this PDF. If it’s a scan or a photo, try a typed version.');
   }
-  const title = paras.find((p) => p.level === 0)?.text;
-  return { kind: 'pdf', fileName, title, pages, paras };
+  const title = metaTitle ?? structured.title ?? paras.find((p) => p.level === 0)?.text;
+  return { kind: 'pdf', fileName, title, pages, paras, tocVia: structured.via, skippedPages: structured.skipped };
 }

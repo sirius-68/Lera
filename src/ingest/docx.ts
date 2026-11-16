@@ -191,7 +191,7 @@ function readNumbering(xml: string | undefined): Record<string, 'bullet' | 'numb
 export async function readDocx(data: ArrayBuffer | Uint8Array, fileName: string): Promise<RawDoc> {
   const zip = await JSZip.loadAsync(data);
   const docXml = await zip.file('word/document.xml')?.async('string');
-  if (!docXml) throw new Error('This doesn’t look like a Word document — it has no document body.');
+  if (!docXml) throw new Error('This doesn’t look like a Word document, it has no document body.');
   const { styles, body } = readStyles(await zip.file('word/styles.xml')?.async('string'));
   const numbering = readNumbering(await zip.file('word/numbering.xml')?.async('string'));
 
@@ -228,6 +228,8 @@ export async function readDocx(data: ArrayBuffer | Uint8Array, fileName: string)
       if (para.level === 0 && !title) title = text;
       paras.push(para);
     }
+    // a drawing or picture in this paragraph: leave a marker so its graph can be rebuilt from the text beside it
+    if (find(p, 'w:drawing').length || find(p, 'w:pict').length) paras.push({ text: '[figure]', figure: true });
   };
 
   const walkBody = (n: XNode) => {

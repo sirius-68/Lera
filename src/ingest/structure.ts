@@ -2,11 +2,12 @@ import { Statement, statementToText, statementVars, walk, Node } from '../engine
 import { finalForm, isCollected, prepare } from '../engine/check';
 import { cleanPath } from '../engine/analyze';
 import { CONCEPTS, conceptsForText } from '../engine/concepts';
+import { buildCalcProblem, graphFunctions, markInlineMath } from './calc';
 import { PROMPTS } from '../engine/generate';
 import { parseLine } from '../engine/parse';
 import { ConceptId, Problem, ProblemKind } from '../engine/types';
 import { GLOSSARY } from './glossary';
-import { slug, toMathText } from './text';
+import { repairFlatPowers, slug, toMathText } from './text';
 import { Block, LeraDoc, RawDoc, RawPara, Topic, Unit } from './types';
 
 /**
@@ -23,12 +24,12 @@ const EXERCISE_LEAD = /^(exercise|problem|question|q|упражнение|зад
 const EXAMPLE_LEAD = /^((?:worked\s+)?example|пример)\s*(\d+)?\s*[:.)–-]?\s*/i;
 const NOTE_LEAD = /^(definition|note|remember|key\s+idea|key\s+point|rule|tip|important|recall|property|theorem|правило|определение|запомни)\s*[:.–-]\s*/i;
 const VERB =
-  /^(solve|simplify|factor(?:ise|ize)?|expand|evaluate|calculate|work\s+out|find|determine|compute|multiply\s+out|reduce|write|решите|упростите|разложите|вычислите|найдите|раскройте)\b/i;
+  /^(solve|simplify|factor(?:ise|ize)?|expand|evaluate|calculate|work\s+out|find|determine|compute|multiply\s+out|reduce|write|differentiate|integrate|sketch|продифференцируйте|проинтегрируйте|решите|упростите|разложите|вычислите|найдите|раскройте)\b/i;
 const NUMBERING = /^(?:\(?\d{1,2}[.)]|\(?[a-hA-H][.)]|\([ivx]{1,4}\)|[•▪◦●○■□➢➤✓–—-])\s+/;
 const MATH_WORDS = new Set(['sqrt', 'and', 'or', 'abs']);
 
 /** Text with the $…$ maths markers removed. */
-export const plain = (text: string): string => text.replace(/\$/g, '');
+export const plain = (text: string): string => text.replace(/[$\u2063]/g, '');
 
 export function isMathLine(text: string): boolean {
   const t = toMathText(plain(text)).replace(/[.;,]+$/, '');
@@ -190,9 +191,15 @@ export function buildProblem(text: string, inherited: string | undefined, topicI
   if (plain(clean).length < 2) return null;
   const ownVerb = VERB.exec(clean)?.[1];
   const verb = ownVerb ?? (inherited ? VERB.exec(inherited.trim())?.[1] : undefined);
-  const ex = extractMath(clean);
-  const id = `${topicId}-e${++exerciseCounter}`;
   const original = inherited && !ownVerb ? `${plain(inherited).replace(/[:.]\s*$/, '')}: ${clean}` : clean;
+  // calculus first: d/dx, ∫ and lim never parse as algebra
+  const calc = buildCalcProblem(repairFlatPowers(clean), ownVerb ? undefined : inherited, topicId, original);
+  if (calc) return calc;
+  // powers that arrived flattened ("x2 − 5x + 6 = 0") are repaired before the algebra is read
+  // "12x^7 / 4x^3" in notes means the whole 4x^3 is underneath
+  const repaired = repairFlatPowers(clean).replace(/\s\/\s*(\d+(?:[a-z](?:\^\(?-?\d+\)?)?)+)(?=\s|[.,;]|$)/g, ' / ($1)');
+  const ex = (repaired !== clean ? extractMath(repaired) : null) ?? extractMath(clean);
+  const id = `${topicId}-e${++exerciseCounter}`;
 
   const open = (): Problem => ({
     id,
@@ -401,6 +408,9 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
   let instruction: string | undefined;
   let instructionLive = false;
 
+  let load = 0;
+  let baseTitle = '';
+  let partNo = 1;
   const ensureUnit = (): Unit => {
     if (!unit) {
       unit = { id: `u${units.length + 1}`, title, topics: [] };
@@ -414,6 +424,9 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
       const name = u.topics.length === 0 ? (u.title === title ? 'Introduction' : 'Overview') : `Part ${u.topics.length + 1}`;
       topic = { id: `${u.id}t${u.topics.length + 1}`, title: name, blocks: [], exercises: [], concepts: [] };
       u.topics.push(topic);
+      load = 0;
+      baseTitle = name;
+      partNo = 1;
     }
     return topic;
   };
@@ -423,14 +436,43 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
     instruction = undefined;
     instructionLive = false;
   };
-  const pushBlock = (b: Block) => {
+  /**
+   * A lesson is something to finish in one sitting. A long section becomes several lessons: at its next
+   * sub-heading once it has grown past LESSON_SOFT, or, with no sub-heading to break at, at a paragraph
+   * once past LESSON_HARD. (About 1,250 characters fill a phone page: these are roughly 4 and 9 pages.)
+   */
+  const LESSON_SOFT = 4500;
+  const LESSON_HARD = 11000;
+  const startTopic = (name: string, continued = false): Topic => {
+    const u = ensureUnit();
+    topic = { id: `${u.id}t${u.topics.length + 1}`, title: name, blocks: [], exercises: [], concepts: [] };
+    u.topics.push(topic);
+    load = 0;
+    if (!continued) {
+      baseTitle = name;
+      partNo = 1;
+    }
+    return topic;
+  };
+  const pushBlock = (raw: Block) => {
+    if (topic && load > LESSON_HARD && raw.t === 'p' && !inExample) {
+      partNo += 1;
+      startTopic(`${baseTitle} · part ${partNo}`, true);
+    }
     const t = ensureTopic();
+    load += raw.t === 'list' ? raw.items.join(' ').length + 60 : raw.t === 'example' ? 400 : raw.t === 'graph' ? 500 : raw.text.length + 40;
+    // prose from files without equation objects: typeset the powers it mentions
+    const b: Block =
+      raw.t === 'p' || raw.t === 'note' ? { ...raw, text: markInlineMath(raw.text) } : raw.t === 'list' ? { ...raw, items: raw.items.map(markInlineMath) } : raw;
     const last = t.blocks[t.blocks.length - 1];
     if (b.t === 'list' && last && last.t === 'list' && last.ordered === b.ordered) last.items.push(...b.items);
     else t.blocks.push(b);
   };
 
-  for (const tg of tagged) {
+  const drawn = new Set<string>();
+  let pendingFigure: { fns: string[]; caption: string } | null = null;
+  for (let i = 0; i < tagged.length; i++) {
+    const tg = tagged[i];
     const text = tg.text;
     if (tg.role === 'title') continue;
     if (tg.role === 'unit') {
@@ -441,9 +483,7 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
       continue;
     }
     if (tg.role === 'topic') {
-      const u = ensureUnit();
-      topic = { id: `${u.id}t${u.topics.length + 1}`, title: cleanHeading(text), blocks: [], exercises: [], concepts: [] };
-      u.topics.push(topic);
+      startTopic(cleanHeading(text));
       resetFlow();
       continue;
     }
@@ -455,7 +495,9 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
     }
     if (tg.role === 'sub') {
       resetFlow();
-      pushBlock({ t: 'h', text: cleanHeading(text) });
+      // a sub-heading inside a lesson that is already long starts the next lesson
+      if (topic && load > LESSON_SOFT) startTopic(cleanHeading(text));
+      else pushBlock({ t: 'h', text: cleanHeading(text) });
       continue;
     }
 
@@ -492,7 +534,7 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
     const exm = EXAMPLE_LEAD.exec(text);
     if (exm) {
       const rest = text.slice(exm[0].length).trim();
-      inExample = { t: 'example', title: exm[2] ? `Example ${exm[2]}` : 'Example', lines: rest ? [rest] : [] };
+      inExample = { t: 'example', title: exm[2] ? `Example ${exm[2]}` : 'Example', lines: rest ? [markInlineMath(rest)] : [] };
       pushBlock(inExample);
       instructionLive = false;
       continue;
@@ -506,7 +548,7 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
       const worked = /^(solution|answer|step|so|therefore|then|check|hence|решение|ответ)\b/i.test(text);
       const keep = !note && !VERB.test(bare) && (mathy || worked || text.length <= 110);
       if (keep && inExample.lines.length < 14) {
-        inExample.lines.push(text);
+        inExample.lines.push(...(tg.para.rows ?? [text]).map(markInlineMath));
         continue;
       }
       inExample = null;
@@ -548,11 +590,40 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
       pushBlock({ t: 'list', ordered: tg.para.list === 'number', items: [bare] });
       continue;
     }
+    if (tg.para.figure) {
+      // a picture in the file: rebuild it from the function its caption (or the text beside it) names
+      const near = [tagged[i + 1], tagged[i - 1], tagged[i + 2], tagged[i - 2]].filter((x) => x && !x.para.figure && x.role === 'content');
+      for (const n of near) {
+        const fns = graphFunctions(n.text, true);
+        if (fns.length) {
+          pendingFigure = { fns, caption: /^(fig|figure|graph|рис)/i.test(n.text) ? n.text : '' };
+          break;
+        }
+      }
+      if (pendingFigure && !drawn.has(pendingFigure.fns.join('|'))) {
+        drawn.add(pendingFigure.fns.join('|'));
+        pushBlock({ t: 'graph', text: pendingFigure.caption, fns: pendingFigure.fns });
+      }
+      pendingFigure = null;
+      continue;
+    }
     if (mathy) {
-      pushBlock({ t: 'math', text: toMathText(plain(text)).replace(/[.;,]+$/, '') });
+      const tidy = (row: string) => toMathText(plain(row)).replace(/[.;,]+$/, '');
+      const rows = tg.para.rows?.map(tidy);
+      const block: Block = { t: 'math', text: rows ? rows[0] : tidy(text) };
+      // working shown over several rows keeps its rows; a formula with its name beside it keeps the name
+      if (rows && rows.length > 1) block.steps = rows.slice(1);
+      if (tg.para.caption) block.caption = tg.para.caption;
+      pushBlock(block);
       continue;
     }
     pushBlock({ t: 'p', text });
+    // "The graph of y = x² − 4 is a parabola." → the graph itself, right under the sentence
+    const fns = graphFunctions(text);
+    if (fns.length && !drawn.has(fns.join('|'))) {
+      drawn.add(fns.join('|'));
+      pushBlock({ t: 'graph', text: '', fns });
+    }
   }
 
   // 4. no headings at all: cut long text into readable topics
@@ -573,6 +644,12 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
 
   // 5. tidy up and annotate
   for (const u of units) {
+    // a few opening lines before the first section ("In this chapter…") are not a lesson of their own
+    const lead = u.topics[0];
+    if (lead && u.topics.length > 1 && /^(Overview|Introduction)$/.test(lead.title) && lead.exercises.length === 0 && lead.blocks.reduce((n, b) => n + ('text' in b ? b.text.length : b.t === 'list' ? b.items.join(' ').length : 400), 0) < 600) {
+      u.topics[1].blocks.unshift(...lead.blocks);
+      lead.blocks = [];
+    }
     u.topics = u.topics.filter((tp) => tp.blocks.length > 0 || tp.exercises.length > 0);
     for (const tp of u.topics) {
       // the title says what a topic is about; its exercises confirm it; the body text is only a fallback
@@ -597,7 +674,7 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
   // list items that are nothing but their number: the equations were pictures, not text
   const emptyItems = paras.filter((p) => /^\(?\d{1,2}[.)]$/.test(p.text.trim())).length;
   if (emptyItems >= 3) {
-    warnings.push('The equations in this file are stored as pictures, so I couldn’t read them. A Word file — or a PDF exported straight from Word — will keep the maths.');
+    warnings.push('The equations in this file are stored as pictures, so I couldn’t read them. A Word file, or a PDF exported straight from Word, will keep the maths.');
   }
   const exerciseCount = kept.reduce((n, u) => n + u.topics.reduce((k, tp) => k + tp.exercises.length, 0), 0);
   if (kept.length > 0 && exerciseCount === 0) {
