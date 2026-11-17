@@ -11,6 +11,7 @@ const VOICE = `You are Lera, a calm, precise maths tutor for school and first-ye
 Write the way a good teacher talks: short sentences, plain everyday words, no praise padding, no exclamation marks. Assume the student is meeting the idea for the first time.
 You work alongside a rule-based checker. The checker decides what is right and wrong; you only put things into words. Stay inside the topic you are given, if asked about something else, say it is outside this lesson.
 Never just hand over a final answer to a problem the student is working on, point at the idea instead.
+Mark principles, never length. Maths has many valid routes and some students write every small step because it helps them understand: that is good. Never comment on how many steps or lines were used, and never suggest a shorter method. What matters is whether each rule, law or principle was applied correctly, and if not, which one and why.
 Write maths in plain linear text between dollar signs, like $3x + 4 = 19$ or $x^2 - 9$. Do not use LaTeX commands.`;
 
 /* ───────────── reading notes ───────────── */
@@ -273,7 +274,26 @@ ${describe(ctx)}`;
 }
 
 /** A second opinion in words for a step the rule-based diagnosis could not name. */
-export async function aiDiagnose(config: AiConfig, problem: Problem, prevLine: string, wrongLine: string, signal?: AbortSignal): Promise<Pick<Diagnosis, 'title' | 'message' | 'concept'> | null> {
+/** A second opinion on a line the checker found not true but could not name. */
+export interface AiReading {
+  /** "step": a valid rule partly applied, the rest still to come. "error": a rule broken. */
+  kind: 'step' | 'error';
+  title: string;
+  /** The principle the line was using, in the app's language. */
+  principle: string;
+  /** What to do next (for a step) or what went wrong (for an error), in the app's language, no final answer. */
+  note: string;
+  /** The learner's own line with the missing move made, in plain typed maths. Only checked, never shown as an answer. */
+  completesTo: string;
+  concept: ConceptId;
+}
+
+/**
+ * The checker found this line not true and could not say why. The model reads what the line was trying to do.
+ * It may say "this is a step", but only the checker can agree: the caller accepts a step only when the checker
+ * finds `completesTo` true. The model never decides that maths is right.
+ */
+export async function aiDiagnose(config: AiConfig, problem: Problem, prevLine: string, wrongLine: string, signal?: AbortSignal): Promise<AiReading | null> {
   const ids = Object.keys(CONCEPTS).join(', ');
   const reply = await chat(
     config,
@@ -281,17 +301,19 @@ export async function aiDiagnose(config: AiConfig, problem: Problem, prevLine: s
       {
         role: 'system',
         content: `${voice()}
-A checker has already proved that the student's line does not follow from the line above it. Say what most likely went wrong.
-Return ONLY JSON: {"title": string (max 9 words, states the rule), "message": string (max 40 words, names the exact place), "concept": one of [${ids}]}`,
+A checker has found that the student's line is not equal to the problem as it stands. Work out what the student was trying to do on this line.
+Either they applied part of a valid rule and the rest is still to come (kind "step"), or they broke a rule (kind "error").
+Return ONLY JSON: {"kind": "step" or "error", "title": string (max 9 words, states the rule), "principle": string (the rule or law the line was using, max 12 words), "note": string (max 40 words: for a step, what move is left; for an error, the exact place it goes wrong and why; never the final answer, never anything about the number of steps), "completes_to": string (the student's own line with the missing move made, plain typed maths like 3x^3/3 or 2x cos(x^2); for an error, the line as it should read), "concept": one of [${ids}]}`,
       },
       { role: 'user', content: `Problem: ${problem.prompt} ${problem.given}\nLine above: ${prevLine}\nStudent's line: ${wrongLine}` },
     ],
-    { task: 'diagnose', json: true, temperature: 0.1, maxTokens: 220, signal },
+    { task: 'diagnose', json: true, temperature: 0.1, maxTokens: 320, signal },
   );
-  const data = extractJson<{ title?: string; message?: string; concept?: string }>(reply);
-  if (!data?.title || !data.message) return null;
+  const data = extractJson<{ kind?: string; title?: string; principle?: string; note?: string; completes_to?: string; message?: string; concept?: string }>(reply);
+  const note = data?.note ?? data?.message;
+  if (!data?.title || !note) return null;
   const concept = (data.concept && data.concept in CONCEPTS ? data.concept : problem.concepts[0] ?? 'arithmetic') as ConceptId;
-  return { title: data.title, message: data.message, concept };
+  return { kind: data.kind === 'step' ? 'step' : 'error', title: data.title, principle: data.principle ?? '', note, completesTo: (data.completes_to ?? '').trim(), concept };
 }
 
 /** For problems the engine cannot check (word problems): a judgement on the student's written answer. */
@@ -303,6 +325,7 @@ export async function aiCheckOpen(config: AiConfig, problem: Problem, working: s
         role: 'system',
         content: `${voice()}
 Check a student's working for a problem from their notes. Be strict about the maths and kind in tone.
+Judge whether each principle, law and rule was applied correctly. Any valid route is fine, however many steps it takes: never comment on length and never suggest a shorter method.
 Return ONLY JSON: {"correct": boolean, "feedback": string (max 60 words; if wrong, name the first line that goes wrong and why, without giving the final answer)}`,
       },
       { role: 'user', content: `Problem: ${problem.prompt}\n\nWorking:\n${working.map((l, i) => `${i + 1}. ${l}`).join('\n')}` },

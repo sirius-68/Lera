@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { aiCheckOpen, aiDiagnose, aiSimplify } from '../ai/tasks';
 import { aiReady } from '../ai/providers';
 import { analyze, cleanPath, hintLadder, HintLadder } from '../engine/analyze';
-import { isCalc } from '../engine/calc/check';
+import { confirmsStep, isCalc } from '../engine/calc/check';
 import { conceptOf } from '../engine/concepts';
 import { PLAIN } from '../engine/concepts-calc';
 import { AttemptAnalysis, CheckedLine, Diagnosis, Problem } from '../engine/types';
@@ -222,6 +222,8 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
   const [compare, setCompare] = useState(false);
   const [shake, setShake] = useState(0);
   const [aiNotes, setAiNotes] = useState<Record<string, string>>({});
+  /** Lines the AI read as a step, each confirmed true by the checker once completed. */
+  const [aiSteps, setAiSteps] = useState<Record<string, { note: string; fix?: string }>>({});
   // 'line' marks each line as it lands; 'end' holds every mark back until the learner asks
   const [mode, setMode] = useState<'line' | 'end'>(() => getState().profile.checkMode ?? 'line');
   const [checkedCount, setCheckedCount] = useState(0);
@@ -243,9 +245,9 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
 
   /** How many lines there were when "Done" was last pressed: only then is a rule left half-done a mark. */
   const [doneAt, setDoneAt] = useState<number | null>(null);
-  const analysis = useMemo(() => analyze(problem, lines, { done: doneAt === lines.length }), [problem, lines, doneAt]);
+  const analysis = useMemo(() => analyze(problem, lines, { done: doneAt === lines.length, aiSteps }), [problem, lines, doneAt, aiSteps]);
   /** The attempt read as finished: for the record, and for leaving the problem. */
-  const finalAnalysis = (): AttemptAnalysis => (doneAt === lines.length ? analysis : analyze(problem, lines, { done: true }));
+  const finalAnalysis = (): AttemptAnalysis => (doneAt === lines.length ? analysis : analyze(problem, lines, { done: true, aiSteps }));
   const isChecked = (i: number): boolean => mode === 'line' || i < checkedCount;
   const allChecked = mode === 'line' || checkedCount >= lines.length;
   const solved = analysis.verdict === 'solved' && allChecked;
@@ -333,7 +335,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       return null;
     }
     const next = [...lines, text];
-    const a = analyze(problem, next, { done: false });
+    const a = analyze(problem, next, { done: false, aiSteps });
     const line = a.lines[a.lines.length - 1];
     if (!line || line.status === 'unreadable') {
       setNote(line?.note ?? tr('I couldn’t read that line. Check the brackets and signs.'));
@@ -374,12 +376,22 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       haptic([14, 40, 14]);
       setTimeout(() => setMood('thinking'), 1700);
       const st = getState();
-      // the rules couldn't name it: ask the model for a second opinion in words, if one is connected
+      // the rules couldn't name it: ask the model what the line was trying to do, if one is connected.
+      // A "step" stands only if the checker finds the completed line true; anything else is put into words.
       if (line.diag?.code === 'unknown' && aiReady(st.ai)) {
         const prev = next[idx - 1] ?? problem.given;
-        aiDiagnose(st.ai, problem, prev, text)
-          .then((d) => d && setAiNotes((n) => ({ ...n, [text]: `**${d.title}** ${d.message}` })))
-          .catch(() => undefined);
+        const stop = new AbortController();
+        const timer = setTimeout(() => stop.abort(), 6000);
+        aiDiagnose(st.ai, problem, prev, text, stop.signal)
+          .then((d) => {
+            if (!d) return;
+            if (d.kind === 'step' && confirmsStep(problem, d.completesTo)) {
+              setAiSteps((m) => ({ ...m, [text]: { note: d.note, fix: d.completesTo } }));
+              setMood('happy');
+            } else setAiNotes((n) => ({ ...n, [text]: `**${d.title}** ${d.note}` }));
+          })
+          .catch(() => undefined)
+          .finally(() => clearTimeout(timer));
       }
     } else if (a.verdict === 'solved') {
       setOpenDiag(null);
@@ -410,7 +422,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
    */
   const reviewWork = (all: string[] = lines) => {
     if (!all.length || finished) return;
-    const a = analyze(problem, all, { done: true });
+    const a = analyze(problem, all, { done: true, aiSteps });
     setDoneAt(all.length);
     setCheckedCount(all.length);
     setHintOpen(false);

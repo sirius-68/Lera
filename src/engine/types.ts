@@ -125,6 +125,11 @@ export interface AnalyzeOptions {
    * the last line is then a mark; while they are still writing it is a step with a note on what is left.
    */
   done?: boolean;
+  /**
+   * Lines the AI read as a valid rule partly applied, each confirmed by the checker (its completed form is true).
+   * Keyed by the line's text. They are treated like any other half-done rule.
+   */
+  aiSteps?: Record<string, { note: string; fix?: string }>;
 }
 
 export interface AttemptAnalysis {

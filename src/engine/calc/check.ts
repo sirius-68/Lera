@@ -108,6 +108,17 @@ function parseLine(text: string, v: string): ParsedLine {
   return { ok: true, sides, latex: tex.join(' = ') };
 }
 
+/**
+ * Does this line hold true for the problem? Used to confirm the AI's reading of a line: its "this is a step" counts
+ * only when the line it says the step completes to is true here. The model never decides that maths is right.
+ */
+export function confirmsStep(problem: Problem, line: string): boolean {
+  const p = prepCalc(problem);
+  if (!p || !line.trim()) return false;
+  const parsed = parseLine(line, p.v);
+  return parsed.ok && parsed.sides.every((s) => truth(p, s) === true);
+}
+
 /** LaTeX for a calculus line or problem, or null when it doesn't read as one. */
 export function calcLatex(text: string): string | null {
   const p = parseLine(text, 'x');
@@ -366,7 +377,7 @@ export function calcAnalyze(problem: Problem, rawLines: string[], opts: AnalyzeO
     | { kind: 'unreadable'; text: string; note: string }
     | { kind: 'unchecked'; text: string; latex: string }
     | { kind: 'true'; text: string; latex: string; last: Side; fin: { final: boolean; remaining?: string } }
-    | { kind: 'false'; text: string; latex: string; last: Side; first: Side; sides: Side[]; bad: Side; diag: Diagnosis; unfinished: boolean };
+    | { kind: 'false'; text: string; latex: string; last: Side; first: Side; sides: Side[]; bad: Side; diag: Diagnosis; unfinished: boolean; note?: string };
   const judged: Judged[] = texts.map((text): Judged => {
     const parsed = parseLine(text, p.v);
     if (!parsed.ok) return { kind: 'unreadable', text, note: parsed.error };
@@ -378,6 +389,8 @@ export function calcAnalyze(problem: Problem, rawLines: string[], opts: AnalyzeO
     const bad = parsed.sides[badAt];
     const diag = diagnose(p, problem, bad);
     // half a rule, on the last side of the line: a step on the way, not a false claim
+    const ai = diag.code === 'unknown' ? opts.aiSteps?.[text] : undefined;
+    if (ai) return { kind: 'false', text, latex: parsed.latex, last, first: parsed.sides[0], sides: parsed.sides, bad, diag: { ...diag, fix: ai.fix ?? diag.fix }, unfinished: true, note: ai.note };
     const unfinished = diag.code in UNFINISHED && badAt === parsed.sides.length - 1;
     return { kind: 'false', text, latex: parsed.latex, last, first: parsed.sides[0], sides: parsed.sides, bad, diag: unfinished ? { ...diag, fix: completedText(p, bad, diag.code) } : diag, unfinished };
   });
@@ -407,7 +420,7 @@ export function calcAnalyze(problem: Problem, rawLines: string[], opts: AnalyzeO
     const finishedLater = later.some((x) => x.kind === 'true');
     // finished on a later line, or the last line while the learner is still writing: a step
     if (j.unfinished && prevGood && (finishedLater || (!later.length && !done))) {
-      const note = t(UNFINISHED[j.diag.code]);
+      const note = j.note ?? t(UNFINISHED[j.diag.code]);
       lines.push({ text: j.text, status: 'step', latex: j.latex, trueToGiven: false, note, diag: j.diag });
       lastState = { good: false, final: false, remaining: note };
       prevSide = j.last;

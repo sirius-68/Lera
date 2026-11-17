@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { analyze, answerOf, cleanPath } from '../analyze';
 import { ALL_CONCEPTS, practiceFor } from '../generate';
 import { buildCalcProblem } from '../../ingest/calc';
-import { isCalc } from '../calc/check';
+import { confirmsStep, isCalc } from '../calc/check';
 import { Problem, ProblemKind } from '../types';
 import { recordAttempt } from '../../store/learner';
 import { xpOf } from '../../store/game';
@@ -149,4 +149,23 @@ test('"the derivative of …" in words is read as a derivative', () => {
 test('a proof stays a written answer', () => {
   const p = buildCalcProblem('Show that the harmonic series diverges.', undefined, 't', '');
   assert.ok(!p || p.kind === 'open');
+});
+
+/* ───────────── the AI's reading of a line ───────────── */
+
+test('the AI can only call a line a step when the checker finds its completed form true', () => {
+  const p = P('integral', '∫ 3x^2 dx');
+  assert.equal(confirmsStep(p, 'x^3 + C'), true);
+  assert.equal(confirmsStep(p, '3x^3'), false);
+  assert.equal(confirmsStep(p, ''), false);
+  assert.equal(confirmsStep(p, 'hello'), false);
+});
+
+test('a line the checker could not name becomes a step only with a confirmed AI reading, and is still marked if never finished', () => {
+  const p = P('integral', '∫ 3x^2 dx');
+  const odd = '5x^4';
+  assert.equal(analyze(p, [odd, 'x^3 + C'], { done: true }).lines[0].status, 'wrong');
+  const aiSteps = { [odd]: { note: 'Next: something.', fix: 'x^3' } };
+  assert.equal(analyze(p, [odd, 'x^3 + C'], { done: true, aiSteps }).lines[0].status, 'step');
+  assert.equal(analyze(p, [odd], { done: true, aiSteps }).lines[0].status, 'wrong');
 });
