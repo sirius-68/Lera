@@ -4,6 +4,7 @@ import { Lera, Mood } from '../mascot/Lera';
 import { Button3D, Confetti, CountUp, haptic } from './kit';
 import { Icon } from './icons';
 import '../styles/celebrate.css';
+import { t } from '../i18n';
 
 /**
  * Celebration scenes.
@@ -66,7 +67,7 @@ function Stage({ scene }: { scene: Scene }) {
           {Array.from({ length: 10 }, (_, i) => <path key={i} className="tick" d="M100 4v9" style={{ '--i': i } as CSSProperties} />)}
         </svg>
         <div className="cb-lera centre"><Lera size={112} mood="cool" interactive={false} /></div>
-        <span className="cb-pill"><Icon name="check" size={14} stroke={3.4} /> {scene.value ?? 0} XP today</span>
+        <span className="cb-pill"><Icon name="check" size={14} stroke={3.4} /> {scene.value ?? 0}{' '}{t('XP today')}</span>
       </div>
     );
   }
@@ -80,7 +81,7 @@ function Stage({ scene }: { scene: Scene }) {
             <path className="shine" d="M26 30l28-10v96C38 104 26 86 26 62z" />
           </svg>
           <b>{scene.value ?? 2}</b>
-          <span>LEVEL</span>
+          <span>{t('LEVEL')}</span>
         </div>
         <div className="cb-lera side"><Lera size={88} mood="party" interactive={false} /></div>
       </div>
@@ -126,7 +127,7 @@ export function Celebration({ scene, onNext, children }: { scene: Scene; onNext:
         {children}
       </div>
       <div className="cb-foot">
-        <Button3D sheen onClick={onNext}>{scene.cta ?? 'Continue'}</Button3D>
+        <Button3D sheen onClick={onNext}>{scene.cta ?? t('Continue')}</Button3D>
       </div>
       <Confetti fire={1} />
     </div>

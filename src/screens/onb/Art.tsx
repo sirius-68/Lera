@@ -1,5 +1,6 @@
 import { Lera, Mood } from '../../mascot/Lera';
 import { Icon } from '../../ui/icons';
+import { msg, t } from '../../i18n';
 
 /**
  * Small moving pictures for the onboarding: one for each answer tile, and
@@ -80,10 +81,10 @@ export function TileArt({ id }: { id: string }) {
 }
 
 const DAY: { mood: Mood; tone: string; line: string; n: string }[] = [
-  { mood: 'happy', tone: 'purple', line: 'Time to practise!', n: '6' },
-  { mood: 'pleading', tone: 'violet', line: 'Got 3 minutes?', n: '6' },
-  { mood: 'scared', tone: 'orange', line: 'Save your streak!', n: '6' },
-  { mood: 'strong', tone: 'green', line: 'Streak safe!', n: '7' },
+  { mood: 'happy', tone: 'purple', line: msg('Time to practise!'), n: '6' },
+  { mood: 'pleading', tone: 'violet', line: msg('Got 3 minutes?'), n: '6' },
+  { mood: 'scared', tone: 'orange', line: msg('Save your streak!'), n: '6' },
+  { mood: 'strong', tone: 'green', line: msg('Streak safe!'), n: '7' },
 ];
 
 /** A phone whose widget runs through a day: calm, asking, alarmed, pleased. */
@@ -95,7 +96,7 @@ export function SceneWidget() {
           {DAY.map((d, i) => (
             <div key={i} className={`wg wg-${d.tone}`} style={{ animationDelay: `${i * 2.2}s` }}>
               <b><Icon name="flame" size={19} fill /> {d.n}</b>
-              <span>{d.line}</span>
+              <span>{t(d.line)}</span>
               <i><Lera size={70} mood={d.mood} interactive={false} /></i>
             </div>
           ))}

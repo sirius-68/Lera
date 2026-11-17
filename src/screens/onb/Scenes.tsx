@@ -1,6 +1,7 @@
 import { Lera } from '../../mascot/Lera';
 import { Icon } from '../../ui/icons';
 import { MathView } from '../../ui/math';
+import { t } from '../../i18n';
 
 /**
  * Motion graphics for the first run. Each scene is a short loop that shows —
@@ -14,7 +15,7 @@ export function SceneLines() {
   return (
     <div className="sc sc-lines" aria-hidden="true">
       <div className="sc-card">
-        <span className="sc-label">Solve for x</span>
+        <span className="sc-label">{t('Solve for x')}</span>
         <div className="sc-given"><MathView text="3x + 4 = 19" /></div>
         <div className="sc-row r1">
           <span className="n">1</span>
@@ -38,7 +39,7 @@ export function SceneLines() {
         <i className="sc-scan" />
       </div>
       <div className="sc-tip">
-        <b>Line 1</b> The + 4 crossed over but kept its sign.
+        <b>{t('Line 1')}</b>{' '}{t('The + 4 crossed over but kept its sign.')}
       </div>
     </div>
   );
@@ -90,7 +91,7 @@ export function SceneReturn() {
       <svg viewBox="0 0 300 220" width="100%" height="100%">
         <line x1="30" y1="30" x2="30" y2="176" stroke="#d9d6ff" strokeWidth="2.5" strokeLinecap="round" />
         <line x1="30" y1="176" x2="284" y2="176" stroke="#d9d6ff" strokeWidth="2.5" strokeLinecap="round" />
-        <text x="36" y="26" fontSize="10.5" fontWeight="700" fill="#9494aa">how much you remember</text>
+        <text x="36" y="26" fontSize="10.5" fontWeight="700" fill="#9494aa">{t('how much you remember')}</text>
         <path className="fade f0" d="M34 52 C62 54 74 132 112 146" pathLength="100" />
         <path className="fade f1" d="M112 54 C150 56 168 108 202 118" pathLength="100" />
         <path className="fade f2" d="M202 54 C240 55 258 78 284 84" pathLength="100" />
@@ -107,11 +108,11 @@ export function SceneReturn() {
             <text x={x as number} y="194" textAnchor="middle" fontSize="11" fontWeight="700" fill="#55556d">{label}</text>
           </g>
         ))}
-        <text className="lift v2" x="270" y="194" textAnchor="middle" fontSize="11" fontWeight="700" fill="#55556d">day 7</text>
-        <text x="40" y="194" textAnchor="middle" fontSize="11" fontWeight="700" fill="#55556d">today</text>
+        <text className="lift v2" x="270" y="194" textAnchor="middle" fontSize="11" fontWeight="700" fill="#55556d">{t('day 7')}</text>
+        <text x="40" y="194" textAnchor="middle" fontSize="11" fontWeight="700" fill="#55556d">{t('today')}</text>
         <g className="lift v2">
           <rect x="196" y="20" width="88" height="24" rx="12" fill="#e6f7ef" />
-          <text x="240" y="36" textAnchor="middle" fontSize="11" fontWeight="700" fill="#0f8a5d">it holds</text>
+          <text x="240" y="36" textAnchor="middle" fontSize="11" fontWeight="700" fill="#0f8a5d">{t('it holds')}</text>
         </g>
       </svg>
     </div>
@@ -124,19 +125,19 @@ export function ScenePlain() {
   return (
     <div className="sc sc-plain" aria-hidden="true">
       <div className="jargon">
-        <span>“Apply the distributive property of multiplication over addition to each term of the binomial.”</span>
+        <span>{t('“Apply the distributive property of multiplication over addition to each term of the binomial.”')}</span>
       </div>
       <div className="plainly">
         <Lera size={46} mood="happy" interactive={false} />
         <div className="bubble">
-          <span>Everyone inside the bracket gets a share.</span>
+          <span>{t('Everyone inside the bracket gets a share.')}</span>
           <div className="mini"><MathView text="3(x + 2) = 3x + 6" /></div>
         </div>
       </div>
       <div className="ask-row">
-        <span>Did that make sense?</span>
-        <i className="yes">Yes</i>
-        <i>Not really</i>
+        <span>{t('Did that make sense?')}</span>
+        <i className="yes">{t('Yes')}</i>
+        <i>{t('Not really')}</i>
       </div>
     </div>
   );
@@ -166,7 +167,7 @@ export function SceneReward() {
         <div className="xp-bar"><i /></div>
         <span className="xp-tag">+15 XP</span>
       </div>
-      <div className="level">Level 2 · Explorer</div>
+      <div className="level">{t('Level 2 · Explorer')}</div>
     </div>
   );
 }
@@ -181,15 +182,15 @@ export function SceneBell({ time }: { time: string }) {
         <div className="push p1">
           <span className="push-ic"><Lera size={26} mood="idle" interactive={false} /></span>
           <div>
-            <b>Lera <i>now</i></b>
-            <span>The chain rule is ready to come back. Two minutes?</span>
+            <b>Lera <i>{t('now')}</i></b>
+            <span>{t('The chain rule is ready to come back. Two minutes?')}</span>
           </div>
         </div>
         <div className="push p2">
           <span className="push-ic flame"><Icon name="flame" size={18} fill /></span>
           <div>
-            <b>3-day streak <i>earlier</i></b>
-            <span>One problem keeps it alive.</span>
+            <b>{t('3-day streak')}{' '}<i>{t('earlier')}</i></b>
+            <span>{t('One problem keeps it alive.')}</span>
           </div>
         </div>
       </div>

@@ -27,10 +27,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Shared logic tests
+      - name: Shared logic tests, and every line has a French and a Russian translation
         run: |
           npm install --no-audit --no-fund
           npm test
+          npm run i18n
 
       - name: Install the app
         working-directory: apps/mobile

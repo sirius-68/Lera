@@ -1,4 +1,5 @@
 import { ConceptId, Problem, ProblemKind } from './types';
+import { msg } from '../i18n';
 
 /** Small seeded RNG so a session can be rebuilt identically. */
 export function rng(seed: number): () => number {
@@ -35,20 +36,20 @@ const plus = (n: number): string => (n < 0 ? `- ${-n}` : `+ ${n}`);
 const co = (n: number): string => (n === 1 ? '' : n === -1 ? '-' : String(n));
 
 export const PROMPTS: Record<ProblemKind, string> = {
-  linear: 'Solve for x',
-  quadratic: 'Solve for x',
-  equation: 'Solve for x',
-  inequality: 'Solve the inequality',
-  simplify: 'Simplify',
-  expand: 'Expand and simplify',
-  factor: 'Factorise',
-  evaluate: 'Work out',
-  system: 'Solve the system',
-  derivative: 'Differentiate',
-  integral: 'Integrate',
-  definite: 'Evaluate the integral',
-  limit: 'Find the limit',
-  open: 'Work through this',
+  linear: msg('Solve for x'),
+  quadratic: msg('Solve for x'),
+  equation: msg('Solve for x'),
+  inequality: msg('Solve the inequality'),
+  simplify: msg('Simplify'),
+  expand: msg('Expand and simplify'),
+  factor: msg('Factorise'),
+  evaluate: msg('Work out'),
+  system: msg('Solve the system'),
+  derivative: msg('Differentiate'),
+  integral: msg('Integrate'),
+  definite: msg('Evaluate the integral'),
+  limit: msg('Find the limit'),
+  open: msg('Work through this'),
 };
 
 interface Draft {
@@ -264,7 +265,7 @@ const ALGEBRA_MAKERS: Partial<Record<ConceptId, ((r: R) => Draft)[]>> = {
     (r) => {
       const g = int(r, 2, 6);
       const [n, d] = pick(r, [[2, 3], [3, 4], [1, 2], [3, 5], [5, 6]]);
-      return { kind: 'evaluate', given: `${n * g}/${d * g}`, prompt: 'Write in simplest form', level: 1 };
+      return { kind: 'evaluate', given: `${n * g}/${d * g}`, prompt: msg('Write in simplest form'), level: 1 };
     },
   ],
 };

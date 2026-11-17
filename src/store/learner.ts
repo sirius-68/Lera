@@ -1,8 +1,9 @@
-import { CONCEPTS } from '../engine/concepts';
+import { conceptOf } from '../engine/concepts';
 import { practiceFor, seedFrom } from '../engine/generate';
 import { AttemptAnalysis, ConceptId, Problem } from '../engine/types';
 import { LeraDoc, Topic } from '../ingest/types';
 import { AppState, AttemptRecord, ConceptState } from './types';
+import { t as tr } from '../i18n';
 
 /**
  * The learner model — the "recursive" part of Lera.
@@ -265,7 +266,7 @@ export function buildSession(
   const minutes = Math.max(2, Math.round(problems.length * 1.4));
   return {
     topicId: topic?.id,
-    title: topic?.title ?? 'Review',
+    title: topic?.title ?? tr('Review'),
     problems,
     reviews,
     minutes,
@@ -358,7 +359,7 @@ export function insights(state: Pick<AppState, 'attempts' | 'concepts'>): Insigh
     slipLines.forEach((i) => tally.set(i, (tally.get(i) ?? 0) + 1));
     const [line, count] = [...tally.entries()].sort((a, b) => b[1] - a[1])[0];
     if (count / slipLines.length >= 0.55 && line < ORDINAL.length) {
-      out.push({ tone: 'slip', text: `Your slips cluster on the **${ORDINAL[line]} line** of a problem, you speed up once you think you’ve seen it.` });
+      out.push({ tone: 'slip', text: tr('Your slips cluster on the **{0} line** of a problem, you speed up once you think you’ve seen it.', { 0: ORDINAL[line] }) });
     }
   }
 
@@ -368,7 +369,7 @@ export function insights(state: Pick<AppState, 'attempts' | 'concepts'>): Insigh
   const total = [...approaches.values()].reduce((s, n) => s + n, 0);
   const top = [...approaches.entries()].sort((a, b) => b[1] - a[1])[0];
   if (top && total >= 3 && top[1] / total >= 0.6) {
-    out.push({ tone: 'strategy', text: `You reach for **${top[0]}** most of the time (${top[1]} of ${total}). It works, just make sure it’s a choice, not a habit.` });
+    out.push({ tone: 'strategy', text: tr('You reach for **{0}** most of the time ({1} of {2}). It works, just make sure it’s a choice, not a habit.', { 0: top[0], 1: top[1], 2: total }) });
   }
 
   // the weakest spot
@@ -376,7 +377,7 @@ export function insights(state: Pick<AppState, 'attempts' | 'concepts'>): Insigh
     .filter((c): c is ConceptState => !!c && c.outstanding && c.gaps > 0)
     .sort((a, b) => b.gaps - a.gaps)[0];
   if (worst) {
-    out.push({ tone: 'gap', text: `**${CONCEPTS[worst.id].title}** has been marked ${worst.gaps === 1 ? 'once' : `${worst.gaps} times`}. That’s the one thing worth your time right now.` });
+    out.push({ tone: 'gap', text: worst.gaps === 1 ? tr('**{0}** has been marked once. That’s the one thing worth your time right now.', { 0: conceptOf(worst.id).title }) : tr('**{0}** has been marked {1} times. That’s the one thing worth your time right now.', { 0: conceptOf(worst.id).title, 1: worst.gaps }) });
   }
 
   // steps and hints
@@ -384,18 +385,18 @@ export function insights(state: Pick<AppState, 'attempts' | 'concepts'>): Insigh
   const solved = attempts.filter((a) => a.verdict === 'solved' && a.cleanSteps > 0 && a.marks.length === 0);
   if (solved.length >= 3) {
     const ratio = solved.reduce((s, a) => s + a.steps / a.cleanSteps, 0) / solved.length;
-    if (ratio >= 1.6) out.push({ tone: 'strategy', text: `You write about **${ratio.toFixed(1)}× as many lines** as the shortest route. Nothing wrong with that, it’s also why your slips are easy to find.` });
-    else if (ratio <= 0.8) out.push({ tone: 'slip', text: 'You skip lines when a step feels obvious. Most slips hide in exactly those skipped lines.' });
+    if (ratio >= 1.6) out.push({ tone: 'strategy', text: tr('You write about **{0}× as many lines** as the shortest route. Nothing wrong with that, it’s also why your slips are easy to find.', { 0: ratio.toFixed(1) }) });
+    else if (ratio <= 0.8) out.push({ tone: 'slip', text: tr('You skip lines when a step feels obvious. Most slips hide in exactly those skipped lines.') });
   }
   const hinted = attempts.filter((a) => a.hintRung > 0);
   if (hinted.length >= 2) {
     const avg = hinted.reduce((s, a) => s + a.hintRung, 0) / hinted.length;
-    if (avg <= 1.5) out.push({ tone: 'ok', text: 'When you’re stuck, a nudge is usually enough, you rarely need to be shown the line.' });
+    if (avg <= 1.5) out.push({ tone: 'ok', text: tr('When you’re stuck, a nudge is usually enough, you rarely need to be shown the line.') });
   }
   const gaps = attempts.reduce((s, a) => s + a.marks.filter((m) => m.severity === 'gap').length, 0);
   const slips = attempts.reduce((s, a) => s + a.marks.filter((m) => m.severity === 'slip').length, 0);
   if (out.length < 2 && gaps + slips >= 3 && slips > gaps * 2) {
-    out.push({ tone: 'slip', text: `Most of your marks (${slips} of ${gaps + slips}) are slips, not gaps. You know this material; slow the last line down.` });
+    out.push({ tone: 'slip', text: tr('Most of your marks ({0} of {1}) are slips, not gaps. You know this material; slow the last line down.', { 0: slips, 1: gaps + slips }) });
   }
   if (out.length === 0 && attempts.length >= 2) {
     const clean = attempts.filter((a) => a.verdict === 'solved' && a.marks.length === 0).length;

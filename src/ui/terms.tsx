@@ -1,5 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { line } from '../i18n';
+import { t } from '../i18n';
 import type { ReactNode } from 'react';
 import { GLOSSARY } from '../ingest/glossary';
 import { openOverlay } from '../store/nav';
@@ -42,7 +42,7 @@ export function TermText({ text }: { text: string }) {
   const used = new Set<string>();
   return (
     <>
-      {tokenize(line(text)).map((tok, i) => {
+      {tokenize(text).map((tok, i) => {
         if (tok.t === 'math') return <MathView key={i} text={tok.s} />;
         if (tok.t === 'bold') return <strong key={i}>{tok.s}</strong>;
         const out: ReactNode[] = [];
@@ -86,9 +86,9 @@ export function TermPop() {
   return (
     <div className="termpop" style={at.above ? { left: at.x, bottom: at.top, zIndex: 70 } : { left: at.x, top: at.top, zIndex: 70 }}>
       <b>{at.key.charAt(0).toUpperCase() + at.key.slice(1)}</b>
-      <p>{GLOSSARY[at.key]}</p>
-      <button className="linkbtn" style={{ padding: '4px 0', fontSize: 14 }} onClick={() => { openOverlay({ name: 'ask', seed: `What is ${/^[aeiou]/.test(at.key) ? 'an' : 'a'} ${at.key}?` }); set(null); }}>
-        Learn more <Icon name="chevron" size={14} />
+      <p>{t(GLOSSARY[at.key])}</p>
+      <button className="linkbtn" style={{ padding: '4px 0', fontSize: 14 }} onClick={() => { openOverlay({ name: 'ask', seed: t('What is {0} {1}?', { 0: /^[aeiou]/.test(at.key) ? 'an' : 'a', 1: at.key }) }); set(null); }}>
+        {t('Learn more')}{' '}<Icon name="chevron" size={14} />
       </button>
     </div>
   );

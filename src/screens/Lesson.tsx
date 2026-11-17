@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
-import { CONCEPTS } from '../engine/concepts';
+import { conceptOf } from '../engine/concepts';
 import { functionOfLine } from '../ingest/calc';
 import { isMathLine, parseExercises, plain } from '../ingest/structure';
 import { prettyInline } from '../ingest/text';
@@ -18,6 +18,7 @@ import { Graph } from '../ui/Graph';
 import { Fit, MathView, tokenize } from '../ui/math';
 import { Table } from '../ui/Md';
 import { AS_WRITTEN } from '../engine/latex';
+import { promptText, t as tr, tn } from '../i18n';
 
 export const HIGHLIGHT_COLORS = ['#22c55e', '#3b82f6', '#06b6d4', '#f59e0b', '#ec4899', '#a855f7', '#ef4444', '#6366f1'];
 
@@ -144,7 +145,7 @@ function SegText({ text, block, item, ctx }: SegProps) {
         );
       })}
       {notes.map((n) => (
-        <button key={n.id} className="note-pin" onClick={() => ctx.onNote(n)} aria-label={`Your note: ${n.title || 'untitled'}`}>
+        <button key={n.id} className="note-pin" onClick={() => ctx.onNote(n)} aria-label={tr('Your note: {0}', { 0: n.title || 'untitled' })}>
           <Icon name="note" size={14} />
         </button>
       ))}
@@ -208,7 +209,7 @@ function MathBlock({ text, steps, caption, index, ctx }: { text: string; steps?:
         {caption && <span className="rd-cap">{caption}</span>}
         {fnText && (
           <button className="graph-it" onClick={() => { haptic(5); setOpen(!open); }} aria-expanded={open}>
-            <Icon name="chart" size={15} /> {open ? 'Hide graph' : 'Graph it'}
+            <Icon name="chart" size={15} /> {open ? tr('Hide graph') : tr('Graph it')}
           </button>
         )}
       </Fit>
@@ -231,7 +232,7 @@ function ExampleCard({ block, index, ctx }: { block: Extract<Block, { t: 'exampl
   }, [block, index, ctx.topicId]);
   return (
     <div className="rd-example">
-      <span className="label">{block.title || 'Example'}</span>
+      <span className="label">{block.title || tr('Example')}</span>
       <div className="col" style={{ gap: 8, marginTop: 8 }}>
         {block.lines.slice(0, shown).map((line, i) => (
           <div key={i} className="ex-line">
@@ -253,22 +254,22 @@ function ExampleCard({ block, index, ctx }: { block: Extract<Block, { t: 'exampl
               setShown(shown + 1);
             }}
           >
-            Next line <span className="faint">· {shown}/{total}</span> <Icon name="down" size={16} />
+            {tr('Next line')}{' '}<span className="faint">· {shown}/{total}</span> <Icon name="down" size={16} />
           </button>
         )}
         {problem && (
-          <button className="reveal alt" onClick={() => { haptic(5); go({ name: 'session', problems: [problem], title: block.title || 'Example' }); }}>
-            <Icon name="pencil" size={15} /> Try it myself
+          <button className="reveal alt" onClick={() => { haptic(5); go({ name: 'session', problems: [problem], title: block.title || tr('Example') }); }}>
+            <Icon name="pencil" size={15} />{' '}{tr('Try it myself')}
           </button>
         )}
         <button
           className="reveal alt"
           onClick={() => {
             haptic(5);
-            openOverlay({ name: 'ask', topicId: ctx.topicId, seed: `Explain this example to me step by step, and say why each step is allowed: ${block.lines.map((l) => plain(l)).join(' ; ')}` });
+            openOverlay({ name: 'ask', topicId: ctx.topicId, seed: tr('Explain this example to me step by step, and say why each step is allowed: {0}', { 0: block.lines.map((l) => plain(l)).join(' ; ') }) });
           }}
         >
-          <Icon name="chat" size={15} /> Explain it
+          <Icon name="chat" size={15} />{' '}{tr('Explain it')}
         </button>
       </div>
     </div>
@@ -539,11 +540,11 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
   if (!found) {
     return (
       <div className="screen" data-dir={dir}>
-        <div className="topbar"><button className="iconbtn" onClick={back} aria-label="Back"><Icon name="back" /></button></div>
+        <div className="topbar"><button className="iconbtn" onClick={back} aria-label={tr('Back')}><Icon name="back" /></button></div>
         <div className="scroll center" style={{ justifyContent: 'center', gap: 12 }}>
           <Lera size={90} mood="curious" />
-          <p className="muted">This lesson isn’t here any more.</p>
-          <Button3D small onClick={() => go({ name: 'lessons' })}>Open lessons</Button3D>
+          <p className="muted">{tr('This lesson isn’t here any more.')}</p>
+          <Button3D small onClick={() => go({ name: 'lessons' })}>{tr('Open lessons')}</Button3D>
         </div>
       </div>
     );
@@ -615,23 +616,23 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
     clearSel();
   };
 
-  const copy = async (text: string, done = 'Copied') => {
+  const copy = async (text: string, done = tr('Copied')) => {
     try {
       await navigator.clipboard.writeText(text);
       toast(done);
     } catch {
-      toast('Copying isn’t allowed here, select and copy by hand.');
+      toast(tr('Copying isn’t allowed here, select and copy by hand.'));
     }
   };
 
   const share = async (text: string) => {
-    const payload = { title: topic.title, text: `“${text}”, from my notes on ${topic.title}` };
+    const payload = { title: topic.title, text: tr('“{0}”, from my notes on {1}', { 0: text, 1: topic.title }) };
     try {
       if (navigator.share) await navigator.share(payload);
-      else await copy(payload.text, 'Copied, ready to share');
+      else await copy(payload.text, tr('Copied, ready to share'));
     } catch (e) {
       // closing the share sheet is fine; a refusal (embedded pages) falls back to copying
-      if (!(e instanceof DOMException && e.name === 'AbortError')) await copy(payload.text, 'Copied, ready to share');
+      if (!(e instanceof DOMException && e.name === 'AbortError')) await copy(payload.text, tr('Copied, ready to share'));
     }
   };
 
@@ -652,17 +653,17 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
   return (
     <div className="screen lesson" data-dir={dir} ref={screen}>
       <div className="lesson-nav">
-        <button className="navpill" onClick={() => go({ name: 'home' })}><Icon name="home" size={18} /> Home</button>
-        <button className="streakpill tap" onClick={() => go({ name: 'streak' })} aria-label={`${days}-day streak`}><Icon name="flame" size={17} fill /> Day {Math.max(1, days)}</button>
-        <button className="navpill" onClick={() => go({ name: 'lessons' })}>Lessons <Icon name="book" size={18} /></button>
+        <button className="navpill" onClick={() => go({ name: 'home' })}><Icon name="home" size={18} />{' '}{tr('Home')}</button>
+        <button className="streakpill tap" onClick={() => go({ name: 'streak' })} aria-label={tr('{0}-day streak', { 0: days })}><Icon name="flame" size={17} fill />{' '}{tr('Day')}{' '}{Math.max(1, days)}</button>
+        <button className="navpill" onClick={() => go({ name: 'lessons' })}>{tr('Lessons')}{' '}<Icon name="book" size={18} /></button>
       </div>
       {hasPractice && <div style={{ padding: '2px 20px 10px' }}>
-        <Seg options={[{ id: 'lesson', label: 'Lesson' }, { id: 'practice', label: `Practice${topic.exercises.length ? ` · ${topic.exercises.length}` : ''}` }]} value={tab} onChange={(v) => { clearSel(); setTerm(null); setTab(v); }} />
+        <Seg options={[{ id: 'lesson', label: tr('Lesson') }, { id: 'practice', label: topic.exercises.length ? tr('Practice · {0}', { 0: topic.exercises.length }) : tr('Practice') }]} value={tab} onChange={(v) => { clearSel(); setTerm(null); setTab(v); }} />
       </div>}
       {showTab === 'lesson' && pages.length > 1 ? (
-        <div className="pager" role="tablist" aria-label="Parts of this lesson">
+        <div className="pager" role="tablist" aria-label={tr('Parts of this lesson')}>
           {pages.map((_, i) => (
-            <button key={i} role="tab" aria-selected={i === at} aria-label={`Part ${i + 1} of ${pages.length}`} data-state={i < at ? 'done' : i === at ? 'now' : 'todo'} onClick={() => goPage(i)} />
+            <button key={i} role="tab" aria-selected={i === at} aria-label={tr('Part {0} of {1}', { 0: i + 1, 1: pages.length })} data-state={i < at ? 'done' : i === at ? 'now' : 'todo'} onClick={() => goPage(i)} />
           ))}
         </div>
       ) : (
@@ -690,13 +691,13 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
                 <h1 className="rd-title">{topic.title}</h1>
               </>
             ) : (
-              <span className="label">{topic.title} · part {at + 1} of {pages.length}</span>
+              <span className="label">{tr('{0} · part {1} of {2}', { 0: topic.title, 1: at + 1, 2: pages.length })}</span>
             )}
             {at > 0 && !pageHeading && <div style={{ height: 8 }} />}
             {topic.blocks.slice(page.start, page.end).map((b, k) => (
               <BlockView key={page.start + k} block={b} index={page.start + k} ctx={ctx} />
             ))}
-            {topic.blocks.length === 0 && <p className="rd-p muted">{hasPractice ? 'Your notes have exercises under this heading but no explanation. Head to Practice.' : 'This heading has no text under it in your notes.'}</p>}
+            {topic.blocks.length === 0 && <p className="rd-p muted">{hasPractice ? tr('Your notes have exercises under this heading but no explanation. Head to Practice.') : tr('This heading has no text under it in your notes.')}</p>}
           </article>
         </div>
       ) : (
@@ -707,39 +708,39 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
         <div className="lesson-foot">
           <div className="row" style={{ gap: 10 }}>
             {at > 0 ? (
-              <button className="page-back" onClick={() => goPage(at - 1)} aria-label="Previous part"><Icon name="back" size={20} /></button>
+              <button className="page-back" onClick={() => goPage(at - 1)} aria-label={tr('Previous part')}><Icon name="back" size={20} /></button>
             ) : prevTopic ? (
               // on a lesson's first part the arrow goes back to the lesson before it; with none before, it is not shown
-              <button className="page-back" onClick={() => replace({ name: 'lesson', topicId: prevTopic.id })} aria-label="Previous lesson"><Icon name="back" size={20} /></button>
+              <button className="page-back" onClick={() => replace({ name: 'lesson', topicId: prevTopic.id })} aria-label={tr('Previous lesson')}><Icon name="back" size={20} /></button>
             ) : null}
             {!lastOne ? (
               <Button3D onClick={() => goPage(at + 1)}>
-                Continue <span style={{ opacity: 0.75, fontWeight: 500 }}>· {at + 1}/{pages.length}</span> <Icon name="arrow" size={18} />
+                {tr('Continue')}{' '}<span style={{ opacity: 0.75, fontWeight: 500 }}>· {at + 1}/{pages.length}</span> <Icon name="arrow" size={18} />
               </Button3D>
             ) : hasPractice ? (
               <Button3D sheen onClick={() => setTab('practice')}>
-                <Icon name="pencil" size={18} /> Practise this lesson
+                <Icon name="pencil" size={18} />{' '}{tr('Practise this lesson')}
               </Button3D>
             ) : nextTopic ? (
               <Button3D sheen onClick={toNext}>
-                Next lesson <Icon name="arrow" size={18} />
+                {tr('Next lesson')}{' '}<Icon name="arrow" size={18} />
               </Button3D>
             ) : (
               <Button3D sheen variant="ok" onClick={toNext}>
-                <Icon name="check" size={18} stroke={3} /> Finish
+                <Icon name="check" size={18} stroke={3} />{' '}{tr('Finish')}
               </Button3D>
             )}
           </div>
           {lastOne && nextTopic && (
             <button className="linkbtn lesson-next" onClick={hasPractice ? toNext : undefined} disabled={!hasPractice}>
-              {hasPractice ? 'Skip to: ' : 'Up next: '}{nextTopic.title}
+              {hasPractice ? tr('Skip to:') : tr('Up next:')}{' '}{nextTopic.title}
             </button>
           )}
         </div>
       )}
       {chapterDone && (
         <Celebration
-          scene={{ kind: 'chapter', title: 'Chapter complete!', sub: unitTitle, cta: nextTopic ? `Next: ${nextUnit?.title ?? 'next chapter'}` : 'Back to lessons' }}
+          scene={{ kind: 'chapter', title: tr('Chapter complete!'), sub: unitTitle, cta: nextTopic ? tr('Next: {0}', { 0: nextUnit?.title ?? 'next chapter' }) : tr('Back to lessons') }}
           onNext={() => {
             setChapterDone(false);
             if (nextTopic) replace({ name: 'lesson', topicId: nextTopic.id });
@@ -749,7 +750,7 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
       )}
       {showTab === 'lesson' && (
         <button className="ask-fab" onClick={() => openOverlay({ name: 'ask', topicId: topic.id })}>
-          <Lera size={30} interactive={false} /> Ask Lera
+          <Lera size={30} interactive={false} />{' '}{tr('Ask Lera')}
         </button>
       )}
 
@@ -757,22 +758,22 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
         <div className="seltool" style={{ left: barLeft(picked.x), top: picked.top > 150 ? picked.top - 12 : picked.bottom + 12 }} data-below={picked.top > 150 ? undefined : ''} onPointerDown={(e: { preventDefault(): void }) => e.preventDefault()}>
           <div className="swatches">
             {HIGHLIGHT_COLORS.map((c) => (
-              <button key={c} style={{ background: c }} onClick={() => paint(c)} aria-label={`Highlight ${c}`} data-on={picked.hl?.color === c && !picked.hl.underline ? '' : undefined} />
+              <button key={c} style={{ background: c }} onClick={() => paint(c)} aria-label={tr('Highlight {0}', { 0: c })} data-on={picked.hl?.color === c && !picked.hl.underline ? '' : undefined} />
             ))}
-            <button className="under" onClick={() => paint(picked.hl?.color ?? '#6c63ff', true)} aria-label="Underline"><Icon name="underline" size={16} /></button>
+            <button className="under" onClick={() => paint(picked.hl?.color ?? '#6c63ff', true)} aria-label={tr('Underline')}><Icon name="underline" size={16} /></button>
             {picked.hl && (
-              <button className="under" onClick={() => { actions.removeHighlight(picked.hl!.id); setPicked(null); }} aria-label="Remove highlight"><Icon name="trash" size={16} /></button>
+              <button className="under" onClick={() => { actions.removeHighlight(picked.hl!.id); setPicked(null); }} aria-label={tr('Remove highlight')}><Icon name="trash" size={16} /></button>
             )}
           </div>
           <div className="actions">
             {(
               [
-                ['copy', 'Copy', () => { void copy(picked.text); clearSel(); }],
-                ['bulb', 'Explain', () => { openOverlay({ name: 'ask', topicId: topic.id, seed: `Explain this: “${picked.text.slice(0, 300)}”` }); clearSel(); }],
-                ['note', 'Note', () => { setNoteDraft(picked); clearSel(); }],
-                ['chat', 'Ask Lera', () => { openOverlay({ name: 'ask', topicId: topic.id, seed: `Tell me more about “${picked.text.slice(0, 300)}”` }); clearSel(); }],
-                ['bookmark', 'Save', () => { actions.save({ topicId: topic.id, topicTitle: topic.title, text: picked.text }); haptic([8, 30, 8]); toast('Saved to your notebook'); clearSel(); }],
-                ['share', 'Share', () => { void share(picked.text); clearSel(); }],
+                ['copy', tr('Copy'), () => { void copy(picked.text); clearSel(); }],
+                ['bulb', tr('Explain'), () => { openOverlay({ name: 'ask', topicId: topic.id, seed: tr('Explain this: “{0}”', { 0: picked.text.slice(0, 300) }) }); clearSel(); }],
+                ['note', tr('Note'), () => { setNoteDraft(picked); clearSel(); }],
+                ['chat', tr('Ask Lera'), () => { openOverlay({ name: 'ask', topicId: topic.id, seed: tr('Tell me more about “{0}”', { 0: picked.text.slice(0, 300) }) }); clearSel(); }],
+                ['bookmark', tr('Save'), () => { actions.save({ topicId: topic.id, topicTitle: topic.title, text: picked.text }); haptic([8, 30, 8]); toast(tr('Saved to your notebook')); clearSel(); }],
+                ['share', tr('Share'), () => { void share(picked.text); clearSel(); }],
               ] as [string, string, () => void][]
             ).map(([icon, label, fn]) => (
               <button key={label} onClick={fn}>
@@ -788,23 +789,23 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
         <div className="termpop" style={{ left: barLeft(term.x), top: term.top + 10 }}>
           <b>{term.key.charAt(0).toUpperCase() + term.key.slice(1)}</b>
           <p>{doc.glossary[term.key]}</p>
-          <button className="linkbtn" style={{ padding: '4px 0', fontSize: 14 }} onClick={() => { openOverlay({ name: 'ask', topicId: topic.id, seed: `What is ${/^[aeiou]/.test(term.key) ? 'an' : 'a'} ${term.key}?` }); setTerm(null); }}>
-            Learn more <Icon name="chevron" size={14} />
+          <button className="linkbtn" style={{ padding: '4px 0', fontSize: 14 }} onClick={() => { openOverlay({ name: 'ask', topicId: topic.id, seed: tr('What is {0} {1}?', { 0: /^[aeiou]/.test(term.key) ? 'an' : 'a', 1: term.key }) }); setTerm(null); }}>
+            {tr('Learn more')}{' '}<Icon name="chevron" size={14} />
           </button>
         </div>
       )}
 
-      {noteDraft && <NoteEditor quote={noteDraft.text} onClose={() => setNoteDraft(null)} onSave={(title, content) => { actions.addNote({ topicId: topic.id, block: noteDraft.block, item: noteDraft.item, offset: noteDraft.end, title, content, quote: noteDraft.text }); setNoteDraft(null); toast('Note added'); }} />}
+      {noteDraft && <NoteEditor quote={noteDraft.text} onClose={() => setNoteDraft(null)} onSave={(title, content) => { actions.addNote({ topicId: topic.id, block: noteDraft.block, item: noteDraft.item, offset: noteDraft.end, title, content, quote: noteDraft.text }); setNoteDraft(null); toast(tr('Note added')); }} />}
 
       {viewNote && (
-        <Sheet onClose={() => setViewNote(null)} label="Your note">
+        <Sheet onClose={() => setViewNote(null)} label={tr('Your note')}>
           <div className="sheet-body">
-            <span className="label">Your note</span>
-            <h3 style={{ fontSize: 20, margin: '6px 0 8px' }}>{viewNote.title || 'Untitled'}</h3>
+            <span className="label">{tr('Your note')}</span>
+            <h3 style={{ fontSize: 20, margin: '6px 0 8px' }}>{viewNote.title || tr('Untitled')}</h3>
             <blockquote className="quote">{prettyInline(viewNote.quote)}</blockquote>
             <p style={{ lineHeight: 1.55, whiteSpace: 'pre-wrap', margin: '12px 0 18px' }}>{viewNote.content}</p>
             <button className="linkbtn" style={{ color: 'var(--gap)', paddingLeft: 0 }} onClick={() => { actions.removeNote(viewNote.id); setViewNote(null); }}>
-              <Icon name="trash" size={16} /> Delete note
+              <Icon name="trash" size={16} />{' '}{tr('Delete note')}
             </button>
           </div>
         </Sheet>
@@ -817,14 +818,14 @@ function NoteEditor({ quote, onClose, onSave }: { quote: string; onClose: () => 
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   return (
-    <Sheet onClose={onClose} label="Add a note">
+    <Sheet onClose={onClose} label={tr('Add a note')}>
       <div className="sheet-body col" style={{ gap: 10 }}>
-        <span className="label">New note</span>
+        <span className="label">{tr('New note')}</span>
         <blockquote className="quote">{prettyInline(quote)}</blockquote>
-        <input className="field" placeholder="Title" value={title} maxLength={60} onChange={(e: { target: { value: string } }) => setTitle(e.target.value)} aria-label="Note title" autoFocus />
-        <textarea className="field" style={{ minHeight: 110, resize: 'none' }} placeholder="What do you want to remember?" value={content} maxLength={200} onChange={(e: { target: { value: string } }) => setContent(e.target.value)} aria-label="Note" />
+        <input className="field" placeholder={tr('Title')} value={title} maxLength={60} onChange={(e: { target: { value: string } }) => setTitle(e.target.value)} aria-label={tr('Note title')} autoFocus />
+        <textarea className="field" style={{ minHeight: 110, resize: 'none' }} placeholder={tr('What do you want to remember?')} value={content} maxLength={200} onChange={(e: { target: { value: string } }) => setContent(e.target.value)} aria-label={tr('Note')} />
         <span className="faint" style={{ fontSize: 12.5, alignSelf: 'flex-end' }}>{content.length}/200</span>
-        <div className="center"><Button3D disabled={!title.trim() && !content.trim()} onClick={() => onSave(title.trim(), content.trim())}>Save note</Button3D></div>
+        <div className="center"><Button3D disabled={!title.trim() && !content.trim()} onClick={() => onSave(title.trim(), content.trim())}>{tr('Save note')}</Button3D></div>
       </div>
     </Sheet>
   );
@@ -840,10 +841,10 @@ function TopicPractice({ topic, doc }: { topic: Topic; doc: LeraDoc }) {
   const done = topic.exercises.filter((e) => solved[e.id]).length;
   const text =
     n === 0
-      ? 'I didn’t find exercises under this heading, so I’ll write problems that fit the topic.'
+      ? tr('I didn’t find exercises under this heading, so I’ll write problems that fit the topic.')
       : done === n
-        ? `You’ve solved all **${n}** exercises from this part of your notes. I can still bring fresh ones.`
-        : `I found **${n}** ${n === 1 ? 'exercise' : 'exercises'} in this part of your notes${done ? `, ${done} solved` : ''}. Write every line; I read the working.`;
+        ? tr('You’ve solved all **{0}** exercises from this part of your notes. I can still bring fresh ones.', { 0: n })
+        : done ? tn(n, 'I found **{n}** exercise in this part of your notes, {done} solved. Write every line; I read the working.', 'I found **{n}** exercises in this part of your notes, {done} solved. Write every line; I read the working.', { done }) : tn(n, 'I found **{n}** exercise in this part of your notes. Write every line; I read the working.', 'I found **{n}** exercises in this part of your notes. Write every line; I read the working.');
   const lastFor = (id: string) => [...attempts].reverse().find((a) => a.problemId === id);
   return (
     <div className="scroll">
@@ -851,13 +852,13 @@ function TopicPractice({ topic, doc }: { topic: Topic; doc: LeraDoc }) {
         <LeraSays size={54} text={text} mood={done === n && n > 0 ? 'proud' : 'idle'} />
         <div className="center">
           <Button3D sheen onClick={() => go({ name: 'session', topicId: topic.id })}>
-            <Icon name="play" size={17} fill /> Start practice
+            <Icon name="play" size={17} fill />{' '}{tr('Start practice')}
           </Button3D>
         </div>
 
         {n > 0 && (
           <section>
-            <span className="label">From your notes</span>
+            <span className="label">{tr('From your notes')}</span>
             <div className="col" style={{ gap: 10, marginTop: 8 }}>
               {topic.exercises.map((e, i) => {
                 const last = lastFor(e.id);
@@ -866,10 +867,10 @@ function TopicPractice({ topic, doc }: { topic: Topic; doc: LeraDoc }) {
                   <button key={e.id} className="card tap exercise" onClick={() => go({ name: 'session', topicId: topic.id, problems: [e], title: `${topic.title} · exercise ${i + 1}` })}>
                     <span className={`exn ${solved[e.id] ? 'done' : ''}`}>{solved[e.id] ? <Icon name="check" size={15} stroke={3} /> : i + 1}</span>
                     <span className="grow">
-                      <span className="muted" style={{ fontSize: 13.5, display: 'block' }}>{e.kind === 'open' ? 'Written answer' : e.prompt}</span>
+                      <span className="muted" style={{ fontSize: 13.5, display: 'block' }}>{e.kind === 'open' ? tr('Written answer') : promptText(e.prompt)}</span>
                       {e.kind === 'open' ? <span style={{ fontSize: 15, lineHeight: 1.4 }}>{prettyInline(plain(e.original ?? e.prompt)).slice(0, 110)}</span> : <MathView text={e.given} block />}
-                      {last && !solved[e.id] && <span className="chip slip" style={{ marginTop: 6 }}>Tried · not solved yet</span>}
-                      {last && solved[e.id] && gaps > 0 && <span className="chip gap" style={{ marginTop: 6 }}>Solved with a gap</span>}
+                      {last && !solved[e.id] && <span className="chip slip" style={{ marginTop: 6 }}>{tr('Tried · not solved yet')}</span>}
+                      {last && solved[e.id] && gaps > 0 && <span className="chip gap" style={{ marginTop: 6 }}>{tr('Solved with a gap')}</span>}
                     </span>
                     <Icon name="chevron" size={17} />
                   </button>
@@ -881,7 +882,7 @@ function TopicPractice({ topic, doc }: { topic: Topic; doc: LeraDoc }) {
 
         {topic.concepts.length > 0 && (
           <section>
-            <span className="label">Ideas this lesson leans on</span>
+            <span className="label">{tr('Ideas this lesson leans on')}</span>
             <div className="col" style={{ gap: 8, marginTop: 8 }}>
               {topic.concepts.map((id) => {
                 const st = statusOf(concepts[id]);
@@ -889,8 +890,8 @@ function TopicPractice({ topic, doc }: { topic: Topic; doc: LeraDoc }) {
                   <button key={id} className="noticed" style={{ borderTop: 0 }} onClick={() => openOverlay({ name: 'review', concept: id })}>
                     <span className={`dot ${st}`} />
                     <span className="grow">
-                      <b style={{ fontSize: 14.5, display: 'block' }}>{CONCEPTS[id].title}</b>
-                      <span className="muted" style={{ fontSize: 13 }}>{CONCEPTS[id].short}</span>
+                      <b style={{ fontSize: 14.5, display: 'block' }}>{conceptOf(id).title}</b>
+                      <span className="muted" style={{ fontSize: 13 }}>{conceptOf(id).short}</span>
                     </span>
                     <Icon name="chevron" size={16} />
                   </button>

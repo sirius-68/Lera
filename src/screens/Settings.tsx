@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LANGS, t } from '../i18n';
+import { LANGS, t, t as tr } from '../i18n';
 import { inHost, post } from '../host';
 import { SUBJECT_LABEL } from '../engine/concepts-calc';
 import { Subject } from '../engine/types';
@@ -36,9 +36,9 @@ export function SettingsScreen() {
     } catch {
       try {
         await navigator.clipboard.writeText(json);
-        toast('Progress copied, paste it into a file to keep it.');
+        toast(tr('Progress copied, paste it into a file to keep it.'));
       } catch {
-        toast('Export isn’t available here.');
+        toast(tr('Export isn’t available here.'));
       }
     }
   };
@@ -46,18 +46,18 @@ export function SettingsScreen() {
   return (
     <div className="screen" data-dir="1">
       <div className="topbar">
-        <button className="iconbtn" onClick={back} aria-label="Back"><Icon name="back" /></button>
-        <h1>Settings</h1>
+        <button className="iconbtn" onClick={back} aria-label={tr('Back')}><Icon name="back" /></button>
+        <h1>{tr('Settings')}</h1>
       </div>
       <div className="scroll">
         <div className="stagger" style={{ padding: '4px 20px 30px', display: 'flex', flexDirection: 'column', gap: 22 }}>
           <section className="col" style={{ gap: 8 }}>
-            <span className="label">You</span>
-            <input className="field" value={profile.name} placeholder="First name" onChange={(e: { target: { value: string } }) => actions.setProfile({ name: e.target.value })} aria-label="First name" />
+            <span className="label">{tr('You')}</span>
+            <input className="field" value={profile.name} placeholder={tr('First name')} onChange={(e: { target: { value: string } }) => actions.setProfile({ name: e.target.value })} aria-label={tr('First name')} />
           </section>
 
           <section className="col" style={{ gap: 8 }}>
-            <span className="label">What you’re studying</span>
+            <span className="label">{tr('What you’re studying')}</span>
             <div className="chips-row">
               {SUBJECTS.map((s) => {
                 const on = subjects.includes(s);
@@ -72,12 +72,12 @@ export function SettingsScreen() {
                       if (next.length) actions.setProfile({ subjects: next });
                     }}
                   >
-                    {on && <Icon name="check" size={14} stroke={3} />} {SUBJECT_LABEL[s]}
+                    {on && <Icon name="check" size={14} stroke={3} />} {tr(SUBJECT_LABEL[s])}
                   </button>
                 );
               })}
             </div>
-            <p className="faint" style={{ fontSize: 13 }}>Decides which ideas are offered under Practice. Your notes are always read in full.</p>
+            <p className="faint" style={{ fontSize: 13 }}>{tr('Decides which ideas are offered under Practice. Your notes are always read in full.')}</p>
           </section>
 
           <section className="col" style={{ gap: 8 }}>
@@ -99,11 +99,11 @@ export function SettingsScreen() {
           </section>
 
           <section className="col" style={{ gap: 8 }}>
-            <span className="label">Checking your working</span>
+            <span className="label">{tr('Checking your working')}</span>
             {(
               [
-                ['line', 'As I go', 'Each line is marked the moment you write it.'],
-                ['end', 'When I finish', 'Write the whole solution, then have every line marked at once.'],
+                ['line', tr('As I go'), tr('Each line is marked the moment you write it.')],
+                ['end', tr('When I finish'), tr('Write the whole solution, then have every line marked at once.')],
               ] as ['line' | 'end', string, string][]
             ).map(([id, title, sub]) => (
               <button key={id} className={`option ${profile.checkMode === id ? 'on' : ''}`} onClick={() => { haptic(5); actions.setProfile({ checkMode: id }); }}>
@@ -111,11 +111,11 @@ export function SettingsScreen() {
                 <span className="radio" />
               </button>
             ))}
-            <p className="faint" style={{ fontSize: 13 }}>You can also switch inside any problem.</p>
+            <p className="faint" style={{ fontSize: 13 }}>{tr('You can also switch inside any problem.')}</p>
           </section>
 
           <section className="col" style={{ gap: 8 }}>
-            <span className="label">Reminders</span>
+            <span className="label">{tr('Reminders')}</span>
             <div className="goal-grid">
               <button
                 className={!profile.notifications ? 'on' : ''}
@@ -125,8 +125,8 @@ export function SettingsScreen() {
                   void disableReminders();
                 }}
               >
-                <b>Off</b>
-                <span>No nudges</span>
+                <b>{tr('Off')}</b>
+                <span>{tr('No nudges')}</span>
               </button>
               {Object.entries(STUDY_TIMES).map(([id, t]) => (
                 <button
@@ -138,20 +138,20 @@ export function SettingsScreen() {
                     actions.setProfile({ notifications: ok, studyTime: id });
                   }}
                 >
-                  <b>{t.label.split(' · ')[0]}</b>
-                  <span>{t.label.split(' · ')[1]}</span>
+                  <b>{tr(t.label).split(' · ')[0]}</b>
+                  <span>{tr(t.label).split(' · ')[1]}</span>
                 </button>
               ))}
             </div>
-            <p className="faint" style={{ fontSize: 13 }}>One reminder a day, sent by this phone itself. Nothing leaves the device.</p>
+            <p className="faint" style={{ fontSize: 13 }}>{tr('One reminder a day, sent by this phone itself. Nothing leaves the device.')}</p>
           </section>
 
           <section className="col" style={{ gap: 8 }}>
-            <span className="label">Daily goal</span>
+            <span className="label">{tr('Daily goal')}</span>
             <div className="goal-grid">
               {GOALS.map((g) => (
                 <button key={g.xp} className={profile.dailyXp === g.xp ? 'on' : ''} onClick={() => { haptic(5); actions.setProfile({ dailyXp: g.xp, focusMinutes: g.xp <= 15 ? 5 : g.xp <= 30 ? 10 : g.xp <= 50 ? 15 : 20 }); }}>
-                  <b>{g.label}</b>
+                  <b>{tr(g.label)}</b>
                   <span>{g.xp} XP</span>
                 </button>
               ))}
@@ -159,45 +159,45 @@ export function SettingsScreen() {
           </section>
 
           <section className="col" style={{ gap: 8 }}>
-            <span className="label">Profile</span>
+            <span className="label">{tr('Profile')}</span>
             {profile.email ? (
               <>
-                <p className="muted" style={{ fontSize: 14 }}>Signed in as <b>{profile.email}</b></p>
-                <Button3D small variant="secondary" style={{ alignSelf: 'flex-start' }} onClick={async () => { if (await confirmDialog('Sign out?', { body: 'Your notes and progress stay on this phone. You’ll need your password to get back in.', yes: 'Sign out' })) { actions.setProfile({ signedIn: false }); resetNav(); } }}>
-                  <Icon name="lock" size={16} /> Sign out
+                <p className="muted" style={{ fontSize: 14 }}>{tr('Signed in as')}{' '}<b>{profile.email}</b></p>
+                <Button3D small variant="secondary" style={{ alignSelf: 'flex-start' }} onClick={async () => { if (await confirmDialog(tr('Sign out?'), { body: tr('Your notes and progress stay on this phone. You’ll need your password to get back in.'), yes: tr('Sign out') })) { actions.setProfile({ signedIn: false }); resetNav(); } }}>
+                  <Icon name="lock" size={16} />{' '}{tr('Sign out')}
                 </Button3D>
               </>
             ) : accountOpen ? (
               <AuthPanel mode="signup" name={profile.name} onDone={() => setAccountOpen(false)} />
             ) : (
               <>
-                <p className="muted" style={{ fontSize: 14 }}>No profile yet. Create one to lock the app behind a password.</p>
-                <Button3D small variant="secondary" style={{ alignSelf: 'flex-start' }} onClick={() => setAccountOpen(true)}><Icon name="plus" size={16} /> Create a profile</Button3D>
+                <p className="muted" style={{ fontSize: 14 }}>{tr('No profile yet. Create one to lock the app behind a password.')}</p>
+                <Button3D small variant="secondary" style={{ alignSelf: 'flex-start' }} onClick={() => setAccountOpen(true)}><Icon name="plus" size={16} />{' '}{tr('Create a profile')}</Button3D>
               </>
             )}
           </section>
 
           <section className="col" style={{ gap: 8 }}>
-            <span className="label">About</span>
+            <span className="label">{tr('About')}</span>
             <p className="muted" style={{ fontSize: 14, lineHeight: 1.5 }}>
-              Lera checks algebra and calculus on this device with its own engine. Your notes, working and progress stay on this phone.
+              {tr('Lera checks algebra and calculus on this device with its own engine. Your notes, working and progress stay on this phone.')}
             </p>
           </section>
 
           <section className="col" style={{ gap: 8 }}>
-            <span className="label">Your data</span>
-            <Button3D small variant="secondary" onClick={exportData} style={{ alignSelf: 'flex-start' }}><Icon name="share" size={16} /> Export progress</Button3D>
+            <span className="label">{tr('Your data')}</span>
+            <Button3D small variant="secondary" onClick={exportData} style={{ alignSelf: 'flex-start' }}><Icon name="share" size={16} />{' '}{tr('Export progress')}</Button3D>
             <button
               className="linkbtn"
               style={{ color: 'var(--gap)', alignSelf: 'flex-start', paddingLeft: 0 }}
               onClick={async () => {
-                if (await confirmDialog('Erase everything?', { body: 'All notes, progress and settings on this device will be removed.', yes: 'Erase', danger: true })) {
+                if (await confirmDialog(tr('Erase everything?'), { body: tr('All notes, progress and settings on this device will be removed.'), yes: tr('Erase'), danger: true })) {
                   actions.reset();
                   resetNav();
                 }
               }}
             >
-              <Icon name="trash" size={16} /> Erase everything and start again
+              <Icon name="trash" size={16} />{' '}{tr('Erase everything and start again')}
             </button>
           </section>
         </div>

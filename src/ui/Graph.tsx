@@ -4,6 +4,7 @@ import { E, diff, ev, simp, toText, tryParse } from '../engine/calc/expr';
 import { Icon } from './icons';
 import { MathView } from './math';
 import { haptic } from './kit';
+import { t as tr } from '../i18n';
 
 /**
  * An interactive graph of one or more functions of x.
@@ -301,13 +302,13 @@ export function Graph({ fns, caption, height = 250 }: { fns: string[]; caption?:
         ))}
       </div>
       <div className="graph-stage" ref={wrap} style={{ height }}>
-        <canvas ref={canvas} style={{ width: size.w, height: size.h }} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onWheel={onWheel} role="img" aria-label={`Graph of ${curves.map((c) => `y = ${c.src}`).join(' and ')}`} />
+        <canvas ref={canvas} style={{ width: size.w, height: size.h }} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp} onWheel={onWheel} role="img" aria-label={tr('Graph of {0}', { 0: curves.map((c) => `y = ${c.src}`).join(' and ') })} />
         <div className="graph-tools">
-          <button onClick={() => zoom(0.7)} aria-label="Zoom in"><Icon name="plus" size={17} /></button>
-          <button onClick={() => zoom(1.4)} aria-label="Zoom out"><span style={{ fontSize: 20, lineHeight: 1, fontWeight: 700 }}>−</span></button>
-          <button onClick={() => { setView(null); setTrace(null); }} aria-label="Reset view"><Icon name="refresh" size={16} /></button>
+          <button onClick={() => zoom(0.7)} aria-label={tr('Zoom in')}><Icon name="plus" size={17} /></button>
+          <button onClick={() => zoom(1.4)} aria-label={tr('Zoom out')}><span style={{ fontSize: 20, lineHeight: 1, fontWeight: 700 }}>−</span></button>
+          <button onClick={() => { setView(null); setTrace(null); }} aria-label={tr('Reset view')}><Icon name="refresh" size={16} /></button>
         </div>
-        {!trace && <span className="graph-tip">Tap the curve · drag to move · pinch to zoom</span>}
+        {!trace && <span className="graph-tip">{tr('Tap the curve · drag to move · pinch to zoom')}</span>}
       </div>
       <div className="graph-read">
         {t && Number.isFinite(t.y) ? (
@@ -317,15 +318,15 @@ export function Graph({ fns, caption, height = 250 }: { fns: string[]; caption?:
             <span className="slope"><b>slope</b> {Number.isFinite(t.m) ? fmt(t.m) : '·'}</span>
           </>
         ) : (
-          <span className="faint">{caption || 'Rebuilt from the function in your notes.'}</span>
+          <span className="faint">{caption || tr('Rebuilt from the function in your notes.')}</span>
         )}
         <button className="graph-toggle" data-on={slope ? '' : undefined} onClick={() => setSlope(!slope)} aria-pressed={slope}>
-          <Icon name="chart" size={14} /> Slope
+          <Icon name="chart" size={14} />{' '}{tr('Slope')}
         </button>
       </div>
       {slope && (
         <figcaption className="graph-cap">
-          Dashed: the slope of the curve at each x, its derivative, <MathView text={`y = ${curves[trace?.i ?? 0].dText}`} />. Where the dashed curve crosses zero, the solid one is flat.
+          {tr('Dashed: the slope of the curve at each x, its derivative,')}{' '}<MathView text={`y = ${curves[trace?.i ?? 0].dText}`} />{tr('. Where the dashed curve crosses zero, the solid one is flat.')}
         </figcaption>
       )}
     </figure>

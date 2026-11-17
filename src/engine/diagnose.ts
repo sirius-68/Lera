@@ -8,6 +8,7 @@ import { Frac, ONE, fAdd, fDiv, fEq, fIsInt, fIsZero, fMul, fNum, frac, snapToFr
 import { evalNum, pConstValue, pDegree, pIsConst, pPrimitive, pUniCoeffs, pVars, rSub } from './poly';
 import { FLIP, closeTo, statementSolutions } from './solve';
 import { ConceptId, Diagnosis, ProblemKind, Severity } from './types';
+import { t as tr } from '../i18n';
 
 /**
  * Why a line doesn't follow from the one above it.
@@ -104,14 +105,14 @@ const distributionRule: NodeRule = (n) => {
               'distributive',
               'gap',
               'A minus in front flips every sign inside.',
-              `In ${m(whole)} the minus applies to the whole bracket, so every term changes sign: ${m(expanded(n))}.`,
+              tr('In {0} the minus applies to the whole bracket, so every term changes sign: {1}.', { 0: m(whole), 1: m(expanded(n)) }),
             )
           : d(
               'distribute-first-only',
               'distributive',
               'gap',
-              'The number outside multiplies everything inside.',
-              `In ${m(whole)} you multiplied the first term but not the rest. ${m(k as Node)} has to reach every term in the bracket: ${m(expanded(n))}.`,
+              tr('The number outside multiplies everything inside.'),
+              tr('In {0} you multiplied the first term but not the rest. {1} has to reach every term in the bracket: {2}.', { 0: m(whole), 1: m(k as Node), 2: m(expanded(n)) }),
             ),
     });
     // one product carries the wrong sign
@@ -125,7 +126,7 @@ const distributionRule: NodeRule = (n) => {
             'distribute-sign',
             'distributive',
             kNeg ? 'gap' : 'slip',
-            kNeg ? 'A negative outside flips the signs inside.' : 'Watch the sign when you multiply out.',
+            kNeg ? 'A negative outside flips the signs inside.' : tr('Watch the sign when you multiply out.'),
             `${m(isBareMinus ? '-1' : (k as Node))} times ${m(s[j])} is ${m(expanded(times(s[j])))}. Multiplying out ${m(whole)} gives ${m(expanded(n))}.`,
           ),
       });
@@ -142,7 +143,7 @@ const distributionRule: NodeRule = (n) => {
             'foil-partial',
             'expanding-binomials',
             'gap',
-            'Every term meets every term.',
+            tr('Every term meets every term.'),
             `${m(n)} makes four products, not two. You have first × first and last × last, but the two cross terms are missing: ${m(expanded(n))}.`,
           ),
       });
@@ -198,7 +199,7 @@ const exponentRule: NodeRule = (n) => {
                 'exp-product-multiplied',
                 'exponent-rules',
                 'gap',
-                'Multiplying powers adds the exponents.',
+                tr('Multiplying powers adds the exponents.'),
                 `${m(mul(n.args[i], n.args[j]))} is ${m(pow(base, lit(sum)))}, not ${m(pow(base, lit(prod)))}. You count how many times ${m(base)} is multiplied in total.`,
               ),
           });
@@ -252,8 +253,8 @@ const exponentRule: NodeRule = (n) => {
             'power-of-product',
             'exponent-rules',
             'gap',
-            'The power applies to the number too.',
-            `In ${m(n)} everything inside the bracket is raised to the power, including the ${m(nums[0])}: ${m(expanded(n))}.`,
+            tr('The power applies to the number too.'),
+            tr('In {0} everything inside the bracket is raised to the power, including the {1}: {2}.', { 0: m(n), 1: m(nums[0]), 2: m(expanded(n)) }),
           ),
       });
     }
@@ -273,7 +274,7 @@ const exponentRule: NodeRule = (n) => {
             'exp-quotient-divided',
             'exponent-rules',
             'gap',
-            'Dividing powers subtracts the exponents.',
+            tr('Dividing powers subtracts the exponents.'),
             `${m(n)} is ${m(expanded(n))}: each ${m(base)} underneath cancels one on top.`,
           ),
       });
@@ -318,7 +319,7 @@ const exponentRule: NodeRule = (n) => {
           'neg-square',
           'order-of-operations',
           'gap',
-          'Without brackets, the power comes before the minus.',
+          tr('Without brackets, the power comes before the minus.'),
           `${m(n)} squares first and then takes the negative. To square the negative number itself you need ${m(pow(neg(p.base), p.exp))}.`,
         ),
     });
@@ -376,7 +377,7 @@ const combineRule: NodeRule = (n) => {
               'combine-unlike',
               'like-terms',
               'gap',
-              'Only like terms can be combined.',
+              tr('Only like terms can be combined.'),
               `${m(n.args[i])} and ${m(n.args[j])} are different kinds of term, so they can’t be added into one. They stay separate.`,
             ),
         });
@@ -390,7 +391,7 @@ const combineRule: NodeRule = (n) => {
               'add-exponents-when-adding',
               'like-terms',
               'gap',
-              'Adding like terms doesn’t change the power.',
+              tr('Adding like terms doesn’t change the power.'),
               `${m(add(n.args[i], n.args[j]))} is ${m(coefTimes(sum, mono))}. The power only changes when you multiply.`,
             ),
         });
@@ -402,7 +403,7 @@ const combineRule: NodeRule = (n) => {
                 'dropped-variable',
                 'like-terms',
                 'slip',
-                'The letter went missing.',
+                tr('The letter went missing.'),
                 `${m(add(n.args[i], n.args[j]))} is ${m(coefTimes(sum, mono))}, not ${m(lit(sum))}. Adding like terms adds the numbers in front; the letter part stays.`,
               ),
           });
@@ -414,7 +415,7 @@ const combineRule: NodeRule = (n) => {
               'multiplied-when-adding',
               'like-terms',
               'slip',
-              'These are added, not multiplied.',
+              tr('These are added, not multiplied.'),
               `${m(add(n.args[i], n.args[j]))} adds the coefficients: ${m(coefTimes(sum, mono))}.`,
             ),
         });
@@ -444,8 +445,8 @@ const fractionRule: NodeRule = (n) => {
               'add-fractions-straight',
               'fractions',
               'gap',
-              'Fractions need a common denominator first.',
-              `You can’t add tops and bottoms separately. Rewrite ${m(a)} and ${m(b)} over the same denominator, then add the tops only.`,
+              tr('Fractions need a common denominator first.'),
+              tr('You can’t add tops and bottoms separately. Rewrite {0} and {1} over the same denominator, then add the tops only.', { 0: m(a), 1: m(b) }),
             ),
         });
       }
@@ -462,8 +463,8 @@ const fractionRule: NodeRule = (n) => {
             'cancel-term',
             'fractions',
             'gap',
-            'You can cancel factors, not terms.',
-            `In ${m(n)} the ${m(t)} on top is added to something, so it can’t cancel on its own. The bottom divides the whole top.`,
+            tr('You can cancel factors, not terms.'),
+            tr('In {0} the {1} on top is added to something, so it can’t cancel on its own. The bottom divides the whole top.', { 0: m(n), 1: m(t) }),
           );
         out.push({ node: fromTerms(others), diag });
         out.push({ node: fromTerms(ts.map((x, q) => (q === i ? num(1) : x))), diag });
@@ -475,7 +476,7 @@ const fractionRule: NodeRule = (n) => {
             'divide-one-term',
             'fractions',
             'gap',
-            'The denominator divides every term on top.',
+            tr('The denominator divides every term on top.'),
             `${m(n)} means each term of the top is divided by ${m(n.den)}, not only ${m(t)}.`,
           ),
       });
@@ -513,8 +514,8 @@ const orderRule: NodeRule = (n) => {
             'order-of-operations',
             'order-of-operations',
             'gap',
-            'Multiplication comes before addition.',
-            `In ${m(n)} work out ${m(core)} first, then add. Going strictly left to right gives a different number.`,
+            tr('Multiplication comes before addition.'),
+            tr('In {0} work out {1} first, then add. Going strictly left to right gives a different number.', { 0: m(n), 1: m(core) }),
           ),
       });
     });
@@ -528,8 +529,8 @@ const orderRule: NodeRule = (n) => {
           'order-power',
           'order-of-operations',
           'gap',
-          'Powers come before multiplication.',
-          `In ${m(n)} only ${m(p.base)} is raised to the power. Work out ${m(p)} first, then multiply.`,
+          tr('Powers come before multiplication.'),
+          tr('In {0} only {1} is raised to the power. Work out {2} first, then multiply.', { 0: m(n), 1: m(p.base), 2: m(p) }),
         ),
     });
   }
@@ -608,7 +609,7 @@ function* signFlipCandidates(prev: Statement, cur: Statement): Generator<Candida
           'transpose-sign',
           'inverse-operations',
           'gap',
-          'A term changes sign when it crosses the equals sign.',
+          tr('A term changes sign when it crosses the equals sign.'),
           `${m(bare)} was ${was} on the ${t.side === 'lhs' ? 'left' : 'right'}. To move it you ${undo} ${m(bare)} on both sides, so it arrives on the other side as ${m(negate(t.node))}.`,
         );
       },
@@ -667,8 +668,8 @@ function* coefficientCandidates(prev: Statement): Generator<Candidate> {
           'subtracted-coefficient',
           'inverse-operations',
           'gap',
-          'Undo multiplying by dividing.',
-          `In ${m(term)} the ${m(lit(a))} multiplies ${m(x)}. Subtracting it doesn’t undo that, divide both sides by ${m(lit(a))} instead.`,
+          tr('Undo multiplying by dividing.'),
+          tr('In {0} the {1} multiplies {2}. Subtracting it doesn’t undo that, divide both sides by {3} instead.', { 0: m(term), 1: m(lit(a)), 2: m(x), 3: m(lit(a)) }),
         ),
     };
     yield {
@@ -678,7 +679,7 @@ function* coefficientCandidates(prev: Statement): Generator<Candidate> {
           'multiplied-coefficient',
           'inverse-operations',
           'gap',
-          'Use the opposite operation.',
+          tr('Use the opposite operation.'),
           isFraction
             ? `${m(x)} is being divided here, so undo it by multiplying both sides.`
             : `${m(x)} is being multiplied by ${m(lit(a))}, so undo it by dividing both sides by ${m(lit(a))}.`,
@@ -692,8 +693,8 @@ function* coefficientCandidates(prev: Statement): Generator<Candidate> {
             'inverted-quotient',
             'balance',
             'slip',
-            'That division is upside down.',
-            `Dividing both sides of ${m(statementToText(prev))} by ${m(lit(a))} gives ${m(x)} = ${m(lit(fDiv(c, a)))}.`,
+            tr('That division is upside down.'),
+            tr('Dividing both sides of {0} by {1} gives {2} = {3}.', { 0: m(statementToText(prev)), 1: m(lit(a)), 2: m(x), 3: m(lit(fDiv(c, a))) }),
           ),
       };
     }
@@ -704,7 +705,7 @@ function* coefficientCandidates(prev: Statement): Generator<Candidate> {
           'sign-in-division',
           'signed-arithmetic',
           'slip',
-          'Check the sign of that division.',
+          tr('Check the sign of that division.'),
           `${m(lit(c))} divided by ${m(lit(a))} is ${m(lit(fDiv(c, a)))}. Same signs give a positive, different signs give a negative.`,
         ),
     };
@@ -729,8 +730,8 @@ function* partialDivisionCandidates(prev: Statement): Generator<Candidate> {
             'divide-partial',
             'balance',
             'gap',
-            'Divide every term, not just some.',
-            `Dividing by ${m(lit(k))} has to happen to each term on both sides. Here some terms were divided and others weren’t.`,
+            tr('Divide every term, not just some.'),
+            tr('Dividing by {0} has to happen to each term on both sides. Here some terms were divided and others weren’t.', { 0: m(lit(k)) }),
           ),
       };
     }
@@ -770,8 +771,8 @@ function* clearingCandidates(prev: Statement): Generator<Candidate> {
             'multiply-partial',
             'clearing-fractions',
             'gap',
-            'Multiply every term when clearing a fraction.',
-            `Multiplying by ${m(lit(k))} to remove the fraction has to hit every term on both sides, including the ones that weren’t fractions.`,
+            tr('Multiply every term when clearing a fraction.'),
+            tr('Multiplying by {0} to remove the fraction has to hit every term on both sides, including the ones that weren’t fractions.', { 0: m(lit(k)) }),
           ),
       };
     }
@@ -827,7 +828,7 @@ function rootsDiagnosis(prep: Prepared, prev: Statement, cur: Statement): Draft 
         'divided-by-variable',
         'dividing-by-variable',
         'gap',
-        `Dividing by ${v} threw away ${v} = 0.`,
+        tr('Dividing by {0} threw away {1} = 0.', { 0: v, 1: v }),
         `Dividing both sides by ${m(v)} is only safe when ${m(v)} can’t be zero, and here ${m(`${v} = 0`)} was a solution. Bring everything to one side and factor instead.`,
       );
     }
@@ -835,7 +836,7 @@ function rootsDiagnosis(prep: Prepared, prev: Statement, cur: Statement): Draft 
       'lost-solution',
       'zero-product',
       'gap',
-      'One solution went missing.',
+      tr('One solution went missing.'),
       `The line above is true for ${missing.concat(kept).map((r) => m(`${v} = ${r.text}`)).join(' and ')}. This line only keeps ${kept.map((r) => m(`${v} = ${r.text}`)).join(' and ')}.`,
     );
   }
@@ -846,7 +847,7 @@ function rootsDiagnosis(prep: Prepared, prev: Statement, cur: Statement): Draft 
       'extra-solution',
       'zero-product',
       'gap',
-      'This line lets in a value the one above doesn’t.',
+      tr('This line lets in a value the one above doesn’t.'),
       `${extra.map((r) => m(`${v} = ${r.text}`)).join(' and ')} doesn’t satisfy the line above. Check it by substituting back.`,
     );
   }
@@ -863,15 +864,15 @@ function rootsDiagnosis(prep: Prepared, prev: Statement, cur: Statement): Draft 
         'factor-sign',
         'factoring',
         'gap',
-        'Check the signs inside the brackets.',
-        `Multiply your brackets back out and compare with the line above, the middle term comes out with the opposite sign. Swap the signs in the brackets.`,
+        tr('Check the signs inside the brackets.'),
+        tr('Multiply your brackets back out and compare with the line above, the middle term comes out with the opposite sign. Swap the signs in the brackets.'),
       );
     }
     return d(
       'factor-root-sign',
       'zero-product',
       'gap',
-      'The solution has the opposite sign to the number in the bracket.',
+      tr('The solution has the opposite sign to the number in the bracket.'),
       `A bracket like ${m(`(${v} - 2)`)} is zero when ${m(`${v} = 2`)}, not ${m(`${v} = -2`)}. Set each bracket equal to zero and solve it.`,
     );
   }
@@ -897,8 +898,8 @@ function factoringDiagnosis(prev: Node, cur: Node): Draft | null {
       'factor-sign',
       'factoring',
       'gap',
-      'Check the signs inside the brackets.',
-      `Your brackets multiply back to ${m(back)}. The numbers are right but the middle term has the wrong sign, flip the signs in the brackets.`,
+      tr('Check the signs inside the brackets.'),
+      tr('Your brackets multiply back to {0}. The numbers are right but the middle term has the wrong sign, flip the signs in the brackets.', { 0: m(back) }),
     );
   }
   if (fEq(a[0], b[0]) && !fEq(a[1], b[1])) {
@@ -906,8 +907,8 @@ function factoringDiagnosis(prev: Node, cur: Node): Draft | null {
       'factor-wrong-sum',
       'factoring',
       'gap',
-      'Those numbers multiply correctly, but don’t add up.',
-      `Your brackets multiply back to ${m(back)}. You need two numbers that multiply to ${m(lit(fDiv(a[0], a[2])))} and add to ${m(lit(fDiv(a[1], a[2])))}.`,
+      tr('Those numbers multiply correctly, but don’t add up.'),
+      tr('Your brackets multiply back to {0}. You need two numbers that multiply to {1} and add to {2}.', { 0: m(back), 1: m(lit(fDiv(a[0], a[2]))), 2: m(lit(fDiv(a[1], a[2]))) }),
     );
   }
   if (fEq(a[1], b[1]) && !fEq(a[0], b[0])) {
@@ -915,8 +916,8 @@ function factoringDiagnosis(prev: Node, cur: Node): Draft | null {
       'factor-wrong-product',
       'factoring',
       'gap',
-      'Those numbers add correctly, but don’t multiply to the last term.',
-      `Your brackets multiply back to ${m(back)}. You need two numbers that add to ${m(lit(fDiv(a[1], a[2])))} and multiply to ${m(lit(fDiv(a[0], a[2])))}.`,
+      tr('Those numbers add correctly, but don’t multiply to the last term.'),
+      tr('Your brackets multiply back to {0}. You need two numbers that add to {1} and multiply to {2}.', { 0: m(back), 1: m(lit(fDiv(a[1], a[2]))), 2: m(lit(fDiv(a[0], a[2]))) }),
     );
   }
   return null;
@@ -1084,10 +1085,10 @@ export function diagnose(prep: Prepared, prev: Statement, cur: Statement): Diagn
           'inequality-flip',
           'inequality-flip',
           'gap',
-          negativeAround ? 'Dividing by a negative flips the inequality.' : 'The inequality only flips for a negative.',
+          negativeAround ? tr('Dividing by a negative flips the inequality.') : tr('The inequality only flips for a negative.'),
           negativeAround
-            ? 'When you multiply or divide both sides by a negative number, the inequality sign turns around. Everything else in this line is right.'
-            : 'The sign turns around only when you multiply or divide by a negative number. Here that didn’t happen, so it should point the same way as before.',
+            ? tr('When you multiply or divide both sides by a negative number, the inequality sign turns around. Everything else in this line is right.')
+            : tr('The sign turns around only when you multiply or divide by a negative number. Here that didn’t happen, so it should point the same way as before.'),
         ),
         statementToText(flipped),
       );
@@ -1146,8 +1147,8 @@ export function diagnose(prep: Prepared, prev: Statement, cur: Statement): Diagn
           'exponent-slip',
           'exponent-rules',
           'gap',
-          'Check that power.',
-          `The power ${m(fix.was)} should be ${m(lit(fix.shouldBe))}. Count how the exponents combine in the line above.`,
+          tr('Check that power.'),
+          tr('The power {0} should be {1}. Count how the exponents combine in the line above.', { 0: m(fix.was), 1: m(lit(fix.shouldBe)) }),
         ),
         fixedText,
       );
@@ -1158,8 +1159,8 @@ export function diagnose(prep: Prepared, prev: Statement, cur: Statement): Diagn
         'arithmetic-slip',
         involvesNegatives ? 'signed-arithmetic' : 'arithmetic',
         'slip',
-        'One number slipped.',
-        `You wrote ${m(fix.was)} where it should be ${m(lit(fix.shouldBe))}. The method is fine, it’s just the calculation.`,
+        tr('One number slipped.'),
+        tr('You wrote {0} where it should be {1}. The method is fine, it’s just the calculation.', { 0: m(fix.was), 1: m(lit(fix.shouldBe)) }),
       ),
       fixedText,
     );
@@ -1171,8 +1172,8 @@ export function diagnose(prep: Prepared, prev: Statement, cur: Statement): Diagn
       'unknown',
       prep.problem.concepts[0] ?? KIND_CONCEPT[prep.problem.kind],
       'gap',
-      'This line doesn’t follow from the one above.',
-      'I can’t find a valid step that turns the line above into this one. Change one thing at a time and write each change on its own line, so we can both see where it goes.',
+      tr('This line doesn’t follow from the one above.'),
+      tr('I can’t find a valid step that turns the line above into this one. Change one thing at a time and write each change on its own line, so we can both see where it goes.'),
     ),
   );
 }

@@ -1,7 +1,8 @@
 import { hintLadder } from '../engine/analyze';
-import { CONCEPTS, conceptsForText } from '../engine/concepts';
+import { CONCEPTS, conceptsForText, conceptOf } from '../engine/concepts';
 import { ConceptId, Problem } from '../engine/types';
 import { GLOSSARY } from '../ingest/glossary';
+import { t as tr } from '../i18n';
 
 /**
  * What Lera can say with no language model connected: definitions from the
@@ -58,18 +59,18 @@ export function localAnswer(question: string, ctx: LocalContext): string {
     if (ladder) return `${ladder.nudge}\n\n${ladder.method}`;
   }
   if (ctx.problem && /\b(answer|solution)\b/i.test(q)) {
-    return 'I won’t hand over the answer, but tap **Hint** under your working and I’ll walk you there one rung at a time.';
+    return tr('I won’t hand over the answer, but tap **Hint** under your working and I’ll walk you there one rung at a time.');
   }
 
-  for (const t of termsIn(q, glossary)) parts.push(`**${cap(t)}**, ${glossary[t]}`);
+  for (const t of termsIn(q, glossary)) parts.push(tr('**{0}**, {1}', { 0: cap(t), 1: glossary[t] }));
 
   const concept = bestConcept(q) ?? conceptsForText(q)[0] ?? (parts.length === 0 && ctx.topicTitle ? conceptsForText(ctx.topicTitle)[0] : undefined);
   if (concept) {
-    const c = CONCEPTS[concept];
+    const c = conceptOf(concept);
     // the idea first, then at most one definition
-    parts.splice(0, parts.length, `**${c.title}.** ${c.explain[0]}`, ...(c.trap ? [`Watch for this: ${c.trap.note}`] : []), ...parts.slice(0, 1));
+    parts.splice(0, parts.length, `**${c.title}.** ${c.explain[0]}`, ...(c.trap ? [tr('Watch for this: {0}', { 0: c.trap.note })] : []), ...parts.slice(0, 1));
   }
 
   if (parts.length) return parts.join('\n\n');
-  return 'I can’t answer that one on my own yet. Without an AI model connected I can define terms from your notes, explain any of the algebra ideas, and give hints on the problem you’re solving. Connect a free model in **Settings → AI assistant** and I’ll answer open questions too.';
+  return tr('I can’t answer that one on my own yet. Without an AI model connected I can define terms from your notes, explain any of the algebra ideas, and give hints on the problem you’re solving. Connect a free model in **Settings → AI assistant** and I’ll answer open questions too.');
 }

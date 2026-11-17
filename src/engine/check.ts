@@ -12,6 +12,7 @@ import {
   SolSet, polyRoots, relationHoldsAt, sameSol, sameTruthSet, solveLinearSystem, statementSolutions,
 } from './solve';
 import { Problem } from './types';
+import { t as tr } from '../i18n';
 
 export type Mode = 'eq' | 'ineq' | 'expr' | 'system' | 'open';
 
@@ -320,16 +321,16 @@ export function finalForm(prep: Prepared, st: Statement): FinalCheck {
   const { problem, v } = prep;
   if (prep.mode === 'eq') {
     if (st.kind === 'special') return { final: true };
-    if (st.kind !== 'rel') return { final: false, remaining: 'Write it as an equation.' };
+    if (st.kind !== 'rel') return { final: false, remaining: tr('Write it as an equation.') };
     for (const r of st.rels) {
-      if (r.op !== '=') return { final: false, remaining: `Finish with ${v} = …` };
+      if (r.op !== '=') return { final: false, remaining: tr('Finish with {0} = …', { 0: v }) };
       const s = solvedRelation(r, v);
       if (!s.ok)
         return {
           final: false,
           remaining:
             s.reason === 'number'
-              ? 'Almost, work out that last number.'
+              ? tr('Almost, work out that last number.')
               : `${v} isn’t on its own yet. Keep going until the line reads ${v} = a number.`,
         };
     }
@@ -337,20 +338,20 @@ export function finalForm(prep: Prepared, st: Statement): FinalCheck {
   }
   if (prep.mode === 'ineq') {
     if (st.kind === 'special') return { final: true };
-    if (st.kind !== 'rel') return { final: false, remaining: 'Write it as an inequality.' };
+    if (st.kind !== 'rel') return { final: false, remaining: tr('Write it as an inequality.') };
     for (const r of st.rels) {
       const s = solvedRelation(r, v);
       if (!s.ok)
         return {
           final: false,
           remaining:
-            s.reason === 'number' ? 'Almost, work out that last number.' : `Get ${v} on its own on one side.`,
+            s.reason === 'number' ? tr('Almost, work out that last number.') : tr('Get {0} on its own on one side.', { 0: v }),
         };
     }
     return { final: true };
   }
   if (prep.mode === 'system') {
-    if (st.kind !== 'rel') return { final: false, remaining: 'Give a value for each letter.' };
+    if (st.kind !== 'rel') return { final: false, remaining: tr('Give a value for each letter.') };
     const solved = new Set<string>();
     for (const r of st.rels) {
       for (const name of prep.vars) {
@@ -359,7 +360,7 @@ export function finalForm(prep: Prepared, st: Statement): FinalCheck {
     }
     const missing = prep.vars.filter((x) => !solved.has(x));
     return missing.length
-      ? { final: false, remaining: `You still need a value for ${missing.join(' and ')}.` }
+      ? { final: false, remaining: tr('You still need a value for {0}.', { 0: missing.join(' and ') }) }
       : { final: true };
   }
   if (prep.mode === 'expr') {
@@ -369,11 +370,11 @@ export function finalForm(prep: Prepared, st: Statement): FinalCheck {
     const givenExpr = prep.given.kind === 'expr' ? prep.given.expr : e;
     switch (problem.kind) {
       case 'evaluate':
-        return isSimpleConstant(e) ? { final: true } : { final: false, remaining: 'Keep going until it’s a single number.' };
+        return isSimpleConstant(e) ? { final: true } : { final: false, remaining: tr('Keep going until it’s a single number.') };
       case 'factor':
         return isFullyFactored(e, givenExpr)
           ? { final: true }
-          : { final: false, remaining: flattenFactors(e).length >= 2 ? 'One of those brackets can be factored further.' : 'Write it as a product of brackets.' };
+          : { final: false, remaining: flattenFactors(e).length >= 2 ? tr('One of those brackets can be factored further.') : tr('Write it as a product of brackets.') };
       case 'expand':
       case 'simplify':
       default: {
@@ -385,18 +386,18 @@ export function finalForm(prep: Prepared, st: Statement): FinalCheck {
           const reducible = g ? !isReducedRational(givenExpr) : false;
           if (isReducedRational(e) && (!reducible || nodeCount(e) < nodeCount(givenExpr)))
             return { final: true };
-          return { final: false, remaining: 'Something still cancels top and bottom.' };
+          return { final: false, remaining: tr('Something still cancels top and bottom.') };
         }
         if (!r) {
           // surds and the like: accept once it is no bigger than what we started with
           return nodeCount(e) <= Math.max(6, nodeCount(givenExpr) - 1)
             ? { final: true }
-            : { final: false, remaining: 'This can be tidied further.' };
+            : { final: false, remaining: tr('This can be tidied further.') };
         }
         const hasBrackets = terms(e).some((t) => !isMonomialTerm(t));
         return {
           final: false,
-          remaining: hasBrackets ? 'There are still brackets to multiply out.' : 'There are like terms left to collect.',
+          remaining: hasBrackets ? tr('There are still brackets to multiply out.') : tr('There are like terms left to collect.'),
         };
       }
     }

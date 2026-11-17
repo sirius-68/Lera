@@ -1,7 +1,6 @@
 import { ReactNode, useLayoutEffect, useRef } from 'react';
 import katex from 'katex';
 import { AS_WRITTEN, mathLatex } from '../engine/latex';
-import { line } from '../i18n';
 import { mathRuns, plainLatex } from '../engine/mathtext';
 import { cleanTex, hasTex } from '../engine/tex';
 import { prettyInline } from '../ingest/text';
@@ -114,7 +113,7 @@ export function tokenize(text: string): Tok[] {
 export function RichText({ text }: { text: string }) {
   return (
     <>
-      {tokenize(line(text)).map((tok, i) =>
+      {tokenize(text).map((tok, i) =>
         tok.t === 'math' ? <MathView key={i} text={tok.s} /> : tok.t === 'bold' ? <strong key={i}>{tok.s}</strong> : <span key={i}>{tok.s}</span>,
       )}
     </>

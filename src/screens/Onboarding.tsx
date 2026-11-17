@@ -8,7 +8,7 @@ import { getAccount } from '../store/auth';
 import { resetNav } from '../store/nav';
 import { enableReminders } from '../store/remind';
 import { Celebration } from '../ui/Celebrate';
-import { Button3D, Confetti, haptic, toast } from '../ui/kit';
+import { Button3D, Confetti, haptic, toast, Emph } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import { Graph } from '../ui/Graph';
 import { MathView } from '../ui/math';
@@ -18,6 +18,7 @@ import { canPinWidget, hasWidget, pinWidget } from '../store/widget';
 import { AuthPanel } from './Auth';
 import { SceneWidget, TileArt } from './onb/Art';
 import { Processing, Source, UploadPicker } from './Upload';
+import { msg, t as tr } from '../i18n';
 
 /**
  * First run.
@@ -36,9 +37,9 @@ type Step =
 const HELLO: Mood[] = ['wave', 'wink', 'writing', 'detective', 'wizard', 'starstruck', 'teacher', 'thumbsup'];
 
 const SUBJECTS: { id: Subject; title: string; sub: string; sample: string; tone: string }[] = [
-  { id: 'algebra', title: 'Algebra', sub: 'Equations, brackets, factorising', sample: '3x + 4 = 19', tone: 'a' },
-  { id: 'calc1', title: 'Calculus 1', sub: 'Limits and derivatives', sample: 'd/dx(x^2 sin(x))', tone: 'b' },
-  { id: 'calc2', title: 'Calculus 2', sub: 'Integrals and their techniques', sample: '∫ x e^x dx', tone: 'c' },
+  { id: 'algebra', title: msg('Algebra'), sub: msg('Equations, brackets, factorising'), sample: '3x + 4 = 19', tone: 'a' },
+  { id: 'calc1', title: msg('Calculus 1'), sub: msg('Limits and derivatives'), sample: 'd/dx(x^2 sin(x))', tone: 'b' },
+  { id: 'calc2', title: msg('Calculus 2'), sub: msg('Integrals and their techniques'), sample: '∫ x e^x dx', tone: 'c' },
 ];
 
 interface Choice {
@@ -46,48 +47,47 @@ interface Choice {
   emoji: string;
   title: string;
   sub?: string;
-  reply?: string;
   focus?: string;
 }
 
 const STAGE: Choice[] = [
-  { id: 'school', emoji: '🎒', title: 'At school', reply: 'Good, I’ll keep to what your notes cover and build it up step by step.' },
-  { id: 'uni', emoji: '🎓', title: 'College or university', reply: 'Then pace matters. I’ll help you keep up with the lectures you upload.' },
-  { id: 'self', emoji: '📚', title: 'Teaching myself', reply: 'I like that. Bring any book or notes; I’ll turn them into a path.' },
-  { id: 'back', emoji: '🔁', title: 'Coming back after a break', reply: 'It comes back faster than you’d think. We’ll find what’s still solid first.' },
+  { id: 'school', emoji: '🎒', title: msg('At school') },
+  { id: 'uni', emoji: '🎓', title: msg('College or university') },
+  { id: 'self', emoji: '📚', title: msg('Teaching myself') },
+  { id: 'back', emoji: '🔁', title: msg('Coming back after a break') },
 ];
 
 const WHY: Choice[] = [
-  { id: 'exam', emoji: '🎯', title: 'I have an exam coming', reply: 'Then we hunt down the marks you’re losing, one rule at a time.' },
-  { id: 'grades', emoji: '📈', title: 'I want better grades', reply: 'Grades follow from fewer repeated mistakes. That’s my whole job.' },
-  { id: 'understand', emoji: '💡', title: 'I want it to finally make sense', reply: 'Good. I explain the why, in plain words, every time.' },
-  { id: 'ahead', emoji: '🚀', title: 'I want to get ahead', reply: 'Then I’ll raise the level as soon as something holds.' },
-  { id: 'sharp', emoji: '🧩', title: 'I just want to stay sharp', reply: 'A few minutes a day is plenty. I’ll bring back what’s fading.' },
+  { id: 'exam', emoji: '🎯', title: msg('I have an exam coming') },
+  { id: 'grades', emoji: '📈', title: msg('I want better grades') },
+  { id: 'understand', emoji: '💡', title: msg('I want it to finally make sense') },
+  { id: 'ahead', emoji: '🚀', title: msg('I want to get ahead') },
+  { id: 'sharp', emoji: '🧩', title: msg('I just want to stay sharp') },
 ];
 
 // The places a solution usually goes wrong, in the order they happen: reading the question, setting it up,
 // choosing a method, carrying it out, recalling the rule, and checking (after Newman's error analysis).
 const TRIPS: Choice[] = [
-  { id: 'read', emoji: '🔎', title: 'Understanding what the question asks', focus: 'reading the question before solving' },
-  { id: 'setup', emoji: '🧱', title: 'Setting the problem up as an equation', focus: 'turning the problem into maths' },
-  { id: 'method', emoji: '🧭', title: 'Choosing which rule or method to use', focus: 'choosing the right method' },
-  { id: 'steps', emoji: '➗', title: 'Signs, fractions and powers along the way', focus: 'signs, fractions and powers in each line' },
-  { id: 'forget', emoji: '🫧', title: 'Remembering rules and formulas', focus: 'bringing rules back before they fade' },
-  { id: 'find', emoji: '✅', title: 'Checking my work and finding the mistake', focus: 'pointing at the exact line that breaks' },
+  { id: 'read', emoji: '🔎', title: msg('Understanding what the question asks'), focus: 'reading the question before solving' },
+  { id: 'setup', emoji: '🧱', title: msg('Setting the problem up as an equation'), focus: 'turning the problem into maths' },
+  { id: 'method', emoji: '🧭', title: msg('Choosing which rule or method to use'), focus: 'choosing the right method' },
+  { id: 'steps', emoji: '➗', title: msg('Signs, fractions and powers along the way'), focus: 'signs, fractions and powers in each line' },
+  { id: 'forget', emoji: '🫧', title: msg('Remembering rules and formulas'), focus: 'bringing rules back before they fade' },
+  { id: 'find', emoji: '✅', title: msg('Checking my work and finding the mistake'), focus: 'pointing at the exact line that breaks' },
 ];
 
 const WHEN: (Choice & { time: string })[] = [
-  { id: 'morning', emoji: '🌅', title: 'Morning', sub: 'Before the day gets going', time: '8:00' },
-  { id: 'afternoon', emoji: '☀️', title: 'Afternoon', sub: 'Between classes or work', time: '14:30' },
-  { id: 'evening', emoji: '🌆', title: 'Evening', sub: 'When things calm down', time: '19:00' },
-  { id: 'night', emoji: '🌙', title: 'Late at night', sub: 'When it’s finally quiet', time: '22:00' },
+  { id: 'morning', emoji: '🌅', title: msg('Morning'), sub: msg('Before the day gets going'), time: '8:00' },
+  { id: 'afternoon', emoji: '☀️', title: msg('Afternoon'), sub: msg('Between classes or work'), time: '14:30' },
+  { id: 'evening', emoji: '🌆', title: msg('Evening'), sub: msg('When things calm down'), time: '19:00' },
+  { id: 'night', emoji: '🌙', title: msg('Late at night'), sub: msg('When it’s finally quiet'), time: '22:00' },
 ];
 
-const FEEL: { mood: Mood; label: string; short: string; line: string }[] = [
-  { mood: 'sad', label: 'Lost', short: 'We’ll start where it’s solid.', line: 'That’s an honest answer. We’ll start where it’s solid and build from there.' },
-  { mood: 'nervous', label: 'Shaky', short: 'I’ll find the loose rules.', line: 'Shaky usually means two or three rules aren’t fixed yet. I’ll find which.' },
-  { mood: 'happy', label: 'Okay', short: 'Let’s make it reliable.', line: 'Okay is a good place to start. Let’s turn it into reliable.' },
-  { mood: 'cool', label: 'Confident', short: 'Then I’ll be picky.', line: 'Then I’ll be picky, and show you the faster routes.' },
+const FEEL: { mood: Mood; label: string; short: string }[] = [
+  { mood: 'sad', label: msg('Lost'), short: msg('We’ll start where it’s solid.') },
+  { mood: 'nervous', label: msg('Shaky'), short: msg('I’ll find the loose rules.') },
+  { mood: 'happy', label: msg('Okay'), short: msg('Let’s make it reliable.') },
+  { mood: 'cool', label: msg('Confident'), short: msg('Then I’ll be picky.') },
 ];
 
 interface Spot {
@@ -100,21 +100,21 @@ interface Spot {
 }
 
 const SPOT_ALGEBRA: Spot = {
-  prompt: 'Someone solved this',
+  prompt: msg('Someone solved this'),
   given: '3x + 4 = 19',
   lines: ['3x = 19 + 4', '3x = 23', 'x = 23/3'],
   wrong: 0,
   right: '3x = 19 - 4',
-  why: 'The **+ 4** crossed the equals sign but kept its sign. It should arrive as **− 4**. Everything after that line was done correctly, on top of a mistake.',
+  why: msg('The **+ 4** crossed the equals sign but kept its sign. It should arrive as **− 4**. Everything after that line was done correctly, on top of a mistake.'),
 };
 
 const SPOT_CALC: Spot = {
-  prompt: 'Someone differentiated this',
+  prompt: msg('Someone differentiated this'),
   given: 'd/dx((2x+1)^3)',
   lines: ['3(2x+1)^2', '3(4x^2 + 4x + 1)', '12x^2 + 12x + 3'],
   wrong: 0,
   right: '3(2x+1)^2 * 2',
-  why: 'The outside was differentiated, but the **inside (2x + 1)** was forgotten. The chain rule says: multiply by the inside’s derivative, which is **2**.',
+  why: msg('The outside was differentiated, but the **inside (2x + 1)** was forgotten. The chain rule says: multiply by the inside’s derivative, which is **2**.'),
 };
 
 function Rich({ text }: { text: string }) {
@@ -242,8 +242,8 @@ export function Onboarding() {
         <button key={c.id} className={`ob-card ${value === c.id ? 'on' : ''}`} aria-pressed={value === c.id} onClick={() => { haptic(6); set(c.id); }}>
           <span className="ob-emoji">{c.emoji}</span>
           <span className="grow">
-            {c.title}
-            {c.sub && <span className="sub">{c.sub}</span>}
+            {tr(c.title)}
+            {c.sub && <span className="sub">{tr(c.sub)}</span>}
           </span>
         </button>
       ))}
@@ -255,7 +255,7 @@ export function Onboarding() {
       {items.map((c, i) => (
         <button key={c.id} className={`ob-tile ${value === c.id ? 'on' : ''}`} aria-pressed={value === c.id} style={{ '--i': i } as CSSProperties} onClick={() => { haptic(6); set(c.id); }}>
           <span className="ob-art"><TileArt id={c.id} /></span>
-          <b>{c.title}</b>
+          <b>{tr(c.title)}</b>
         </button>
       ))}
     </div>
@@ -269,8 +269,8 @@ export function Onboarding() {
     <div className="screen ob" data-dir="0">
       {step !== 'splash' && step !== 'hello' && step !== 'done' && (
         <div className="ob-top">
-          <button className="iconbtn" onClick={backStep} aria-label="Back"><Icon name="back" /></button>
-          <div className="ob-segs" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} aria-label="Set-up progress">
+          <button className="iconbtn" onClick={backStep} aria-label={tr('Back')}><Icon name="back" /></button>
+          <div className="ob-segs" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)} aria-label={tr('Set-up progress')}>
             {[0, 1, 2].map((i) => (
               <i key={i}><b style={{ width: `${Math.max(0, Math.min(1, progress * 3 - i)) * 100}%` }} /></i>
             ))}
@@ -284,7 +284,7 @@ export function Onboarding() {
           <Orbit />
           <div className="splash-mark"><span className="halo"><Lera size={116} mood="wave" interactive={false} /></span></div>
           <h1 className="wordmark">Lera</h1>
-          <p className="splash-tag">Your maths, line by line.</p>
+          <p className="splash-tag">{tr('Your maths, line by line.')}</p>
         </div>
       )}
 
@@ -295,11 +295,11 @@ export function Onboarding() {
             <span className="halo big"><Lera size={140} mood={HELLO[helloAt % HELLO.length]} /></span>
           </div>
           <div className="ob-sheet">
-            <h2 className="ob-h">A maths tutor that reads your working</h2>
-            <p className="ob-p">Line by line, until it sticks.</p>
+            <h2 className="ob-h">{tr('A maths tutor that reads your working')}</h2>
+            <p className="ob-p">{tr('Line by line, until it sticks.')}</p>
             <div className="center" style={{ marginTop: 10, gap: 12 }}>
-              <Button3D sheen onClick={next}>Get started</Button3D>
-              <Button3D variant="secondary" onClick={() => go('signin')}>I already have a profile</Button3D>
+              <Button3D sheen onClick={next}>{tr('Get started')}</Button3D>
+              <Button3D variant="secondary" onClick={() => go('signin')}>{tr('I already have a profile')}</Button3D>
             </div>
           </div>
         </div>
@@ -313,16 +313,16 @@ export function Onboarding() {
 
       {step === 'how' && (
         <div className={cls} key="how">
-          <Show title={<>I read <em>every line</em> you write.</>} text="Not just the final answer.">
+          <Show title={<Emph text={tr('I read *every line* you write.')} />} text={tr('Not just the final answer.')}>
             <SceneLines />
           </Show>
-          {foot('Continue')}
+          {foot(tr('Continue'))}
         </div>
       )}
 
       {step === 'subjects' && (
         <div className={cls} key="subjects">
-          <Ask mood={subjects.length > 1 ? 'eureka' : 'curious'}>What are you working on?</Ask>
+          <Ask mood={subjects.length > 1 ? 'eureka' : 'curious'}>{tr('What are you working on?')}</Ask>
           <div className="ob-list">
             {SUBJECTS.map((s) => {
               const on = subjects.includes(s.id);
@@ -330,50 +330,50 @@ export function Onboarding() {
                 <button key={s.id} className={`subject-card tone-${s.tone} ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => { haptic(6); setSubjects(on ? subjects.filter((x) => x !== s.id) : [...subjects, s.id]); }}>
                   <span className="subject-sample"><MathView text={s.sample} /></span>
                   <span className="grow" style={{ textAlign: 'left' }}>
-                    <b>{s.title}</b>
-                    <span className="sub">{s.sub}</span>
+                    <b>{tr(s.title)}</b>
+                    <span className="sub">{tr(s.sub)}</span>
                   </span>
                   <span className="tickbox">{on && <Icon name="check" size={15} stroke={3.2} />}</span>
                 </button>
               );
             })}
           </div>
-          {foot('Continue', { disabled: subjects.length === 0 })}
+          {foot(tr('Continue'), { disabled: subjects.length === 0 })}
         </div>
       )}
 
       {step === 'stage' && (
         <div className={cls} key="stage">
-          <Ask mood={stage === 'uni' || stage === 'school' ? 'graduate' : stage ? 'happy' : 'curious'}>Where are you studying?</Ask>
+          <Ask mood={stage === 'uni' || stage === 'school' ? 'graduate' : stage ? 'happy' : 'curious'}>{tr('Where are you studying?')}</Ask>
           {pickTiles(STAGE, stage, setStage)}
-          {foot('Continue', { disabled: !stage })}
+          {foot(tr('Continue'), { disabled: !stage })}
         </div>
       )}
 
       {step === 'goal' && (
         <div className={cls} key="goal">
-          <Ask mood={why === 'exam' ? 'determined' : why === 'ahead' ? 'fired' : why === 'understand' ? 'eureka' : why === 'sharp' ? 'cool' : why ? 'happy' : 'curious'}>What brings you here?</Ask>
+          <Ask mood={why === 'exam' ? 'determined' : why === 'ahead' ? 'fired' : why === 'understand' ? 'eureka' : why === 'sharp' ? 'cool' : why ? 'happy' : 'curious'}>{tr('What brings you here?')}</Ask>
           {pickList(WHY, why, setWhy)}
-          {foot('Continue', { disabled: !why })}
+          {foot(tr('Continue'), { disabled: !why })}
         </div>
       )}
 
       {step === 'path' && (
         <div className={cls} key="path">
-          <Show title={<>Your notes become <em>your path</em>.</>} text="Upload a PDF. Get lessons and practice.">
+          <Show title={<Emph text={tr('Your notes become *your path*.')} />} text={tr('Upload a PDF. Get lessons and practice.')}>
             <ScenePath />
           </Show>
-          {foot('Continue')}
+          {foot(tr('Continue'))}
         </div>
       )}
 
       {step === 'spot' && (
         <div className={cls} key="spot">
-          <Ask mood={found ? 'eureka' : tapped !== null ? 'thinking' : 'calculating'} hint={found ? undefined : tapped !== null ? 'Not that one. Look higher.' : 'Tap it.'}>
-            {found ? 'Exactly.' : 'One line breaks a rule.'}
+          <Ask mood={found ? 'eureka' : tapped !== null ? 'thinking' : 'calculating'} hint={found ? undefined : tapped !== null ? tr('Not that one. Look higher.') : 'Tap it.'}>
+            {found ? tr('Exactly.') : tr('One line breaks a rule.')}
           </Ask>
           <div className="spot" style={{ marginTop: 8 }}>
-            <span className="label">{spot.prompt}</span>
+            <span className="label">{tr(spot.prompt)}</span>
             <div className="spot-given"><MathView text={spot.given} block /></div>
             {spot.lines.map((l, i) => {
               const state = found ? (i === spot.wrong ? 'bad' : 'carried') : tapped === i ? 'nope' : '';
@@ -394,26 +394,26 @@ export function Onboarding() {
                 >
                   <span className="n">{i + 1}</span>
                   <span className="grow" style={{ textAlign: 'left' }}><MathView text={l} block /></span>
-                  {found && i === spot.wrong && <span className="chip gap">Breaks here</span>}
-                  {found && i !== spot.wrong && <span className="chip plain">Carried</span>}
+                  {found && i === spot.wrong && <span className="chip gap">{tr('Breaks here')}</span>}
+                  {found && i !== spot.wrong && <span className="chip plain">{tr('Carried')}</span>}
                 </button>
               );
             })}
             {found && (
               <div className="spot-why stagger">
-                <p><Rich text={spot.why} /></p>
+                <p><Rich text={tr(spot.why)} /></p>
                 <div className="fixline" style={{ marginTop: 8 }}>
-                  <span className="faint" style={{ fontSize: 12.5 }}>Line 1 should read</span>
+                  <span className="faint" style={{ fontSize: 12.5 }}>{tr('Line 1 should read')}</span>
                   <MathView text={spot.right} block />
                 </div>
               </div>
             )}
           </div>
-          {foot(found ? 'Continue' : 'Skip', { ok: found, sheen: found, onClick: found ? () => setCheer(true) : undefined })}
+          {foot(found ? tr('Continue') : tr('Skip'), { ok: found, sheen: found, onClick: found ? () => setCheer(true) : undefined })}
           {found && <Confetti fire={1} />}
           {cheer && (
             <Celebration
-              scene={{ kind: 'first', title: 'You found it!', sub: 'That is the whole method: find the line, name the rule, fix it once.', stats: [{ label: 'First XP', value: 10, tone: 'xp' }, { label: 'Mistake caught', value: 1, of: 1, tone: 'score' }] }}
+              scene={{ kind: 'first', title: tr('You found it!'), sub: tr('That is the whole method: find the line, name the rule, fix it once.'), stats: [{ label: tr('First XP'), value: 10, tone: 'xp' }, { label: tr('Mistake caught'), value: 1, of: 1, tone: 'score' }] }}
               onNext={() => { setCheer(false); next(); }}
             />
           )}
@@ -425,55 +425,55 @@ export function Onboarding() {
           <div className="center" style={{ gap: 8, paddingTop: 2 }}>
             <Lera size={124} mood={feel === null ? 'curious' : FEEL[feel].mood} />
           </div>
-          <h2 className="ob-q" style={{ textAlign: 'center' }}>How does maths feel right now?</h2>
-          <p className="ob-hint" style={{ textAlign: 'center', minHeight: 22 }}>{feel === null ? 'No wrong answers.' : FEEL[feel].short}</p>
-          <div className="feel-row" role="radiogroup" aria-label="How maths feels">
+          <h2 className="ob-q" style={{ textAlign: 'center' }}>{tr('How does maths feel right now?')}</h2>
+          <p className="ob-hint" style={{ textAlign: 'center', minHeight: 22 }}>{feel === null ? tr('No wrong answers.') : tr(FEEL[feel].short)}</p>
+          <div className="feel-row" role="radiogroup" aria-label={tr('How maths feels')}>
             {FEEL.map((f, i) => (
               <button key={f.label} role="radio" aria-checked={feel === i} className={feel === i ? 'on' : ''} onClick={() => { haptic(6); setFeel(i); }}>
                 <span className="feel-dot" data-i={i} />
-                {f.label}
+                {tr(f.label)}
               </button>
             ))}
           </div>
-          {foot('Continue', { disabled: feel === null })}
+          {foot(tr('Continue'), { disabled: feel === null })}
         </div>
       )}
 
       {step === 'struggle' && (
         <div className={cls} key="struggle">
-          <Ask mood={trips.length ? 'calculating' : 'thinking'}>What usually trips you up?</Ask>
+          <Ask mood={trips.length ? 'calculating' : 'thinking'}>{tr('What usually trips you up?')}</Ask>
           <div className="ob-grid2">
             {TRIPS.map((t) => {
               const on = trips.includes(t.id);
               return (
                 <button key={t.id} className={`ob-card ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => { haptic(6); setTrips(on ? trips.filter((x) => x !== t.id) : trips.length >= 3 ? [...trips.slice(1), t.id] : [...trips, t.id]); }}>
                   <span className="ob-emoji">{t.emoji}</span>
-                  <span>{t.title}</span>
+                  <span>{tr(t.title)}</span>
                 </button>
               );
             })}
           </div>
-          {foot('Continue', { disabled: trips.length === 0 })}
+          {foot(tr('Continue'), { disabled: trips.length === 0 })}
         </div>
       )}
 
       {step === 'return' && (
         <div className={cls} key="return">
-          <Show title={<>Ideas come back <em>before they fade</em>.</>} text="A day later. Then three. Then seven.">
+          <Show title={<Emph text={tr('Ideas come back *before they fade*.')} />} text={tr('A day later. Then three. Then seven.')}>
             <SceneReturn />
           </Show>
-          {foot('Continue')}
+          {foot(tr('Continue'))}
         </div>
       )}
 
       {step === 'check' && (
         <div className={cls} key="check">
-          <Ask mood={mode === 'line' ? 'calculating' : 'thinking'}>When should I check your working?</Ask>
+          <Ask mood={mode === 'line' ? 'calculating' : 'thinking'}>{tr('When should I check your working?')}</Ask>
           <div className="ob-list">
             {(
               [
-                ['line', 'As I go', 'Every line gets a tick or a flag the moment you write it. Best for learning a new method.', ['ok', 'ok', 'bad']],
-                ['end', 'When I finish', 'Write the whole solution first. Then I mark every line at once, like handing in your work.', ['wait', 'wait', 'wait']],
+                ['line', tr('As I go'), tr('Every line gets a tick or a flag the moment you write it. Best for learning a new method.'), ['ok', 'ok', 'bad']],
+                ['end', tr('When I finish'), tr('Write the whole solution first. Then I mark every line at once, like handing in your work.'), ['wait', 'wait', 'wait']],
               ] as ['line' | 'end', string, string, string[]][]
             ).map(([id, title, sub, demo]) => (
               <button key={id} className={`mode-card ${mode === id ? 'on' : ''}`} aria-pressed={mode === id} onClick={() => { haptic(6); setMode(id); }}>
@@ -488,28 +488,28 @@ export function Onboarding() {
               </button>
             ))}
           </div>
-          {foot('Continue')}
+          {foot(tr('Continue'))}
         </div>
       )}
 
       {step === 'plain' && (
         <div className={cls} key="plain">
-          <Show title={<>Explained in <em>plain words</em>.</>} text="And I always ask if it made sense.">
+          <Show title={<Emph text={tr('Explained in *plain words*.')} />} text={tr('And I always ask if it made sense.')}>
             <ScenePlain />
           </Show>
-          {foot('Continue')}
+          {foot(tr('Continue'))}
         </div>
       )}
 
       {step === 'daily' && (
         <div className={cls} key="daily">
-          <Ask mood={daily >= 50 ? 'fired' : daily >= 30 ? 'determined' : 'happy'}>How much each day?</Ask>
+          <Ask mood={daily >= 50 ? 'fired' : daily >= 30 ? 'determined' : 'happy'}>{tr('How much each day?')}</Ask>
           <div className="ob-list">
             {GOALS.map((g) => (
               <button key={g.xp} className={`ob-card ${daily === g.xp ? 'on' : ''}`} aria-pressed={daily === g.xp} onClick={() => { haptic(6); setDaily(g.xp); }}>
                 <span className="grow">
-                  {g.label}
-                  <span className="sub">{g.sub}</span>
+                  {tr(g.label)}
+                  <span className="sub">{tr(g.sub)}</span>
                 </span>
                 <span className="xp-tag">{g.xp} XP</span>
               </button>
@@ -520,33 +520,33 @@ export function Onboarding() {
               <i key={d} style={{ height: `${Math.min(100, 22 + perDay * 14 + (d % 3) * 6)}%`, animationDelay: `${d * 60}ms` } as CSSProperties} />
             ))}
           </div>
-          <p className="ob-projection-cap"><b>{perDay * 7} problems a week</b>, each one checked line by line.</p>
-          {foot('Continue')}
+          <p className="ob-projection-cap"><b>{perDay * 7} problems a week</b>{tr(', each one checked line by line.')}</p>
+          {foot(tr('Continue'))}
         </div>
       )}
 
       {step === 'graph' && (
         <div className={cls} key="graph">
-          <Ask mood="detective" hint="Drag along the curve. Tap Slope.">Graphs you can touch.</Ask>
+          <Ask mood="detective" hint={tr('Drag along the curve. Tap Slope.')}>{tr('Graphs you can touch.')}</Ask>
           <div data-noswipe><Graph fns={['x^2 - 4']} /></div>
-          {foot('Continue')}
+          {foot(tr('Continue'))}
         </div>
       )}
 
       {step === 'when' && (
         <div className={cls} key="when">
-          <Ask mood={when === 'night' ? 'sleepy' : when === 'morning' ? 'happy' : when === 'evening' ? 'cool' : when ? 'idle' : 'curious'}>When do you usually study?</Ask>
+          <Ask mood={when === 'night' ? 'sleepy' : when === 'morning' ? 'happy' : when === 'evening' ? 'cool' : when ? 'idle' : 'curious'}>{tr('When do you usually study?')}</Ask>
           {pickTiles(WHEN, when, setWhen)}
-          {foot('Continue', { disabled: !when })}
+          {foot(tr('Continue'), { disabled: !when })}
         </div>
       )}
 
       {step === 'reward' && (
         <div className={cls} key="reward">
-          <Show title={<>Showing up <em>counts</em>.</>} text="XP, streaks and levels for real progress.">
+          <Show title={<Emph text={tr('Showing up *counts*.')} />} text={tr('XP, streaks and levels for real progress.')}>
             <SceneReward />
           </Show>
-          {foot('Continue')}
+          {foot(tr('Continue'))}
         </div>
       )}
 
@@ -564,10 +564,10 @@ export function Onboarding() {
           <div className="center" style={{ paddingTop: 6 }}>
             <Lera size={112} mood={name.trim() ? 'love' : 'curious'} />
           </div>
-          <h2 className="ob-q" style={{ textAlign: 'center' }}>What should I call you?</h2>
-          <input className="field big" placeholder="First name" value={name} maxLength={24} onChange={(e: { target: { value: string } }) => setName(e.target.value)} autoComplete="given-name" aria-label="First name" />
+          <h2 className="ob-q" style={{ textAlign: 'center' }}>{tr('What should I call you?')}</h2>
+          <input className="field big" placeholder={tr('First name')} value={name} maxLength={24} onChange={(e: { target: { value: string } }) => setName(e.target.value)} autoComplete="given-name" aria-label={tr('First name')} />
           <div className="ob-foot">
-            <Button3D type="submit" disabled={!name.trim()}>Build my plan</Button3D>
+            <Button3D type="submit" disabled={!name.trim()}>{tr('Build my plan')}</Button3D>
           </div>
         </form>
       )}
@@ -580,32 +580,32 @@ export function Onboarding() {
 
       {step === 'widget' && (
         <div className={cls} key="widget">
-          <Show title={<>I’ll cheer you on from your <em>home screen</em>.</>} text="My mood changes with your streak.">
+          <Show title={<Emph text={tr('I’ll cheer you on from your *home screen*.')} />} text={tr('My mood changes with your streak.')}>
             <SceneWidget />
           </Show>
-          {foot('Add widget', {
+          {foot(tr('Add widget'), {
             sheen: true,
             onClick: () => {
-              if (!(canPinWidget() && pinWidget())) toast('Long-press your home screen, choose Widgets, then Lera.', 4200);
+              if (!(canPinWidget() && pinWidget())) toast(tr('Long-press your home screen, choose Widgets, then Lera.'), 4200);
               next();
             },
-            under: <button className="linkbtn" onClick={next}>Not now</button>,
+            under: <button className="linkbtn" onClick={next}>{tr('Not now')}</button>,
           })}
         </div>
       )}
 
       {step === 'plan' && (
         <div className={cls} key="plan">
-          <span className="ob-kicker mid">Your learning plan</span>
-          <h2 className="ob-h mid" style={{ fontSize: 24 }}>{built >= 5 ? `Ready, ${name.trim()}. Here’s how we’ll work.` : 'Putting it together…'}</h2>
+          <span className="ob-kicker mid">{tr('Your learning plan')}</span>
+          <h2 className="ob-h mid" style={{ fontSize: 24 }}>{built >= 5 ? tr('Ready, {0}. Here’s how we’ll work.', { 0: name.trim() }) : tr('Putting it together…')}</h2>
           <div className="ob-peek"><Lera size={74} mood={built >= 5 ? 'party' : 'calculating'} interactive={false} /></div>
           <ul className="plan peeked">
             {[
-              ['target', 'Where your lessons come from', `your own notes · ${subjects.map((s) => SUBJECTS.find((x) => x.id === s)?.title).join(' · ')}`],
-              ['eye', 'What I’ll watch for', focus.length ? focus.join(', ') : 'where your reasoning breaks'],
-              ['check', 'How I’ll check', mode === 'line' ? 'each line, as you write it' : 'the whole solution, when you finish'],
-              ['flame', 'Your daily goal', `${goalInfo.xp} XP, ${goalInfo.sub}`],
-              ['bell', 'Best time for you', `${whenInfo.title.toLowerCase()}, around ${whenInfo.time}`],
+              ['target', tr('Where your lessons come from'), `your own notes · ${subjects.map((s) => SUBJECTS.find((x) => x.id === s)?.title).join(' · ')}`],
+              ['eye', tr('What I’ll watch for'), focus.length ? focus.join(', ') : 'where your reasoning breaks'],
+              ['check', tr('How I’ll check'), mode === 'line' ? 'each line, as you write it' : 'the whole solution, when you finish'],
+              ['flame', tr('Your daily goal'), `${goalInfo.xp} XP, ${tr(goalInfo.sub)}`],
+              ['bell', tr('Best time for you'), tr('{0}, around {1}', { 0: tr(whenInfo.title).toLowerCase(), 1: whenInfo.time })],
             ].map(([icon, label, value], i) => (
               <li key={label} data-on={built > i ? '' : undefined}>
                 <span className="plan-ic"><Icon name={icon} size={18} /></span>
@@ -617,24 +617,24 @@ export function Onboarding() {
               </li>
             ))}
           </ul>
-          {foot('Continue', { disabled: built < 5, sheen: true })}
+          {foot(tr('Continue'), { disabled: built < 5, sheen: true })}
           {built >= 5 && <Confetti fire={1} />}
         </div>
       )}
 
       {step === 'remind' && (
         <div className={cls} key="remind">
-          <Show title={<>A nudge at the <em>right moment</em>.</>} text={`Around ${whenInfo.time}. No spam, ever.`}>
+          <Show title={<Emph text={tr('A nudge at the *right moment*.')} />} text={tr('Around {0}. No spam, ever.', { 0: whenInfo.time })}>
             <SceneBell time={whenInfo.time} />
           </Show>
-          {foot('Allow notifications', {
+          {foot(tr('Allow notifications'), {
             sheen: true,
             onClick: async () => {
               const ok = await enableReminders(when ?? undefined, name.trim());
               actions.setProfile({ notifications: ok });
               next();
             },
-            under: <button className="linkbtn" onClick={next}>Not now</button>,
+            under: <button className="linkbtn" onClick={next}>{tr('Not now')}</button>,
           })}
         </div>
       )}
@@ -661,9 +661,9 @@ export function Onboarding() {
           scene={{
             kind: 'done',
             title: `You’re all set${name.trim() ? `, ${name.trim()}` : ''}!`,
-            sub: 'Solve one problem today and your streak begins.',
-            stats: [{ label: 'XP a day', value: goalInfo.xp, tone: 'xp' }, { label: 'Minutes a day', value: daily <= 15 ? 5 : daily <= 30 ? 10 : daily <= 50 ? 15 : 20, tone: 'time' }],
-            cta: 'Start learning',
+            sub: tr('Solve one problem today and your streak begins.'),
+            stats: [{ label: tr('XP a day'), value: goalInfo.xp, tone: 'xp' }, { label: tr('Minutes a day'), value: daily <= 15 ? 5 : daily <= 30 ? 10 : daily <= 50 ? 15 : 20, tone: 'time' }],
+            cta: tr('Start learning'),
           }}
           onNext={finish}
         />

@@ -1,4 +1,5 @@
 import { AiConfig } from './providers';
+import { t } from '../i18n';
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
@@ -22,12 +23,12 @@ function headers(c: AiConfig): Record<string, string> {
 const base = (c: AiConfig): string => c.baseUrl.replace(/\/+$/, '');
 
 function friendly(status: number, body: string): string {
-  if (status === 401 || status === 403) return 'The AI service turned the request away. Lera will carry on without it.';
-  if (status === 404) return 'The AI service wasn’t found at the address this app was built with.';
-  if (status === 429) return 'Today’s limit for Lera’s AI has been reached. Lera will carry on without it.';
-  if (status >= 500) return 'The AI service is having trouble. Lera will carry on without it.';
+  if (status === 401 || status === 403) return t('The AI service turned the request away. Lera will carry on without it.');
+  if (status === 404) return t('The AI service wasn’t found at the address this app was built with.');
+  if (status === 429) return t('Today’s limit for Lera’s AI has been reached. Lera will carry on without it.');
+  if (status >= 500) return t('The AI service is having trouble. Lera will carry on without it.');
   const detail = body.slice(0, 160).replace(/\s+/g, ' ');
-  return `The AI service refused the request (${status}). ${detail}`;
+  return t('The AI service refused the request ({0}). {1}', { 0: status, 1: detail });
 }
 
 /** The jobs Lera's AI router knows (backend/supabase/functions/_shared/router.ts). It picks the model for each. */
@@ -79,7 +80,7 @@ export async function chat(
     if (res.status === 400 && opts.json) res = await send(false);
   } catch (e) {
     if (e instanceof DOMException && e.name === 'AbortError') throw e;
-    throw new AiError('Couldn’t reach the AI service. Check the connection.');
+    throw new AiError(t('Couldn’t reach the AI service. Check the connection.'));
   }
   if (!res.ok) {
     const text = await res.text().catch(() => '');
@@ -91,7 +92,7 @@ export async function chat(
   if (Array.isArray(content)) {
     return content.map((part) => (typeof part === 'object' && part && 'text' in part ? String((part as { text: unknown }).text) : '')).join('');
   }
-  throw new AiError('The AI service replied with nothing usable.');
+  throw new AiError(t('The AI service replied with nothing usable.'));
 }
 
 /** Pull the first JSON object out of a reply, even when it arrives wrapped in prose or a code fence. */

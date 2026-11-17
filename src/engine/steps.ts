@@ -8,6 +8,7 @@ import {
 } from './poly';
 import { FLIP, Root, polyRoots, solveEquation } from './solve';
 import { SolutionStep } from './types';
+import { t as tr } from '../i18n';
 
 /**
  * The "clean path": a short, textbook route from a line to the answer.
@@ -29,7 +30,7 @@ function linearFactor(root: Frac, v: string): Poly {
 const bracket = (p: Poly): string => `(${polyToText(p)})`;
 
 function rootsLine(v: string, roots: Root[]): string {
-  if (roots.length === 0) return 'no solution';
+  if (roots.length === 0) return tr('no solution');
   // a matching pair reads best as x = ±3
   if (roots.length === 2 && roots[0].exact && roots[1].exact && roots[0].value === -roots[1].value && roots[1].value > 0) {
     return `${v} = ±${roots[1].text}`;
@@ -108,7 +109,7 @@ function equationSteps(prep: Prepared, st: Statement, isIneq: boolean): Solution
     // algebraic fractions or surds: give the destination, not a route
     const sol = solveEquation(rel.lhs, rel.rhs, v);
     if (sol && sol.kind === 'finite' && !isIneq)
-      out.push({ line: rootsLine(v, sol.roots), why: 'Work towards getting the unknown on its own.', tag: 'final' });
+      out.push({ line: rootsLine(v, sol.roots), why: tr('Work towards getting the unknown on its own.'), tag: 'final' });
     return out;
   }
   let L = L0.n;
@@ -144,7 +145,7 @@ function equationSteps(prep: Prepared, st: Statement, isIneq: boolean): Solution
   if (k > 1n) {
     L = pScale(L, frac(k));
     R = pScale(R, frac(k));
-    out.push({ line: line(), why: `Multiply every term on both sides by ${k} to clear the fractions.`, tag: 'clear-fractions' });
+    out.push({ line: line(), why: tr('Multiply every term on both sides by {0} to clear the fractions.', { 0: String(k) }), tag: 'clear-fractions' });
     lhsNode = rhsNode = null;
   }
 
@@ -156,7 +157,7 @@ function equationSteps(prep: Prepared, st: Statement, isIneq: boolean): Solution
     });
     out.push({
       line: line(),
-      why: hasBrackets ? 'Multiply out the brackets, then collect like terms on each side.' : 'Collect the like terms on each side.',
+      why: hasBrackets ? tr('Multiply out the brackets, then collect like terms on each side.') : tr('Collect the like terms on each side.'),
       tag: hasBrackets ? 'expand' : 'collect',
     });
   }
@@ -176,8 +177,8 @@ function equationSteps(prep: Prepared, st: Statement, isIneq: boolean): Solution
     if (!isIneq) {
       out.push(
         fIsZero(c)
-          ? { line: 'all real numbers', why: `The ${v} terms cancel and both sides are identical, so every value works.`, tag: 'final' }
-          : { line: 'no solution', why: `The ${v} terms cancel and what is left is false, so no value works.`, tag: 'final' },
+          ? { line: 'all real numbers', why: tr('The {0} terms cancel and both sides are identical, so every value works.', { 0: v }), tag: 'final' }
+          : { line: tr('no solution'), why: tr('The {0} terms cancel and what is left is false, so no value works.', { 0: v }), tag: 'final' },
       );
     }
     return out;
@@ -192,7 +193,7 @@ function equationSteps(prep: Prepared, st: Statement, isIneq: boolean): Solution
       R = pConst(b);
       out.push({
         line: line(),
-        why: `Get the ${v} terms on one side and the numbers on the other. A term changes sign when it crosses over.`, tag: 'move',
+        why: tr('Get the {0} terms on one side and the numbers on the other. A term changes sign when it crosses over.', { 0: v }), tag: 'move',
       });
     }
     if (!fEq(a, ONE)) {
@@ -204,8 +205,8 @@ function equationSteps(prep: Prepared, st: Statement, isIneq: boolean): Solution
         line: line(),
         why:
           isIneq && negative
-            ? `Divide both sides by ${fText(a)}. Dividing by a negative flips the inequality sign.`
-            : `Divide both sides by ${fText(a)}.`,
+            ? tr('Divide both sides by {0}. Dividing by a negative flips the inequality sign.', { 0: fText(a) })
+            : tr('Divide both sides by {0}.', { 0: fText(a) }),
         tag: 'divide',
       });
     }
@@ -224,21 +225,21 @@ function equationSteps(prep: Prepared, st: Statement, isIneq: boolean): Solution
     // x² = k: no need for standard form, just undo the square
     const kVal = fDiv(fNeg(sc[0]), sc[2]);
     if (fSign(kVal) < 0) {
-      out.push({ line: 'no solution', why: `${v}² can’t be negative, so no real number works.`, tag: 'final' });
+      out.push({ line: tr('no solution'), why: `${v}² can’t be negative, so no real number works.`, tag: 'final' });
       return out;
     }
     const isolated = L.size === 1 && fEq(L.get(`${v}^2`) ?? ZERO, ONE) && pIsConst(R);
-    if (!isolated) out.push({ line: `${v}^2 = ${fText(kVal)}`, why: `Get ${v}² on its own.`, tag: 'move' });
+    if (!isolated) out.push({ line: `${v}^2 = ${fText(kVal)}`, why: tr('Get {0}² on its own.', { 0: v }), tag: 'move' });
     out.push({
       line: rootsLine(v, roots),
-      why: 'Take the square root of both sides, a square has a positive and a negative root.',
+      why: tr('Take the square root of both sides, a square has a positive and a negative root.'),
       tag: 'sqrt',
     });
     return out;
   }
 
   if (!alreadyStd) {
-    out.push({ line: `${polyToText(std)} = 0`, why: 'Move everything to one side so the equation equals zero.', tag: 'standard-form' });
+    out.push({ line: `${polyToText(std)} = 0`, why: tr('Move everything to one side so the equation equals zero.'), tag: 'standard-form' });
   }
 
   if (deg === 2) {
@@ -248,10 +249,10 @@ function equationSteps(prep: Prepared, st: Statement, isIneq: boolean): Solution
       const f = factorText(std, v);
       if (f && f.changed) {
         const why = fIsZero(c)
-          ? `Both terms contain ${v}, so take it out as a common factor.`
+          ? tr('Both terms contain {0}, so take it out as a common factor.', { 0: v })
           : fEq(a, ONE)
-            ? `Factor: find two numbers that multiply to ${fText(c)} and add to ${fText(b)}.`
-            : `Factor: find two numbers that multiply to ${fText(fMul(a, c))} and add to ${fText(b)}, then split the middle term.`;
+            ? tr('Factor: find two numbers that multiply to {0} and add to {1}.', { 0: fText(c), 1: fText(b) })
+            : tr('Factor: find two numbers that multiply to {0} and add to {1}, then split the middle term.', { 0: fText(fMul(a, c)), 1: fText(b) });
         out.push({ line: `${f.text} = 0`, why, tag: fIsZero(c) ? 'common-factor' : 'factor' });
       }
       out.push({ line: rootsLine(v, roots), why: 'A product is zero only when one of its factors is zero. Set each bracket to zero.', tag: 'zero-product' });
@@ -260,19 +261,19 @@ function equationSteps(prep: Prepared, st: Statement, isIneq: boolean): Solution
     const disc = fSub(fMul(b, b), fMul(frac(4), fMul(a, c)));
     out.push({
       line: `${v} = (${fText(fNeg(b))} ± sqrt(${fText(disc)}))/${fText(fMul(frac(2), a))}`,
-      why: `This doesn’t factor into whole numbers, so use the quadratic formula with a = ${fText(a)}, b = ${fText(b)}, c = ${fText(c)}.`, tag: 'formula',
+      why: tr('This doesn’t factor into whole numbers, so use the quadratic formula with a = {0}, b = {1}, c = {2}.', { 0: fText(a), 1: fText(b), 2: fText(c) }), tag: 'formula',
     });
     out.push(
       roots.length
-        ? { line: rootsLine(v, roots), why: 'Simplify the square root and split into the two answers.', tag: 'final' }
-        : { line: 'no solution', why: 'The number under the square root is negative, so there are no real solutions.', tag: 'final' },
+        ? { line: rootsLine(v, roots), why: tr('Simplify the square root and split into the two answers.'), tag: 'final' }
+        : { line: tr('no solution'), why: tr('The number under the square root is negative, so there are no real solutions.'), tag: 'final' },
     );
     return out;
   }
 
   const f = factorText(std, v);
-  if (f && f.changed) out.push({ line: `${f.text} = 0`, why: 'Factor the left-hand side.', tag: 'factor' });
-  out.push({ line: rootsLine(v, roots), why: 'Set each factor to zero and solve.', tag: 'zero-product' });
+  if (f && f.changed) out.push({ line: `${f.text} = 0`, why: tr('Factor the left-hand side.'), tag: 'factor' });
+  out.push({ line: rootsLine(v, roots), why: tr('Set each factor to zero and solve.'), tag: 'zero-product' });
   return out;
 }
 
@@ -395,11 +396,11 @@ function expressionSteps(prep: Prepared, st: Statement): SolutionStep[] {
 
   if (kind === 'evaluate') {
     if (Object.keys(prep.subs).length && e !== st.expr) {
-      out.push({ line: toText(e), why: 'Replace each letter with its value. Brackets keep negatives safe.', tag: 'substitute' });
+      out.push({ line: toText(e), why: tr('Replace each letter with its value. Brackets keep negatives safe.'), tag: 'substitute' });
     }
     if (r && pIsConst(r.d)) {
       const val = pConstValue(r.n);
-      if (val) out.push({ line: fText(val), why: 'Work in order: brackets, powers, then × and ÷, then + and −.', tag: 'evaluate' });
+      if (val) out.push({ line: fText(val), why: tr('Work in order: brackets, powers, then × and ÷, then + and −.'), tag: 'evaluate' });
     }
     return out;
   }
@@ -414,24 +415,24 @@ function expressionSteps(prep: Prepared, st: Statement): SolutionStep[] {
       const f = factorText(r.n, vars[0]);
       if (!f) return out;
       if (cm && f.parts.linear.length + (f.parts.rest ? 1 : 0) >= 2 && pDegree(cm.rest) >= 2) {
-        out.push({ line: `${cm.text}(${polyToText(cm.rest)})`, why: `Every term shares ${cm.text}, so take it out first.`, tag: 'common-factor' });
+        out.push({ line: `${cm.text}(${polyToText(cm.rest)})`, why: tr('Every term shares {0}, so take it out first.', { 0: cm.text }), tag: 'common-factor' });
       }
       if (f.changed) {
         const coeffs = pUniCoeffs(pPrimitive(cm ? cm.rest : r.n).poly, vars[0]) ?? [];
         const why =
           coeffs.length === 3 && fIsZero(coeffs[1])
-            ? 'This is a difference of two squares: a² − b² = (a − b)(a + b).'
+            ? tr('This is a difference of two squares: a² − b² = (a − b)(a + b).')
             : coeffs.length === 3
-              ? `Find two numbers that multiply to ${fText(fMul(coeffs[2], coeffs[0]))} and add to ${fText(coeffs[1])}.`
+              ? tr('Find two numbers that multiply to {0} and add to {1}.', { 0: fText(fMul(coeffs[2], coeffs[0])), 1: fText(coeffs[1]) })
               : cm
-                ? `Every term shares ${cm.text}, so take it out.`
-                : 'Factor into brackets.';
+                ? tr('Every term shares {0}, so take it out.', { 0: cm.text })
+                : tr('Factor into brackets.');
         out.push({ line: f.text, why, tag: 'factor' });
       }
       return out;
     }
     const cm = commonMonomial(r.n);
-    if (cm) out.push({ line: `${cm.text}(${polyToText(cm.rest)})`, why: `Every term shares ${cm.text}, so take it out.`, tag: 'common-factor' });
+    if (cm) out.push({ line: `${cm.text}(${polyToText(cm.rest)})`, why: tr('Every term shares {0}, so take it out.', { 0: cm.text }), tag: 'common-factor' });
     return out;
   }
 
@@ -444,12 +445,12 @@ function expressionSteps(prep: Prepared, st: Statement): SolutionStep[] {
     const needsExpanding = parts !== null && parts.length !== written;
     const needsCollecting = parts === null || parts.length !== (r.n.size || 1);
     if (parts && needsExpanding && needsCollecting) {
-      out.push({ line: joinTerms(parts), why: 'Multiply out each bracket. Every term outside meets every term inside.', tag: 'expand' });
+      out.push({ line: joinTerms(parts), why: tr('Multiply out each bracket. Every term outside meets every term inside.'), tag: 'expand' });
     }
     out.push(
       needsCollecting
-        ? { line: final, why: 'Collect like terms: add the coefficients of terms with the same letters and powers.', tag: 'collect' }
-        : { line: final, why: 'Multiply out each bracket. Every term outside meets every term inside.', tag: 'expand' },
+        ? { line: final, why: tr('Collect like terms: add the coefficients of terms with the same letters and powers.'), tag: 'collect' }
+        : { line: final, why: tr('Multiply out each bracket. Every term outside meets every term inside.'), tag: 'expand' },
     );
     return out;
   }
@@ -464,12 +465,12 @@ function expressionSteps(prep: Prepared, st: Statement): SolutionStep[] {
       if (uniDeg(g) >= 1) {
         const fn = factorText(r.n, vars[0]);
         const fd = factorText(r.d, vars[0]);
-        if (fn && fd) out.push({ line: `(${fn.text})/(${fd.text})`, why: 'Factor the top and the bottom completely.', tag: 'factor' });
+        if (fn && fd) out.push({ line: `(${fn.text})/(${fd.text})`, why: tr('Factor the top and the bottom completely.'), tag: 'factor' });
         const qn = pFromUni(uniDivMod(n, g).q, vars[0]);
         const qd = pFromUni(uniDivMod(dd, g).q, vars[0]);
         const dConst = pConstValue(qd);
         const line = dConst ? polyToText(pScale(qn, fDiv(ONE, dConst))) : `(${polyToText(qn)})/(${polyToText(qd)})`;
-        out.push({ line, why: 'Cancel the factor that appears on both the top and the bottom.', tag: 'cancel' });
+        out.push({ line, why: tr('Cancel the factor that appears on both the top and the bottom.'), tag: 'cancel' });
       }
     }
   }
@@ -482,7 +483,7 @@ function systemSteps(prep: Prepared): SolutionStep[] {
   return [
     {
       line,
-      why: 'Make the coefficients of one letter match, add or subtract the equations to eliminate it, solve for the other letter, then substitute back.',
+      why: tr('Make the coefficients of one letter match, add or subtract the equations to eliminate it, solve for the other letter, then substitute back.'),
       tag: 'system',
     },
   ];

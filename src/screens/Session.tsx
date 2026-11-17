@@ -3,7 +3,7 @@ import { aiCheckOpen, aiDiagnose, aiSimplify } from '../ai/tasks';
 import { aiReady } from '../ai/providers';
 import { analyze, cleanPath, hintLadder, HintLadder, stepConcepts } from '../engine/analyze';
 import { isCalc } from '../engine/calc/check';
-import { CONCEPTS } from '../engine/concepts';
+import { conceptOf } from '../engine/concepts';
 import { PLAIN } from '../engine/concepts-calc';
 import { AttemptAnalysis, CheckedLine, Diagnosis, Problem } from '../engine/types';
 import { Lera, Mood } from '../mascot/Lera';
@@ -20,6 +20,7 @@ import type { Kind } from '../ui/mathrow';
 import { MathView, RichText } from '../ui/math';
 import { TermText } from '../ui/terms';
 import { WeakCard } from './Main';
+import { msg, promptText, t as tr } from '../i18n';
 
 interface Result {
   problem: Problem;
@@ -32,9 +33,9 @@ interface Result {
   skipped?: boolean;
 }
 
-const SOURCE_LABEL: Record<Problem['source'], string> = { notes: 'From your notes', generated: 'Fresh practice', review: 'Coming back' };
+const SOURCE_LABEL: Record<Problem['source'], string> = { notes: msg('From your notes'), generated: msg('Fresh practice'), review: msg('Coming back') };
 
-const SEVERITY_LABEL: Record<Diagnosis['severity'], string> = { gap: 'Gap', slip: 'Slip', notation: 'Notation', strategy: 'Route', incomplete: 'Not finished' };
+const SEVERITY_LABEL: Record<Diagnosis['severity'], string> = { gap: msg('Gap'), slip: msg('Slip'), notation: msg('Notation'), strategy: msg('Route'), incomplete: msg('Not finished') };
 
 const chipTone = (s: Diagnosis['severity']): string => (s === 'gap' ? 'gap' : s === 'slip' ? 'slip' : 'info');
 
@@ -45,47 +46,47 @@ function Keyboard({ vars, onKey, onTpl, onDelete, onEnter, onMove, ready, calc }
   type Key = { k: string; ins?: string; tone?: string; label?: string; tpl?: Kind; then?: string };
   // calculus swaps the inequality column for the functions it needs
   const calcRows: Key[][] = [
-    [{ k: a, tone: 'var' }, { k: 'e', tone: 'var' }, { k: '(' }, { k: ')' }, { k: 'x²', tpl: 'pow', then: '2', label: 'squared' }, { k: '⌫', tone: 'fn', label: 'Delete' }],
-    [{ k: '7' }, { k: '8' }, { k: '9' }, { k: '+', tone: 'op' }, { k: 'sin', ins: 'sin(', tone: 'op' }, { k: 'xⁿ', tpl: 'pow', label: 'to the power' }],
+    [{ k: a, tone: 'var' }, { k: 'e', tone: 'var' }, { k: '(' }, { k: ')' }, { k: 'x²', tpl: 'pow', then: '2', label: tr('squared') }, { k: '⌫', tone: 'fn', label: tr('Delete') }],
+    [{ k: '7' }, { k: '8' }, { k: '9' }, { k: '+', tone: 'op' }, { k: 'sin', ins: 'sin(', tone: 'op' }, { k: 'xⁿ', tpl: 'pow', label: tr('to the power') }],
     [{ k: '4' }, { k: '5' }, { k: '6' }, { k: '−', ins: '-', tone: 'op', label: 'minus' }, { k: 'cos', ins: 'cos(', tone: 'op' }, { k: '√', tpl: 'sqrt', label: 'square root' }],
-    [{ k: '1' }, { k: '2' }, { k: '3' }, { k: '×', ins: '*', tone: 'op', label: 'times' }, { k: 'ln', ins: 'ln(', tone: 'op' }, { k: '+C', ins: '+C', tone: 'op', label: 'plus C' }],
-    [{ k: '0' }, { k: '.' }, { k: '=', tone: 'op' }, { k: '÷', tpl: 'frac', tone: 'op', label: 'fraction' }, { k: 'π', ins: 'pi', tone: 'op', label: 'pi' }, { k: '↵', tone: 'go', label: 'Check this line' }],
+    [{ k: '1' }, { k: '2' }, { k: '3' }, { k: '×', ins: '*', tone: 'op', label: 'times' }, { k: 'ln', ins: 'ln(', tone: 'op' }, { k: '+C', ins: '+C', tone: 'op', label: tr('plus C') }],
+    [{ k: '0' }, { k: '.' }, { k: '=', tone: 'op' }, { k: '÷', tpl: 'frac', tone: 'op', label: 'fraction' }, { k: 'π', ins: 'pi', tone: 'op', label: 'pi' }, { k: '↵', tone: 'go', label: tr('Check this line') }],
   ];
   const algebraRows: Key[][] = [
-    [{ k: a, tone: 'var' }, { k: b, tone: 'var' }, { k: '(' }, { k: ')' }, { k: 'x²', tpl: 'pow', then: '2', label: 'squared' }, { k: '⌫', tone: 'fn', label: 'Delete' }],
-    [{ k: '7' }, { k: '8' }, { k: '9' }, { k: '+', tone: 'op' }, { k: '<', tone: 'op' }, { k: 'xⁿ', tpl: 'pow', label: 'to the power' }],
+    [{ k: a, tone: 'var' }, { k: b, tone: 'var' }, { k: '(' }, { k: ')' }, { k: 'x²', tpl: 'pow', then: '2', label: tr('squared') }, { k: '⌫', tone: 'fn', label: tr('Delete') }],
+    [{ k: '7' }, { k: '8' }, { k: '9' }, { k: '+', tone: 'op' }, { k: '<', tone: 'op' }, { k: 'xⁿ', tpl: 'pow', label: tr('to the power') }],
     [{ k: '4' }, { k: '5' }, { k: '6' }, { k: '−', ins: '-', tone: 'op', label: 'minus' }, { k: '>', tone: 'op' }, { k: '√', tpl: 'sqrt', label: 'square root' }],
     [{ k: '1' }, { k: '2' }, { k: '3' }, { k: '×', ins: '*', tone: 'op', label: 'times' }, { k: '≤', ins: '<=', tone: 'op' }, { k: '±', tone: 'op' }],
-    [{ k: '0' }, { k: '.' }, { k: '=', tone: 'op' }, { k: '÷', tpl: 'frac', tone: 'op', label: 'fraction' }, { k: '≥', ins: '>=', tone: 'op' }, { k: '↵', tone: 'go', label: 'Check this line' }],
+    [{ k: '0' }, { k: '.' }, { k: '=', tone: 'op' }, { k: '÷', tpl: 'frac', tone: 'op', label: 'fraction' }, { k: '≥', ins: '>=', tone: 'op' }, { k: '↵', tone: 'go', label: tr('Check this line') }],
   ];
   const rows = calc ? calcRows : algebraRows;
   void b;
   return (
-    <div className="kbd" aria-label="Maths keyboard">
+    <div className="kbd" aria-label={tr('Maths keyboard')}>
       <div className="kbd-extra">
-        <button onClick={() => onMove(-1)} aria-label="Move left"><Icon name="left" size={18} /></button>
-        <button onClick={() => onMove(1)} aria-label="Move right"><Icon name="right" size={18} /></button>
-        <button className="tpl" onClick={() => onTpl('frac')} aria-label="Fraction"><span className="f"><i /><i /></span></button>
-        <button className="tpl" onClick={() => onTpl('pow')} aria-label="Power">x<i className="hi" /></button>
-        <button className="tpl" onClick={() => onTpl('sqrt')} aria-label="Square root">√<i /></button>
+        <button onClick={() => onMove(-1)} aria-label={tr('Move left')}><Icon name="left" size={18} /></button>
+        <button onClick={() => onMove(1)} aria-label={tr('Move right')}><Icon name="right" size={18} /></button>
+        <button className="tpl" onClick={() => onTpl('frac')} aria-label={tr('Fraction')}><span className="f"><i /><i /></span></button>
+        <button className="tpl" onClick={() => onTpl('pow')} aria-label={tr('Power')}>x<i className="hi" /></button>
+        <button className="tpl" onClick={() => onTpl('sqrt')} aria-label={tr('Square root')}>√<i /></button>
         {calc ? (
           <>
-            <button className="tpl" onClick={() => onTpl('ddx')} aria-label="Derivative">d/d{a}<i /></button>
-            <button className="tpl" onClick={() => onTpl('int')} aria-label="Integral"><svg viewBox="0 0 10 28" aria-hidden="true"><path d="M8.6 2.2c-2.3-.9-3.1.7-3.3 3.2L4.7 22.6c-.2 2.5-1 4.1-3.3 3.2" /></svg><i /></button>
-            <button className="tpl" onClick={() => onTpl('defint')} aria-label="Integral with limits"><svg viewBox="0 0 10 28" aria-hidden="true"><path d="M8.6 2.2c-2.3-.9-3.1.7-3.3 3.2L4.7 22.6c-.2 2.5-1 4.1-3.3 3.2" /></svg><span className="st"><i /><i /></span><i /></button>
-            <button className="tpl" onClick={() => onTpl('lim')} aria-label="Limit">lim<i className="lo" /></button>
+            <button className="tpl" onClick={() => onTpl('ddx')} aria-label={tr('Derivative')}>d/d{a}<i /></button>
+            <button className="tpl" onClick={() => onTpl('int')} aria-label={tr('Integral')}><svg viewBox="0 0 10 28" aria-hidden="true"><path d="M8.6 2.2c-2.3-.9-3.1.7-3.3 3.2L4.7 22.6c-.2 2.5-1 4.1-3.3 3.2" /></svg><i /></button>
+            <button className="tpl" onClick={() => onTpl('defint')} aria-label={tr('Integral with limits')}><svg viewBox="0 0 10 28" aria-hidden="true"><path d="M8.6 2.2c-2.3-.9-3.1.7-3.3 3.2L4.7 22.6c-.2 2.5-1 4.1-3.3 3.2" /></svg><span className="st"><i /><i /></span><i /></button>
+            <button className="tpl" onClick={() => onTpl('lim')} aria-label={tr('Limit')}>lim<i className="lo" /></button>
             <button onClick={() => onKey('tan(')}>tan</button>
-            <button className="tpl" onClick={() => { onKey('e'); onTpl('pow'); }} aria-label="e to the power">e<i className="hi" /></button>
+            <button className="tpl" onClick={() => { onKey('e'); onTpl('pow'); }} aria-label={tr('e to the power')}>e<i className="hi" /></button>
             <button onClick={() => onKey('inf')}>∞</button>
-            <button onClick={() => onKey('DNE')}>no limit</button>
+            <button onClick={() => onKey('DNE')}>{tr('no limit')}</button>
           </>
         ) : (
           <>
-            <button className="tpl" onClick={() => onTpl('abs')} aria-label="Absolute value">|<i />|</button>
+            <button className="tpl" onClick={() => onTpl('abs')} aria-label={tr('Absolute value')}>|<i />|</button>
             <button onClick={() => onKey(' or ')}>or</button>
             <button onClick={() => onKey(',')}>,</button>
-            <button onClick={() => onKey('no solution')}>no solution</button>
-            <button onClick={() => onKey('all real numbers')}>all reals</button>
+            <button onClick={() => onKey(tr('no solution'))}>{tr('no solution')}</button>
+            <button onClick={() => onKey('all real numbers')}>{tr('all reals')}</button>
           </>
         )}
       </div>
@@ -116,21 +117,21 @@ function Keyboard({ vars, onKey, onTpl, onDelete, onEnter, onMove, ready, calc }
 /* ───────────── one line of working ───────────── */
 
 function Mark({ line, pending }: { line: CheckedLine; pending?: boolean }) {
-  if (pending) return <span className="mark wait" aria-label="Not checked yet" />;
+  if (pending) return <span className="mark wait" aria-label={tr('Not checked yet')} />;
   if (line.status === 'ok' || line.status === 'recovered') {
     return (
-      <span className="mark ok" aria-label="Follows">
+      <span className="mark ok" aria-label={tr('Follows')}>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round"><path className="draw" d="M5 12.5l4.5 4.5L19 7.5" /></svg>
       </span>
     );
   }
-  if (line.status === 'wrong') return <span className={`mark ${line.diag?.severity === 'slip' ? 'slip' : 'gap'}`} aria-label="Doesn’t follow" />;
-  if (line.status === 'carried') return <span className="mark carried" aria-label="Follows from a line that is off" />;
-  return <span className="mark none" aria-label="Not checked" />;
+  if (line.status === 'wrong') return <span className={`mark ${line.diag?.severity === 'slip' ? 'slip' : 'gap'}`} aria-label={tr('Doesn’t follow')} />;
+  if (line.status === 'carried') return <span className="mark carried" aria-label={tr('Follows from a line that is off')} />;
+  return <span className="mark none" aria-label={tr('Not checked')} />;
 }
 
 function DiagnosisCard({ diag, onReview, onFix, fixShown, aiNote, onSense }: { diag: Diagnosis; onReview: () => void; onFix: () => void; fixShown: boolean; aiNote?: string; onSense: (ok: boolean) => Promise<string | null> }) {
-  const concept = CONCEPTS[diag.concept];
+  const concept = conceptOf(diag.concept);
   const [sense, setSense] = useState<'yes' | 'no' | null>(null);
   const [simpler, setSimpler] = useState<string | null>(null);
   const answer = (ok: boolean) => {
@@ -143,7 +144,7 @@ function DiagnosisCard({ diag, onReview, onFix, fixShown, aiNote, onSense }: { d
   return (
     <div className={`diag ${chipTone(diag.severity)}`} role="note">
       <div className="row" style={{ gap: 8 }}>
-        <span className={`chip ${chipTone(diag.severity)}`}>{SEVERITY_LABEL[diag.severity]}</span>
+        <span className={`chip ${chipTone(diag.severity)}`}>{tr(SEVERITY_LABEL[diag.severity])}</span>
         <b className="grow" style={{ fontSize: 14.5, lineHeight: 1.3 }}><RichText text={diag.title} /></b>
       </div>
       <p style={{ fontSize: 14.5, lineHeight: 1.5, marginTop: 8 }}><TermText text={aiNote ?? diag.message} /></p>
@@ -151,19 +152,19 @@ function DiagnosisCard({ diag, onReview, onFix, fixShown, aiNote, onSense }: { d
         <div className="sense" data-state={sense ?? 'ask'}>
           {sense === null && (
             <>
-              <span>Did that make sense?</span>
-              <button onClick={() => answer(true)}>Yes</button>
-              <button onClick={() => answer(false)}>Not really</button>
+              <span>{tr('Did that make sense?')}</span>
+              <button onClick={() => answer(true)}>{tr('Yes')}</button>
+              <button onClick={() => answer(false)}>{tr('Not really')}</button>
             </>
           )}
-          {sense === 'yes' && <span className="sense-ok"><Icon name="check" size={14} stroke={3} /> Good. Fix the line and carry on.</span>}
+          {sense === 'yes' && <span className="sense-ok"><Icon name="check" size={14} stroke={3} />{' '}{tr('Good. Fix the line and carry on.')}</span>}
           {sense === 'no' && (
             <div className="plainer">
-              <span className="label">In plain words</span>
-              <p><RichText text={simpler ?? PLAIN[diag.concept]} /></p>
+              <span className="label">{tr('In plain words')}</span>
+              <p><RichText text={simpler ?? tr(PLAIN[diag.concept])} /></p>
               <button className="review-link" onClick={onReview}>
                 <Icon name="play" size={14} fill />
-                <span>Walk me through an example</span>
+                <span>{tr('Walk me through an example')}</span>
                 <Icon name="chevron" size={15} />
               </button>
             </div>
@@ -172,7 +173,7 @@ function DiagnosisCard({ diag, onReview, onFix, fixShown, aiNote, onSense }: { d
       )}
       {fixShown && diag.fix && (
         <p className="fixline">
-          <span className="faint" style={{ fontSize: 12.5 }}>This line should read</span>
+          <span className="faint" style={{ fontSize: 12.5 }}>{tr('This line should read')}</span>
           <MathView text={diag.fix} block />
         </p>
       )}
@@ -180,14 +181,14 @@ function DiagnosisCard({ diag, onReview, onFix, fixShown, aiNote, onSense }: { d
         {(diag.severity === 'gap' || diag.code !== 'arithmetic-slip') && (
           <button className="review-link" onClick={onReview}>
             <Icon name="book" size={16} />
-            <span>Review: {concept.title}</span>
-            <span className="faint">· {concept.minutes} min</span>
+            <span>{tr('Review: {0}', { 0: concept.title })}</span>
+            <span className="faint">{tr('· {0} min', { 0: concept.minutes })}</span>
             <Icon name="chevron" size={15} />
           </button>
         )}
         {diag.fix && !fixShown && (
           <button className="linkbtn" style={{ fontSize: 13.5, padding: '6px 8px' }} onClick={onFix}>
-            Show the corrected line
+            {tr('Show the corrected line')}
           </button>
         )}
       </div>
@@ -313,7 +314,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     const text = input.trim().replace(/^=\s*(?=[^=]*$)/, '');
     if (!text || finished) return null;
     if (gaps) {
-      setNote('One of the boxes is still empty. Fill it in, or delete it.');
+      setNote(tr('One of the boxes is still empty. Fill it in, or delete it.'));
       setShake((n) => n + 1);
       haptic([12, 30, 12]);
       return null;
@@ -322,7 +323,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     const a = analyze(problem, next);
     const line = a.lines[a.lines.length - 1];
     if (!line || line.status === 'unreadable') {
-      setNote(line?.note ?? 'I couldn’t read that line. Check the brackets and signs.');
+      setNote(line?.note ?? tr('I couldn’t read that line. Check the brackets and signs.'));
       setShake((n) => n + 1);
       setMood('curious');
       haptic([12, 30, 12]);
@@ -352,7 +353,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       setMood('calculating'); // she reads along but keeps quiet until asked
       return next;
     }
-    setNote(line.status === 'unchecked' ? line.note ?? 'I can’t compare this line with the one above, so I’ve left it unmarked.' : null);
+    setNote(line.status === 'unchecked' ? line.note ?? tr('I can’t compare this line with the one above, so I’ve left it unmarked.') : null);
     const idx = next.length - 1;
     if (line.status === 'wrong') {
       setOpenDiag(idx);
@@ -375,8 +376,8 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     } else {
       setOpenDiag(null);
       setMood(line.status === 'carried' ? 'thinking' : line.status === 'recovered' ? 'eureka' : 'happy');
-      if (line.status === 'carried') setNote('That follows from the line above, but that line was already off, so the mistake is carried along.');
-      if (line.status === 'recovered') setNote('Back on track: this line is true to the original problem again.');
+      if (line.status === 'carried') setNote(tr('That follows from the line above, but that line was already off, so the mistake is carried along.'));
+      if (line.status === 'recovered') setNote(tr('Back on track: this line is true to the original problem again.'));
       setTimeout(() => setMood('idle'), 1100);
     }
       return next;
@@ -417,7 +418,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       return;
     }
     setNote(null);
-    setReview({ wrong, remaining: wrong.length ? null : a.remaining ?? 'Every line follows, but it isn’t finished yet.' });
+    setReview({ wrong, remaining: wrong.length ? null : a.remaining ?? tr('Every line follows, but it isn’t finished yet.') });
     setOpenDiag(wrong.length ? wrong[0] : null);
     setMood(wrong.length ? 'oops' : 'happy');
     if (wrong.length) {
@@ -443,13 +444,13 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     else setCheckedCount(lines.length);
     setMode(nextMode);
     actions.setProfile({ checkMode: nextMode });
-    toast(nextMode === 'end' ? 'I’ll wait until you ask before marking anything' : 'Marking each line as you write it');
+    toast(nextMode === 'end' ? tr('I’ll wait until you ask before marking anything') : tr('Marking each line as you write it'));
   };
 
   const askHint = () => {
     const ladder = hintLadder(problem, lines);
     if (!ladder) {
-      toast('I don’t have a hint for this one.');
+      toast(tr('I don’t have a hint for this one.'));
       return;
     }
     setHint(ladder);
@@ -484,7 +485,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
 
   const marks = marksNow();
   const strategy = analysis.marks.find((m) => m.severity === 'strategy');
-  const hintText = hint ? (rung <= 1 ? hint.nudge : rung === 2 ? hint.method : 'Here is the next line. Read it, then write it yourself:') : '';
+  const hintText = hint ? (rung <= 1 ? hint.nudge : rung === 2 ? hint.method : tr('Here is the next line. Read it, then write it yourself:')) : '';
 
   return (
     <>
@@ -493,21 +494,21 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <span className={`chip ${problem.source === 'review' ? 'gap' : problem.source === 'notes' ? '' : 'plain'}`}>
               {problem.source === 'review' ? <Icon name="refresh" size={13} /> : problem.source === 'notes' ? <Icon name="file" size={13} /> : null}
-              {SOURCE_LABEL[problem.source]}
+              {tr(SOURCE_LABEL[problem.source])}
             </span>
             <Lera size={42} mood={mood} />
           </div>
-          <p className="prompt"><RichText text={problem.prompt} /></p>
+          <p className="prompt"><RichText text={promptText(problem.prompt)} /></p>
           <div className="given"><MathView text={problem.given} block /></div>
         </div>
 
         {answerFirst && !finished && (
           <div className="answer-first">
             <div className="row" style={{ gap: 8 }}>
-              <span className="chip ok"><Icon name="check" size={13} stroke={3.2} /> Right answer</span>
+              <span className="chip ok"><Icon name="check" size={13} stroke={3.2} />{' '}{tr('Right answer')}</span>
               <MathView text={answerFirst} />
             </div>
-            <p><b>Now show me how you got there.</b> This one takes about {clean.length} lines. Write them, ending with the answer. The answer tells me you can do it. The steps show me how you think, and that is where I can help.</p>
+            <p><b>{tr('Now show me how you got there.')}</b>{' '}{tr('This one takes about')}{' '}{clean.length} lines. Write them, ending with the answer. The answer tells me you can do it. The steps show me how you think, and that is where I can help.</p>
           </div>
         )}
         <ol className="lines">
@@ -555,8 +556,8 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
             <div className="grow">
               <MathField
                 ref={fieldRef}
-                label={`Line ${lines.length + 1} of your working`}
-                placeholder={lines.length ? (mode === 'end' ? 'Next line… then “Check my work”' : 'Next line…') : 'Write your first line…'}
+                label={tr('Line {0} of your working', { 0: lines.length + 1 })}
+                placeholder={lines.length ? (mode === 'end' ? tr('Next line… then “Check my work”') : tr('Next line…')) : tr('Write your first line…')}
                 onChange={(text, hasGaps) => {
                   setInput(text);
                   setGaps(hasGaps);
@@ -572,21 +573,21 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
 
         {review && !finished && (
           <div className={`ws-review ${review.wrong.length ? 'bad' : ''}`} role="status">
-            <b>{review.wrong.length ? (lines.length === 1 ? 'I read your line. It needs another look.' : `I read all ${lines.length} of your lines. ${review.wrong.length === 1 ? 'One needs' : `${review.wrong.length} need`} another look.`) : 'Right so far, but not finished.'}</b>
+            <b>{review.wrong.length ? (lines.length === 1 ? tr('I read your line. It needs another look.') : `I read all ${lines.length} of your lines. ${review.wrong.length === 1 ? 'One needs' : `${review.wrong.length} need`} another look.`) : tr('Right so far, but not finished.')}</b>
             {review.wrong.map((i) => {
               const d = analysis.lines[i]?.diag;
               return (
                 <button key={i} className="ws-review-line" onClick={() => setOpenDiag(i)}>
-                  <span className={`chip ${d ? chipTone(d.severity) : 'gap'}`}>Line {i + 1}</span>
-                  <span className="grow"><RichText text={d?.title ?? 'This line does not follow from the one above.'} /></span>
+                  <span className={`chip ${d ? chipTone(d.severity) : 'gap'}`}>{tr('Line {0}', { 0: i + 1 })}</span>
+                  <span className="grow"><RichText text={d?.title ?? tr('This line does not follow from the one above.')} /></span>
                   <Icon name="chevron" size={15} />
                 </button>
               );
             })}
             {review.remaining && <p><TermText text={review.remaining} /></p>}
             <div className="row" style={{ gap: 8, marginTop: 4 }}>
-              <button className="tool" onClick={() => setReview(null)}>{review.wrong.length ? 'Fix it myself' : 'Keep going'}</button>
-              <button className="tool go" onClick={reveal}>Show it solved, step by step</button>
+              <button className="tool" onClick={() => setReview(null)}>{review.wrong.length ? tr('Fix it myself') : tr('Keep going')}</button>
+              <button className="tool go" onClick={reveal}>{tr('Show it solved, step by step')}</button>
             </div>
           </div>
         )}
@@ -600,14 +601,14 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
                 </span>
               )}
               <span className="row" style={{ gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
-                <span className="hint-rungs" aria-label={`Hint ${rung} of 3`}>{[1, 2, 3].map((n) => <i key={n} data-on={n <= rung ? '' : undefined} />)}</span>
+                <span className="hint-rungs" aria-label={tr('Hint {0} of 3', { 0: rung })}>{[1, 2, 3].map((n) => <i key={n} data-on={n <= rung ? '' : undefined} />)}</span>
                 {rung < 3 ? (
                   <button className="linkbtn" style={{ fontSize: 13.5, padding: '4px 8px' }} onClick={askHint}>
-                    {rung === 1 ? 'Tell me the method' : 'Show me the line'}
+                    {rung === 1 ? tr('Tell me the method') : tr('Show me the line')}
                   </button>
                 ) : (
                   <button className="linkbtn" style={{ fontSize: 13.5, padding: '4px 8px' }} onClick={reveal}>
-                    Show the whole solution
+                    {tr('Show the whole solution')}
                   </button>
                 )}
               </span>
@@ -621,7 +622,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
               <div className="solved-banner">
                 <span className="big-tick"><Icon name="check" size={26} stroke={3.2} /></span>
                 <div>
-                  <b>{marks.length ? 'Solved, with a detour' : rung >= 3 ? 'Solved, with the line shown' : 'Solved'}</b>
+                  <b>{marks.length ? tr('Solved, with a detour') : rung >= 3 ? tr('Solved, with the line shown') : tr('Solved')}</b>
                   <p className="muted" style={{ fontSize: 14 }}>
                     {analysis.steps} {analysis.steps === 1 ? 'line' : 'lines'}
                     {analysis.approach ? ` · ${analysis.approach}` : ''}
@@ -630,17 +631,17 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
               </div>
             ) : (
               <div className="card tint">
-                <b>Here’s a clean route</b>
-                <p className="muted" style={{ fontSize: 14, marginTop: 2 }}>Read each step and the reason beside it. This one comes back later so you can do it yourself.</p>
+                <b>{tr('Here’s a clean route')}</b>
+                <p className="muted" style={{ fontSize: 14, marginTop: 2 }}>{tr('Read each step and the reason beside it. This one comes back later so you can do it yourself.')}</p>
               </div>
             )}
 
             {marks.filter((m) => m.severity !== 'strategy').length > 0 && (
               <div className="card">
-                <span className="label">What I noticed</span>
+                <span className="label">{tr('What I noticed')}</span>
                 {marks.filter((m) => m.severity !== 'strategy').map((m) => (
                   <button key={m.code + m.concept} className="noticed" onClick={() => openOverlay({ name: 'review', concept: m.concept })}>
-                    <span className={`chip ${chipTone(m.severity)}`}>{SEVERITY_LABEL[m.severity]}</span>
+                    <span className={`chip ${chipTone(m.severity)}`}>{tr(SEVERITY_LABEL[m.severity])}</span>
                     <span className="grow"><RichText text={m.title} /></span>
                     <Icon name="chevron" size={16} />
                   </button>
@@ -653,7 +654,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
             {clean.length > 0 && (solved ? analysis.steps !== clean.length || marks.length > 0 || compare : true) && (
               <div className="card">
                 <button className="row" style={{ width: '100%', justifyContent: 'space-between' }} onClick={() => setCompare(!compare)} aria-expanded={compare || revealed}>
-                  <span className="label">{revealed ? 'Clean route' : `A clean route · ${clean.length} ${clean.length === 1 ? 'line' : 'lines'}`}</span>
+                  <span className="label">{revealed ? tr('Clean route') : `A clean route · ${clean.length} ${clean.length === 1 ? 'line' : 'lines'}`}</span>
                   {!revealed && <Icon name={compare ? 'down' : 'chevron'} size={17} />}
                 </button>
                 {(compare || revealed) && (
@@ -661,14 +662,14 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
                     {clean.map((s, i) => {
                       const c = cleanConcepts[i];
                       // the rule is spelled out the first time a step leans on it, not on every line
-                      const rule = c && cleanConcepts.indexOf(c) === i ? CONCEPTS[c] : null;
+                      const rule = c && cleanConcepts.indexOf(c) === i ? conceptOf(c) : null;
                       return (
                         <li key={i} style={{ animationDelay: `${i * 90}ms` }}>
                           <MathView text={s.line} block />
-                          <span className="muted"><b>What I did.</b> <TermText text={s.why} /></span>
+                          <span className="muted"><b>{tr('What I did.')}</b> <TermText text={s.why} /></span>
                           {rule && clean.length > 1 && (
                             <span className="route-why">
-                              <b>Why it is allowed.</b> <TermText text={rule.short} />{' '}
+                              <b>{tr('Why it is allowed.')}</b> <TermText text={rule.short} />{' '}
                               <button className="linkbtn" onClick={() => openOverlay({ name: 'review', concept: rule.id })}>{rule.title} <Icon name="chevron" size={13} /></button>
                             </span>
                           )}
@@ -686,26 +687,26 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       {finished ? (
         <div className="ws-foot">
           <Button3D variant={solved ? 'ok' : 'primary'} sheen onClick={() => finish()}>
-            {last ? 'Finish' : 'Next problem'} <Icon name="arrow" size={19} />
+            {last ? tr('Finish') : tr('Next problem')} <Icon name="arrow" size={19} />
           </Button3D>
         </div>
       ) : (
         <div className="ws-keys">
           <div className="row ws-tools">
             <button className="tool" onClick={askHint}>
-              <Icon name="bulb" size={18} /> Hint{rung ? ` ${rung}/3` : ''}
+              <Icon name="bulb" size={18} />{' '}{tr('Hint')}{rung ? ` ${rung}/3` : ''}
             </button>
-            <button className="tool" onClick={switchMode} aria-label="Change when your working is checked">
-              <Icon name={mode === 'end' ? 'clock' : 'check'} size={16} stroke={2.6} /> {mode === 'end' ? 'At the end' : 'As I go'}
+            <button className="tool" onClick={switchMode} aria-label={tr('Change when your working is checked')}>
+              <Icon name={mode === 'end' ? 'clock' : 'check'} size={16} stroke={2.6} /> {mode === 'end' ? tr('At the end') : tr('As I go')}
             </button>
             <span className="grow" />
             {(lines.length > 0 || !!input.trim()) && (
-              <button className="tool go" onClick={done} aria-label="I have finished solving: check all my work">
-                <Icon name="check" size={16} stroke={3} /> Done
+              <button className="tool go" onClick={done} aria-label={tr('I have finished solving: check all my work')}>
+                <Icon name="check" size={16} stroke={3} />{' '}{tr('Done')}
               </button>
             )}
             <button className="tool" onClick={() => (lines.length || rung ? reveal() : finish(true))}>
-              {lines.length || rung ? 'Show solution' : 'Skip'}
+              {lines.length || rung ? tr('Show solution') : tr('Skip')}
             </button>
           </div>
           <Keyboard vars={vars} onKey={insert} onTpl={tpl} onDelete={del} onEnter={commit} onMove={move} ready={!!input.trim()} calc={calc} />
@@ -731,9 +732,9 @@ function OpenWork({ problem, last, onDone }: { problem: Problem; last: boolean; 
     try {
       const v = await aiCheckOpen(ai, problem, text.split('\n').filter((l) => l.trim()));
       if (v) setVerdict(v);
-      else toast('The AI reply couldn’t be read. Try again.');
+      else toast(tr('The AI reply couldn’t be read. Try again.'));
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'The AI check failed.');
+      toast(e instanceof Error ? e.message : tr('The AI check failed.'));
     }
     setBusy(false);
   };
@@ -741,26 +742,26 @@ function OpenWork({ problem, last, onDone }: { problem: Problem; last: boolean; 
     <>
       <div className="scroll ws">
         <div className="problem">
-          <span className="chip"><Icon name="file" size={13} /> From your notes · written answer</span>
-          <p className="prompt" style={{ fontSize: 17, lineHeight: 1.5 }}><RichText text={problem.original ?? problem.prompt} /></p>
+          <span className="chip"><Icon name="file" size={13} />{' '}{tr('From your notes · written answer')}</span>
+          <p className="prompt" style={{ fontSize: 17, lineHeight: 1.5 }}><RichText text={problem.original ?? promptText(problem.prompt)} /></p>
         </div>
-        <textarea className="field" style={{ minHeight: 150, margin: '4px 0 10px', resize: 'none' }} placeholder="Write your working here, one step per line…" value={text} onChange={(e: { target: { value: string } }) => setText(e.target.value)} aria-label="Your working" />
+        <textarea className="field" style={{ minHeight: 150, margin: '4px 0 10px', resize: 'none' }} placeholder={tr('Write your working here, one step per line…')} value={text} onChange={(e: { target: { value: string } }) => setText(e.target.value)} aria-label={tr('Your working')} />
         {verdict ? (
           <div className={`diag ${verdict.correct ? 'okc' : 'slip'}`}>
-            <span className={`chip ${verdict.correct ? 'ok' : 'slip'}`}>{verdict.correct ? 'Looks right' : 'Not yet'}</span>
+            <span className={`chip ${verdict.correct ? 'ok' : 'slip'}`}>{verdict.correct ? tr('Looks right') : tr('Not yet')}</span>
             <p style={{ marginTop: 8, lineHeight: 1.5, fontSize: 14.5 }}>{verdict.feedback}</p>
-            <p className="faint" style={{ fontSize: 12.5, marginTop: 6 }}>Checked by the AI model you connected, not by the built-in engine.</p>
+            <p className="faint" style={{ fontSize: 12.5, marginTop: 6 }}>{tr('Checked by the AI model you connected, not by the built-in engine.')}</p>
           </div>
         ) : (
-          <p className="ws-note"><Icon name="question" size={16} /> <span>{aiReady(ai) ? 'Word problems are checked by the AI model you connected.' : 'The built-in engine checks algebra line by line, but it can’t mark a word problem. Connect an AI model in Settings to have these checked, or mark it yourself.'}</span></p>
+          <p className="ws-note"><Icon name="question" size={16} /> <span>{aiReady(ai) ? tr('Word problems are checked by the AI model you connected.') : tr('The built-in engine checks algebra line by line, but it can’t mark a word problem. Connect an AI model in Settings to have these checked, or mark it yourself.')}</span></p>
         )}
       </div>
       <div className="ws-foot" style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
-        {aiReady(ai) && !verdict && <Button3D busy={busy} disabled={!text.trim()} onClick={check}>Check my answer</Button3D>}
+        {aiReady(ai) && !verdict && <Button3D busy={busy} disabled={!text.trim()} onClick={check}>{tr('Check my answer')}</Button3D>}
         <Button3D variant={verdict?.correct ? 'ok' : 'secondary'} onClick={() => done(verdict ? verdict.correct : !!text.trim())}>
-          {verdict ? (last ? 'Finish' : 'Next problem') : 'I’ve done this one'}
+          {verdict ? (last ? tr('Finish') : tr('Next problem')) : tr('I’ve done this one')}
         </Button3D>
-        {!verdict && <button className="linkbtn" onClick={() => done(false, true)}>Skip</button>}
+        {!verdict && <button className="linkbtn" onClick={() => done(false, true)}>{tr('Skip')}</button>}
       </div>
     </>
   );
@@ -772,7 +773,7 @@ export function SessionScreen({ route }: { route: Extract<Route, { name: 'sessio
   const [session] = useState<Session>(() => {
     const st = getState();
     if (route.problems?.length) {
-      return { title: route.title ?? 'Practice', topicId: route.topicId, problems: route.problems, reviews: route.problems.filter((p) => p.source === 'review').length, minutes: Math.max(1, Math.round(route.problems.length * 1.4)) };
+      return { title: route.title ?? tr('Practice'), topicId: route.topicId, problems: route.problems, reviews: route.problems.filter((p) => p.source === 'review').length, minutes: Math.max(1, Math.round(route.problems.length * 1.4)) };
     }
     const topic = findTopic(st.docs, route.topicId)?.topic ?? null;
     return buildSession(st, topic);
@@ -799,12 +800,12 @@ export function SessionScreen({ route }: { route: Extract<Route, { name: 'sessio
   if (total === 0) {
     return (
       <div className="screen" data-dir="1">
-        <div className="topbar"><button className="iconbtn" onClick={back} aria-label="Close"><Icon name="close" /></button></div>
+        <div className="topbar"><button className="iconbtn" onClick={back} aria-label={tr('Close')}><Icon name="close" /></button></div>
         <div className="scroll center" style={{ justifyContent: 'center', gap: 14, padding: '0 30px' }}>
           <Lera size={100} mood="proud" />
-          <h2 style={{ fontSize: 22 }}>Nothing is due right now</h2>
-          <p className="muted" style={{ lineHeight: 1.5 }}>When a topic is ready to come back, it will show up here. Until then, pick a lesson and practise it.</p>
-          <Button3D onClick={back}>Back</Button3D>
+          <h2 style={{ fontSize: 22 }}>{tr('Nothing is due right now')}</h2>
+          <p className="muted" style={{ lineHeight: 1.5 }}>{tr('When a topic is ready to come back, it will show up here. Until then, pick a lesson and practise it.')}</p>
+          <Button3D onClick={back}>{tr('Back')}</Button3D>
         </div>
       </div>
     );
@@ -820,10 +821,10 @@ export function SessionScreen({ route }: { route: Extract<Route, { name: 'sessio
   return (
     <div className="screen session" data-dir="1">
       <div className="topbar" style={{ gap: 12 }}>
-        <button className="iconbtn" onClick={() => (phase === 'solve' && results.length + 1 < total ? setLeaving(true) : back())} aria-label="Close session">
+        <button className="iconbtn" onClick={() => (phase === 'solve' && results.length + 1 < total ? setLeaving(true) : back())} aria-label={tr('Close session')}>
           <Icon name="close" />
         </button>
-        <div className="segbar grow" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={results.length} aria-label="Problems done">
+        <div className="segbar grow" role="progressbar" aria-valuemin={0} aria-valuemax={total} aria-valuenow={results.length} aria-label={tr('Problems done')}>
           {session.problems.map((p, i) => {
             const r = results[i];
             const state = !r ? (i === index && phase === 'solve' ? 'now' : 'todo') : r.skipped ? 'skip' : r.verdict === 'solved' && r.marks.length === 0 ? 'ok' : r.verdict === 'solved' ? 'mixed' : 'miss';
@@ -847,12 +848,12 @@ export function SessionScreen({ route }: { route: Extract<Route, { name: 'sessio
       {leaving && (
         <>
           <div className="scrim" onClick={() => setLeaving(false)} />
-          <div className="dialog" role="alertdialog" aria-label="Leave this session?">
+          <div className="dialog" role="alertdialog" aria-label={tr('Leave this session?')}>
             <Lera size={64} mood="curious" interactive={false} />
-            <b style={{ fontSize: 18 }}>Leave this session?</b>
-            <p className="muted" style={{ fontSize: 14.5 }}>What you’ve solved so far is already saved.</p>
-            <Button3D onClick={() => setLeaving(false)}>Keep going</Button3D>
-            <button className="linkbtn" onClick={back}>Leave</button>
+            <b style={{ fontSize: 18 }}>{tr('Leave this session?')}</b>
+            <p className="muted" style={{ fontSize: 14.5 }}>{tr('What you’ve solved so far is already saved.')}</p>
+            <Button3D onClick={() => setLeaving(false)}>{tr('Keep going')}</Button3D>
+            <button className="linkbtn" onClick={back}>{tr('Leave')}</button>
           </div>
         </>
       )}
@@ -867,8 +868,8 @@ function Brief({ session, onStart }: { session: Session; onStart: () => void }) 
     session.reviews > 0
       ? `**${session.reviews}** of these ${session.reviews === 1 ? 'is' : 'are'} coming back from an earlier mistake. Let’s see if ${session.reviews === 1 ? 'it holds' : 'they hold'}.`
       : fromNotes > 0
-        ? `These come straight from your notes. Write every line, I read the working, not just the answer.`
-        : 'Fresh problems for this topic. Write every line, I read the working, not just the answer.';
+        ? tr('These come straight from your notes. Write every line, I read the working, not just the answer.')
+        : tr('Fresh problems for this topic. Write every line, I read the working, not just the answer.');
   return (
     <>
       <div className="scroll center stagger" style={{ justifyContent: 'center', gap: 16, padding: '0 26px' }}>
@@ -883,7 +884,7 @@ function Brief({ session, onStart }: { session: Session; onStart: () => void }) 
         </div>
       </div>
       <div className="ws-foot">
-        <Button3D sheen onClick={onStart}>Start</Button3D>
+        <Button3D sheen onClick={onStart}>{tr('Start')}</Button3D>
       </div>
     </>
   );
@@ -924,11 +925,11 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
     const out: Scene[] = [
       {
         kind: 'done',
-        title: allClean ? 'Flawless session!' : 'Session complete!',
-        sub: allClean ? 'Every line followed from the one before.' : undefined,
+        title: allClean ? tr('Flawless session!') : tr('Session complete!'),
+        sub: allClean ? tr('Every line followed from the one before.') : undefined,
         stats: [
-          { label: 'XP earned', value: earned, tone: 'xp' },
-          { label: 'Solved', value: solved, of: results.length, tone: 'score' },
+          { label: tr('XP earned'), value: earned, tone: 'xp' },
+          { label: tr('Solved'), value: solved, of: results.length, tone: 'score' },
         ],
       },
     ];
@@ -937,26 +938,26 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
       out.push({
         kind: 'streak',
         value: days,
-        title: days === 1 ? 'Your streak starts today' : `${days} days in a row!`,
-        sub: days === 1 ? 'Come back tomorrow to make it two.' : 'You showed up again. That is how it sticks.',
+        title: days === 1 ? tr('Your streak starts today') : `${days} days in a row!`,
+        sub: days === 1 ? tr('Come back tomorrow to make it two.') : tr('You showed up again. That is how it sticks.'),
         week: weekStrip({ attempts, read }).map((d) => d.active),
       });
     }
-    if (xpToday >= goal && xpToday - earned < goal) out.push({ kind: 'goal', value: xpToday, title: 'Daily goal reached!', sub: 'Anything more today is a bonus.' });
+    if (xpToday >= goal && xpToday - earned < goal) out.push({ kind: 'goal', value: xpToday, title: tr('Daily goal reached!'), sub: tr('Anything more today is a bonus.') });
     const before = levelOf(Math.max(0, totalXp({ attempts, read }) - earned));
-    if (before.level < lv.level) out.push({ kind: 'level', value: lv.level, title: `Level ${lv.level} · ${lv.title}`, sub: 'A new level, earned one checked line at a time.' });
+    if (before.level < lv.level) out.push({ kind: 'level', value: lv.level, title: tr('Level {0} · {1}', { 0: lv.level, 1: lv.title }), sub: 'A new level, earned one checked line at a time.' });
     return out;
     // the scenes are fixed the moment the session ends
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   if (party && scenes.length > 0) return <CelebrationFlow scenes={scenes} onDone={() => setParty(false)} />;
   const text = allClean
-    ? 'Every line followed from the one before. That’s what solid looks like.'
+    ? tr('Every line followed from the one before. That’s what solid looks like.')
     : gap
-      ? `One thing to tighten: **${CONCEPTS[gap.concept].title.toLowerCase()}**. I’ll bring it back tomorrow.`
+      ? tr('One thing to tighten: **{0}**. I’ll bring it back tomorrow.', { 0: conceptOf(gap.concept).title.toLowerCase() })
       : solved > 0
-        ? 'Good work. The slips I marked are noted, nothing to review, just slow that line down.'
-        : 'That was a hard set. Have a look at the routes, and we’ll come back to these.';
+        ? tr('Good work. The slips I marked are noted, nothing to review, just slow that line down.')
+        : tr('That was a hard set. Have a look at the routes, and we’ll come back to these.');
   return (
     <>
       <div className="scroll stagger" style={{ padding: '6px 20px 20px' }}>
@@ -969,31 +970,31 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
             <span>XP</span>
           </div>
           <div className="reward-side">
-            <span className={`streakpill ${days > 0 ? 'lit' : ''}`}><Icon name="flame" size={16} fill /> Day {Math.max(1, days)}</span>
-            <span className="faint" style={{ fontSize: 12.5 }}>Level {lv.level} · {lv.title}</span>
+            <span className={`streakpill ${days > 0 ? 'lit' : ''}`}><Icon name="flame" size={16} fill />{' '}{tr('Day')}{' '}{Math.max(1, days)}</span>
+            <span className="faint" style={{ fontSize: 12.5 }}>{tr('Level {0} · {1}', { 0: lv.level, 1: lv.title })}</span>
           </div>
           <Ring value={Math.min(1, xpToday / goal)} size={58} stroke={7} color="var(--flame)">
-            <span style={{ fontSize: 11, fontWeight: 700 }}>{xpToday >= goal ? 'Goal!' : `${xpToday}/${goal}`}</span>
+            <span style={{ fontSize: 11, fontWeight: 700 }}>{xpToday >= goal ? tr('Goal!') : `${xpToday}/${goal}`}</span>
           </Ring>
         </div>
         <div className="row" style={{ gap: 10, marginTop: 12 }}>
-          <div className="stat grow"><b><CountUp to={solved} />/{results.length}</b><span>solved</span></div>
-          <div className="stat grow"><b><CountUp to={clean} /></b><span>clean</span></div>
-          <div className="stat grow"><b><CountUp to={Math.max(1, Math.round(seconds / 60))} /></b><span>min</span></div>
+          <div className="stat grow"><b><CountUp to={solved} />/{results.length}</b><span>{tr('solved')}</span></div>
+          <div className="stat grow"><b><CountUp to={clean} /></b><span>{tr('clean')}</span></div>
+          <div className="stat grow"><b><CountUp to={Math.max(1, Math.round(seconds / 60))} /></b><span>{tr('min')}</span></div>
         </div>
         {list.length > 0 && (
           <div className="card" style={{ marginTop: 14 }}>
-            <span className="label">What I noticed</span>
+            <span className="label">{tr('What I noticed')}</span>
             {list.map((m) => {
               const c = concepts[m.concept];
               const due = c?.due;
               return (
                 <button key={m.severity + m.concept} className="noticed" onClick={() => openOverlay({ name: 'review', concept: m.concept })}>
-                  <span className={`chip ${chipTone(m.severity)}`}>{SEVERITY_LABEL[m.severity]}</span>
+                  <span className={`chip ${chipTone(m.severity)}`}>{tr(SEVERITY_LABEL[m.severity])}</span>
                   <span className="grow">
-                    <b style={{ display: 'block', fontSize: 14.5 }}>{CONCEPTS[m.concept].title}</b>
+                    <b style={{ display: 'block', fontSize: 14.5 }}>{conceptOf(m.concept).title}</b>
                     <span className="muted" style={{ fontSize: 13 }}>
-                      {m.severity === 'gap' ? (due && due > today ? `Comes back ${due === addDays(today, 1) ? 'tomorrow' : `on ${due}`}` : 'In your review queue') : c?.rushing ? 'Keeps happening, worth a look' : 'Noted. No review needed.'}
+                      {m.severity === 'gap' ? (due && due > today ? `Comes back ${due === addDays(today, 1) ? 'tomorrow' : `on ${due}`}` : tr('In your review queue')) : c?.rushing ? tr('Keeps happening, worth a look') : tr('Noted. No review needed.')}
                     </span>
                   </span>
                   <Icon name="chevron" size={16} />
@@ -1004,7 +1005,7 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
         )}
         {weak.length > 0 && (
           <div className="col" style={{ gap: 10, marginTop: 14 }}>
-            <span className="label">Worth going back to</span>
+            <span className="label">{tr('Worth going back to')}</span>
             {weak.map((w) => <WeakCard key={w.id} w={w} />)}
           </div>
         )}
@@ -1013,10 +1014,10 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
       <div className="ws-foot" style={{ display: 'flex', flexDirection: 'column', gap: 16, alignItems: 'center' }}>
         {gap && (
           <Button3D onClick={() => openOverlay({ name: 'review', concept: gap.concept })}>
-            <Icon name="book" size={18} /> Review it now · {CONCEPTS[gap.concept].minutes} min
+            <Icon name="book" size={18} />{' '}{tr('Review it now ·')}{' '}{conceptOf(gap.concept).minutes} min
           </Button3D>
         )}
-        <Button3D variant={gap ? 'secondary' : 'primary'} onClick={back}>Done</Button3D>
+        <Button3D variant={gap ? 'secondary' : 'primary'} onClick={back}>{tr('Done')}</Button3D>
       </div>
       <Confetti fire={solved > 0 ? 1 : 0} />
     </>

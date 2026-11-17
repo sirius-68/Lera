@@ -1,5 +1,6 @@
 import { Node, Relation, RelOp, Statement, walk, replaceAt, negate, statementToLatex } from './ast';
 import { fracFromDecimal } from './frac';
+import { t as tr } from '../i18n';
 
 /**
  * Parser for one line of student working.
@@ -99,7 +100,7 @@ function tokenize(src: string): Tok[] {
         i += 2;
         continue;
       }
-      if (c === '!') throw new ParseError('I don’t know what “!” means here.', i);
+      if (c === '!') throw new ParseError(tr('I don’t know what “!” means here.'), i);
       if (two === '==') {
         toks.push({ k: 'rel', s: '=', pos: i });
         i += 2;
@@ -119,7 +120,7 @@ function tokenize(src: string): Tok[] {
       i++;
       continue;
     }
-    throw new ParseError(`I can’t read “${c}” as maths.`, i);
+    throw new ParseError(tr('I can’t read “{0}” as maths.', { 0: c }), i);
   }
   toks.push({ k: 'end', s: '', pos: src.length });
   return toks;
@@ -201,8 +202,8 @@ class Parser {
         const right = this.power();
         if (t.k === 'num') {
           // `x 2` / `(x+1)3` is almost always a typo for a power or a product
-          if (left.t === 'num') throw new ParseError('Two numbers side by side, is a sign missing between them?', t.pos);
-          throw new ParseError('Put the number in front (3x), or use ^ for a power (x^3).', t.pos);
+          if (left.t === 'num') throw new ParseError(tr('Two numbers side by side, is a sign missing between them?'), t.pos);
+          throw new ParseError(tr('Put the number in front (3x), or use ^ for a power (x^3).'), t.pos);
         }
         left = this.times(left, right);
       } else break;
@@ -275,17 +276,17 @@ class Parser {
       this.expect('|');
       return { t: 'abs', arg: inner };
     }
-    if (t.k === 'end') throw new ParseError('This line stops halfway, something is missing at the end.', t.pos);
-    if (t.k === 'op' && t.s === ')') throw new ParseError('There’s a closing bracket with no opening one.', t.pos);
+    if (t.k === 'end') throw new ParseError(tr('This line stops halfway, something is missing at the end.'), t.pos);
+    if (t.k === 'op' && t.s === ')') throw new ParseError(tr('There’s a closing bracket with no opening one.'), t.pos);
     if (t.k === 'op' && (t.s === '*' || t.s === '/' || t.s === '^'))
-      throw new ParseError(`“${t.s}” needs something before it.`, t.pos);
-    throw new ParseError('I can’t read this part as maths.', t.pos);
+      throw new ParseError(tr('“{0}” needs something before it.', { 0: t.s }), t.pos);
+    throw new ParseError(tr('I can’t read this part as maths.'), t.pos);
   }
 
   private expect(s: string): void {
     const t = this.next();
     if (!(t.k === 'op' && t.s === s)) {
-      throw new ParseError(s === ')' ? 'A bracket was opened but never closed.' : `Expected “${s}”.`, t.pos);
+      throw new ParseError(s === ')' ? 'A bracket was opened but never closed.' : tr('Expected “{0}”.', { 0: s }), t.pos);
     }
   }
 
@@ -346,7 +347,7 @@ function expandPm(n: Node): Node[] {
 
 export function parseLine(input: string, opts: { keepPm?: boolean } = {}): ParseResult {
   const raw = input.trim().replace(/[.;,]+$/, '').trim();
-  if (!raw) return { ok: false, error: 'Nothing written yet.', pos: 0 };
+  if (!raw) return { ok: false, error: tr('Nothing written yet.'), pos: 0 };
   if (SPECIAL_NONE.test(raw)) return { ok: true, st: { kind: 'special', value: 'none' } };
   if (SPECIAL_ALL.test(raw)) return { ok: true, st: { kind: 'special', value: 'all' } };
 
@@ -364,7 +365,7 @@ export function parseLine(input: string, opts: { keepPm?: boolean } = {}): Parse
       parts.push(p.relationChain());
     }
     if (!p.atEnd()) {
-      throw new ParseError('I can’t read this part as maths.', p.pos());
+      throw new ParseError(tr('I can’t read this part as maths.'), p.pos());
     }
 
     // A single bare expression
@@ -372,7 +373,7 @@ export function parseLine(input: string, opts: { keepPm?: boolean } = {}): Parse
       const variants = expandPm(parts[0].exprs[0]);
       if (variants.length === 1) return { ok: true, st: { kind: 'expr', expr: variants[0] } };
       if (opts.keepPm) return { ok: true, st: { kind: 'expr', expr: parts[0].exprs[0] } };
-      throw new ParseError('“±” only makes sense inside an equation, like x = ±3.', 0);
+      throw new ParseError(tr('“±” only makes sense inside an equation, like x = ±3.'), 0);
     }
 
     const rels: Relation[] = [];
@@ -383,7 +384,7 @@ export function parseLine(input: string, opts: { keepPm?: boolean } = {}): Parse
     for (const part of parts) {
       if (part.ops.length === 0) {
         // "x = 3 or -2" / "x = 3, -2": reuse the previous left side
-        if (!lastLhs) throw new ParseError('Write the whole equation, e.g. x = 3.', 0);
+        if (!lastLhs) throw new ParseError(tr('Write the whole equation, e.g. x = 3.'), 0);
         for (const v of expandPm(part.exprs[0])) rels.push({ lhs: lastLhs, op: '=', rhs: v });
         continue;
       }
@@ -391,7 +392,7 @@ export function parseLine(input: string, opts: { keepPm?: boolean } = {}): Parse
       for (let i = 0; i < part.ops.length; i++) {
         const lhsV = expandPm(part.exprs[i]);
         const rhsV = expandPm(part.exprs[i + 1]);
-        if (lhsV.length > 1 && part.ops[i] !== '=') throw new ParseError('“±” only works with “=”.', 0);
+        if (lhsV.length > 1 && part.ops[i] !== '=') throw new ParseError(tr('“±” only works with “=”.'), 0);
         for (const l of lhsV) for (const r of rhsV) rels.push({ lhs: l, op: part.ops[i], rhs: r });
         if (lhsV.length > 1 || rhsV.length > 1) join = 'or';
       }
@@ -407,7 +408,7 @@ export function parseLine(input: string, opts: { keepPm?: boolean } = {}): Parse
     return { ok: true, st: { kind: 'rel', rels, join } };
   } catch (e) {
     if (e instanceof ParseError) return { ok: false, error: e.message, pos: e.pos };
-    const msg = e instanceof Error ? e.message : 'I can’t read this line.';
+    const msg = e instanceof Error ? e.message : tr('I can’t read this line.');
     return { ok: false, error: msg, pos: 0 };
   } finally {
     KEEP_PM = false;

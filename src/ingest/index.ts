@@ -6,6 +6,7 @@ import { loadPdfjs } from './pdfLoader';
 import { structureDoc } from './structure';
 import { cleanText } from './text';
 import { IngestProgress, LeraDoc, RawDoc, RawPara } from './types';
+import { t as tr } from '../i18n';
 
 export type { LeraDoc, IngestProgress } from './types';
 
@@ -99,7 +100,7 @@ export async function ingestBytes(bytes: Uint8Array, fileName: string, opts: Ing
   const type = sniff(bytes, fileName);
   let raw: RawDoc;
   if (type === 'doc') {
-    throw new Error('Old .doc files can’t be read. Open it in Word and save as .docx or PDF, then try again.');
+    throw new Error(tr('Old .doc files can’t be read. Open it in Word and save as .docx or PDF, then try again.'));
   } else if (type === 'pdf') {
     const pdfjs = await loadPdfjs();
     raw = await readPdfWith(pdfjs, bytes, fileName, (f) => report('reading', 0.05 + f * 0.4));
@@ -108,7 +109,7 @@ export async function ingestBytes(bytes: Uint8Array, fileName: string, opts: Ing
   } else {
     raw = readText(new TextDecoder('utf-8').decode(bytes), fileName);
   }
-  if (raw.paras.length === 0) throw new Error('This file doesn’t seem to contain any text I can read.');
+  if (raw.paras.length === 0) throw new Error(tr('This file doesn’t seem to contain any text I can read.'));
   if (opts.translate) {
     const translated = await opts.translate(raw.paras);
     if (translated) raw = { ...raw, paras: translated };
@@ -125,13 +126,13 @@ export async function ingestBytes(bytes: Uint8Array, fileName: string, opts: Ing
       if (e instanceof DOMException && e.name === 'AbortError') throw e;
       doc = structureDoc(raw);
       const why = e instanceof Error ? e.message : 'unknown error';
-      doc.warnings.unshift(`The AI reader wasn’t available (${why}), so these notes were organised by the built-in rules instead.`);
+      doc.warnings.unshift(tr('The AI reader wasn’t available ({0}), so these notes were organised by the built-in rules instead.', { 0: why }));
     }
   } else {
     doc = structureDoc(raw);
-    if (aiReady(opts.ai)) doc.warnings.unshift(`This file is ${raw.pages} pages, so it was arranged by Lera’s built-in reader, not the AI (which takes files up to ${AI_PAGE_LIMIT} pages). The AI still explains, checks and answers inside it.`);
+    if (aiReady(opts.ai)) doc.warnings.unshift(tr('This file is {0} pages, so it was arranged by Lera’s built-in reader, not the AI (which takes files up to {1} pages). The AI still explains, checks and answers inside it.', { 0: raw.pages ?? 0, 1: AI_PAGE_LIMIT }));
   }
-  if (doc.units.length === 0) throw new Error('There wasn’t enough readable text in this file to build lessons from.');
+  if (doc.units.length === 0) throw new Error(tr('There wasn’t enough readable text in this file to build lessons from.'));
   doc = namespaceDoc(doc);
   doc.tocVia = raw.tocVia;
   doc.skippedPages = raw.skippedPages;

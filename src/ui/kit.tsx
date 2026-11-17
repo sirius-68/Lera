@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { line } from '../i18n';
+import { t } from '../i18n';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { Lera, Mood } from '../mascot/Lera';
 import { MathView, tokenize } from './math';
@@ -237,7 +237,7 @@ export function confirmDialog(title: string, opts: { body?: string; yes?: string
     asking = {
       title,
       body: opts.body,
-      yes: opts.yes ?? 'Yes',
+      yes: opts.yes ?? t('Yes'),
       danger: opts.danger,
       done: (ok) => {
         asking = null;
@@ -266,7 +266,7 @@ export function Confirmer() {
         {ask.body && <p className="muted" style={{ fontSize: 14.5, lineHeight: 1.45 }}>{ask.body}</p>}
         <span style={{ height: 4 }} />
         <Button3D variant={ask.danger ? 'dark' : 'primary'} onClick={() => ask.done(true)}>{ask.yes}</Button3D>
-        <button className="linkbtn" onClick={() => ask.done(false)}>Cancel</button>
+        <button className="linkbtn" onClick={() => ask.done(false)}>{t('Cancel')}</button>
       </div>
     </>
   );
@@ -343,7 +343,7 @@ export function Confetti({ fire }: { fire: number }) {
 /** Break a sentence into words, keeping `$maths$` and `**bold**` in one piece each. */
 function words(text: string): { t: 'text' | 'math' | 'bold'; s: string }[] {
   const out: { t: 'text' | 'math' | 'bold'; s: string }[] = [];
-  for (const tok of tokenize(line(text))) {
+  for (const tok of tokenize(text)) {
     if (tok.t !== 'text') out.push({ t: tok.t, s: tok.s });
     else for (const w of tok.s.match(/\S+\s*|\s+/g) ?? []) out.push({ t: 'text', s: w });
   }
@@ -385,3 +385,8 @@ export function LeraSays({ text, mood = 'idle', size = 56, stack, solid, sleepAf
   );
 }
 
+
+/** A line with one phrase stressed: the words between *stars* are set in <em>. Lets a whole sentence be translated as one. */
+export function Emph({ text }: { text: string }) {
+  return <>{text.split(/\*([^*]+)\*/).map((part, i) => (i % 2 ? <em key={i}>{part}</em> : part))}</>;
+}

@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 /**
  * Accounts.
  *
@@ -33,8 +34,8 @@ export const validEmail = (email: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]{
 
 /** Why a password is not acceptable yet, or null when it is. */
 export function passwordProblem(password: string): string | null {
-  if (password.length < 8) return 'Use at least 8 characters.';
-  if (!/[a-zA-Z]/.test(password) || !/\d/.test(password)) return 'Mix letters and at least one number.';
+  if (password.length < 8) return t('Use at least 8 characters.');
+  if (!/[a-zA-Z]/.test(password) || !/\d/.test(password)) return t('Mix letters and at least one number.');
   return null;
 }
 
@@ -76,20 +77,20 @@ async function remote(path: string, body: Record<string, string>): Promise<AuthR
     const res = await fetch(`${REMOTE}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
     if (res.ok && data.ok !== false) return { ok: true, email: body.email };
-    return { ok: false, error: data.error ?? 'That didn’t work. Check the details and try again.' };
+    return { ok: false, error: data.error ?? t('That didn’t work. Check the details and try again.') };
   } catch {
-    return { ok: false, error: 'No connection to the server. Try again in a moment.' };
+    return { ok: false, error: t('No connection to the server. Try again in a moment.') };
   }
 }
 
 export async function signUp(email: string, password: string, name: string): Promise<AuthResult> {
   email = email.trim().toLowerCase();
-  if (!validEmail(email)) return { ok: false, error: 'That email doesn’t look right.' };
+  if (!validEmail(email)) return { ok: false, error: t('That email doesn’t look right.') };
   const problem = passwordProblem(password);
   if (problem) return { ok: false, error: problem };
   if (REMOTE) return remote('/signup', { email, password, name });
   const existing = getAccount();
-  if (existing && existing.email !== email) return { ok: false, error: `This phone already has a profile for ${existing.email}. Sign in instead.` };
+  if (existing && existing.email !== email) return { ok: false, error: t('This phone already has a profile for {0}. Sign in instead.', { 0: existing.email }) };
   const salt = newSalt();
   const account: Account = { email, name, salt, hash: await stretch(password, salt), createdAt: new Date().toISOString() };
   localStorage.setItem(KEY, JSON.stringify(account));
@@ -98,11 +99,11 @@ export async function signUp(email: string, password: string, name: string): Pro
 
 export async function signIn(email: string, password: string): Promise<AuthResult> {
   email = email.trim().toLowerCase();
-  if (!validEmail(email)) return { ok: false, error: 'That email doesn’t look right.' };
+  if (!validEmail(email)) return { ok: false, error: t('That email doesn’t look right.') };
   if (REMOTE) return remote('/signin', { email, password });
   const account = getAccount();
-  if (!account) return { ok: false, error: 'There’s no profile on this phone yet. Create one first.' };
-  if (account.email !== email || (await stretch(password, account.salt)) !== account.hash) return { ok: false, error: 'Email or password is wrong.' };
+  if (!account) return { ok: false, error: t('There’s no profile on this phone yet. Create one first.') };
+  if (account.email !== email || (await stretch(password, account.salt)) !== account.hash) return { ok: false, error: t('Email or password is wrong.') };
   return { ok: true, email };
 }
 
@@ -118,10 +119,10 @@ export type ResetStart = { ok: true; email: string; /** Set only when there is n
  */
 export async function requestReset(email: string): Promise<ResetStart> {
   email = email.trim().toLowerCase();
-  if (!validEmail(email)) return { ok: false, error: 'That email doesn’t look right.' };
+  if (!validEmail(email)) return { ok: false, error: t('That email doesn’t look right.') };
   if (REMOTE) return remote('/reset', { email });
   const account = getAccount();
-  if (!account || account.email !== email) return { ok: false, error: 'No profile with that email on this phone.' };
+  if (!account || account.email !== email) return { ok: false, error: t('No profile with that email on this phone.') };
   const n = new Uint32Array(1);
   if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(n);
   else n[0] = Math.floor(Math.random() * 1e9);
@@ -133,10 +134,10 @@ export async function requestReset(email: string): Promise<ResetStart> {
 /** Step 2: is this the code that was sent? (With a server the code is checked there, together with step 3.) */
 export function checkResetCode(email: string, code: string): AuthResult {
   email = email.trim().toLowerCase();
-  if (!/^\d{6}$/.test(code.trim())) return { ok: false, error: 'The code is six digits.' };
+  if (!/^\d{6}$/.test(code.trim())) return { ok: false, error: t('The code is six digits.') };
   if (REMOTE) return { ok: true, email };
-  if (!pending || pending.email !== email || Date.now() > pending.until) return { ok: false, error: 'That code has expired. Ask for a new one.' };
-  if (pending.code !== code.trim()) return { ok: false, error: 'That code isn’t right.' };
+  if (!pending || pending.email !== email || Date.now() > pending.until) return { ok: false, error: t('That code has expired. Ask for a new one.') };
+  if (pending.code !== code.trim()) return { ok: false, error: t('That code isn’t right.') };
   return { ok: true, email };
 }
 
@@ -149,7 +150,7 @@ export async function confirmReset(email: string, code: string, newPassword: str
   const checked = checkResetCode(email, code);
   if (!checked.ok) return checked;
   const account = getAccount();
-  if (!account || account.email !== email) return { ok: false, error: 'No profile with that email on this phone.' };
+  if (!account || account.email !== email) return { ok: false, error: t('No profile with that email on this phone.') };
   const salt = newSalt();
   localStorage.setItem(KEY, JSON.stringify({ ...account, salt, hash: await stretch(newPassword, salt) }));
   pending = null;

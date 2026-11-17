@@ -11,6 +11,7 @@
     "preview": "node scripts/build.mjs && node scripts/server.mjs dist",
     "test": "tsx --test \"src/**/*.test.ts\" \"backend/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
+    "i18n": "node scripts/i18n-check.mjs",
     "android:sync": "npm run build && npx cap sync android"
   },
   "dependencies": {

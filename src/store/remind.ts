@@ -8,12 +8,13 @@
  */
 
 import { ask, inHost, post } from '../host';
+import { msg, t } from '../i18n';
 
 export const STUDY_TIMES: Record<string, { label: string; hour: number; minute: number }> = {
-  morning: { label: 'Morning · 8:00', hour: 8, minute: 0 },
-  afternoon: { label: 'Afternoon · 14:30', hour: 14, minute: 30 },
-  evening: { label: 'Evening · 19:00', hour: 19, minute: 0 },
-  night: { label: 'Night · 22:00', hour: 22, minute: 0 },
+  morning: { label: msg('Morning · 8:00'), hour: 8, minute: 0 },
+  afternoon: { label: msg('Afternoon · 14:30'), hour: 14, minute: 30 },
+  evening: { label: msg('Evening · 19:00'), hour: 19, minute: 0 },
+  night: { label: msg('Night · 22:00'), hour: 22, minute: 0 },
 };
 
 const REMINDER_ID = 7001;
@@ -38,8 +39,8 @@ export async function enableReminders(studyTime?: string, name?: string): Promis
       t: 'remind',
       hour: at.hour,
       minute: at.minute,
-      title: name ? `${name}, two minutes of maths?` : 'Two minutes of maths?',
-      body: 'One checked problem keeps your streak alive, and brings back an idea before it fades.',
+      title: name ? `${name}, two minutes of maths?` : t('Two minutes of maths?'),
+      body: t('One checked problem keeps your streak alive, and brings back an idea before it fades.'),
     });
     return res?.ok === true;
   }
@@ -53,8 +54,8 @@ export async function enableReminders(studyTime?: string, name?: string): Promis
         notifications: [
           {
             id: REMINDER_ID,
-            title: name ? `${name}, two minutes of maths?` : 'Two minutes of maths?',
-            body: 'One checked problem keeps your streak alive, and brings back an idea before it fades.',
+            title: name ? `${name}, two minutes of maths?` : t('Two minutes of maths?'),
+            body: t('One checked problem keeps your streak alive, and brings back an idea before it fades.'),
             schedule: { on: { hour: at.hour, minute: at.minute }, allowWhileIdle: true },
           },
         ],

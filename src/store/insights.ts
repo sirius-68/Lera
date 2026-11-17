@@ -1,4 +1,4 @@
-import { CONCEPTS } from '../engine/concepts';
+import { conceptOf } from '../engine/concepts';
 import { t, tn } from '../i18n';
 import type { ConceptId } from '../engine/types';
 import { dayOf, daysBetween, dueNow, statusOf, streak } from './learner';
@@ -179,11 +179,11 @@ export function learnerModel(s: Input, now: Date = new Date()): LearnerModel {
   } else if (due.length) {
     action = 'review';
     concept = due[0].concept;
-    reason = `${CONCEPTS[concept].title} is due to come back, before it fades.`;
+    reason = `${conceptOf(concept).title} is due to come back, before it fades.`;
   } else if (weakest.length) {
     action = 'practice-weak';
     concept = weakest[0];
-    reason = `${CONCEPTS[concept].title} is still a gap.`;
+    reason = `${conceptOf(concept).title} is still a gap.`;
   } else if (attempts.length === 0 || Object.keys(s.read).length === 0) {
     action = 'lesson';
     reason = 'Read a lesson first, then try its problems.';
@@ -219,7 +219,7 @@ export function learnerContext(s: Input, now: Date = new Date()): string {
     `Level ${m.skill.level}/5; ${Math.round(m.skill.cleanRate * 100)}% of recent problems solved cleanly${m.skill.trend ? ` (${m.skill.trend > 0 ? 'improving' : 'slipping'})` : ''}.`,
     m.style.mistakes === 'careless' ? 'Mistakes are mostly slips: knows the rules, loses signs and arithmetic. Ask for one more check, do not re-teach.' : m.style.mistakes === 'conceptual' ? 'Mistakes are mostly gaps: a rule is missing. Explain the rule from the start, with one small example.' : '',
     m.topErrors.length ? `Most frequent mistakes: ${m.topErrors.slice(0, 3).map((e) => `${e.title} (${e.count}x)`).join('; ')}.` : '',
-    m.weakest.length ? `Open gaps: ${m.weakest.map((c) => CONCEPTS[c].title).join(', ')}.` : '',
+    m.weakest.length ? `Open gaps: ${m.weakest.map((c) => conceptOf(c).title).join(', ')}.` : '',
     m.style.hintReliance > 0.4 ? 'Leans on hints: give a nudge and a question, not the next line.' : '',
     m.style.answerOnly >= 3 ? 'Often gives only the answer: ask to see the working.' : '',
     m.motivation.goal ? `Why they are here: ${m.motivation.goal}.` : '',
@@ -249,7 +249,7 @@ export function dailyQuests(s: Input, now: Date = new Date()): Quest[] {
   const n = Math.max(2, Math.min(5, m.next.problems - 1));
   const quests: Quest[] = [{ id: 'solve', title: tn(n, 'Solve {n} problem', 'Solve {n} problems'), done: Math.min(n, solvedToday.length), of: n, icon: 'pencil' }];
   const target = dueNow(s.concepts, today)[0]?.concept ?? m.weakest[0];
-  if (target) quests.push({ id: 'weak', title: t('One clean solve: {idea}', { idea: t(CONCEPTS[target].title) }), done: mine.some((a) => clean(a) && a.concepts.includes(target)) ? 1 : 0, of: 1, icon: 'target' });
+  if (target) quests.push({ id: 'weak', title: t('One clean solve: {idea}', { idea: t(conceptOf(target).title) }), done: mine.some((a) => clean(a) && a.concepts.includes(target)) ? 1 : 0, of: 1, icon: 'target' });
   else quests.push({ id: 'read', title: t('Read one lesson'), done: Object.values(s.read).includes(today) ? 1 : 0, of: 1, icon: 'book' });
   if (m.style.hintReliance > 0.4) quests.push({ id: 'nohint', title: t('Solve one with no hints'), done: solvedToday.some((a) => a.hintRung === 0) ? 1 : 0, of: 1, icon: 'bulb' });
   else if (m.style.mistakes === 'careless') quests.push({ id: 'clean', title: t('One solution with every line clean'), done: mine.some(clean) ? 1 : 0, of: 1, icon: 'check' });

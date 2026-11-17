@@ -4,7 +4,7 @@ import sampleUrl from '../../samples/algebra-essentials.docx';
 import uploadImg from '../assets/illustrations/upload.jpg';
 import { aiReady } from '../ai/providers';
 import { aiTranslate } from '../ai/tasks';
-import { getLang, Lang, langName, t } from '../i18n';
+import { Lang, getLang, langName, msg, t, t as tr, tn } from '../i18n';
 import { detectLang } from '../i18n/detect';
 import { ingestBytes } from '../ingest';
 import { IngestProgress, LeraDoc } from '../ingest/types';
@@ -15,10 +15,10 @@ import { Bar, Button3D, haptic } from '../ui/kit';
 import { Icon } from '../ui/icons';
 
 const STAGES: { id: IngestProgress['stage']; label: string }[] = [
-  { id: 'reading', label: 'Reading your file' },
-  { id: 'structuring', label: 'Finding topics and headings' },
-  { id: 'exercises', label: 'Pulling out the exercises' },
-  { id: 'path', label: 'Building your learning path' },
+  { id: 'reading', label: msg('Reading your file') },
+  { id: 'structuring', label: msg('Finding topics and headings') },
+  { id: 'exercises', label: msg('Pulling out the exercises') },
+  { id: 'path', label: msg('Building your learning path') },
 ];
 
 const ORDER = ['reading', 'structuring', 'exercises', 'path', 'done'];
@@ -59,7 +59,7 @@ export function UploadPicker({ onPick, onSkip, compact }: { onPick: (s: Source) 
   return (
     <div className="center stagger" style={{ gap: 14, padding: '0 24px' }}>
       {!compact && <img src={uploadImg} alt="" style={{ width: 210, height: 210, objectFit: 'contain', mixBlendMode: 'multiply' }} />}
-      <h2 style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.2 }}>Upload your notes</h2>
+      <h2 style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.2 }}>{tr('Upload your notes')}</h2>
       <p className="muted" style={{ fontSize: 15.5, lineHeight: 1.5, maxWidth: 300 }}>
         A PDF or Word file with your algebra or calculus notes. Lera turns it into lessons, rebuilds its graphs and puts every exercise it finds under Practice.
       </p>
@@ -79,18 +79,18 @@ export function UploadPicker({ onPick, onSkip, compact }: { onPick: (s: Source) 
         <span className="drop-ic">
           <Icon name="upload" size={24} />
         </span>
-        <b>Choose a file</b>
+        <b>{tr('Choose a file')}</b>
         <span className="faint" style={{ fontSize: 13 }}>
-          PDF, DOCX, TXT or Markdown · stays on this device
+          {tr('PDF, DOCX, TXT or Markdown · stays on this device')}
         </span>
         <input ref={input} type="file" accept=".pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain" hidden onChange={choose} />
       </div>
       <Button3D variant="secondary" onClick={() => onPick(sampleSource)}>
-        <Icon name="sparkle" size={18} /> Try the sample algebra notes
+        <Icon name="sparkle" size={18} />{' '}{tr('Try the sample algebra notes')}
       </Button3D>
       {onSkip && (
         <button className="linkbtn" onClick={onSkip}>
-          Skip for now
+          {tr('Skip for now')}
         </button>
       )}
     </div>
@@ -161,7 +161,7 @@ export function Processing({ source, onDone, onCancel }: { source: Source; onDon
         haptic([10, 40, 14]);
         setDoc(result);
       } catch (e) {
-        if (alive) setError(e instanceof Error ? e.message : 'Something went wrong while reading this file.');
+        if (alive) setError(e instanceof Error ? e.message : tr('Something went wrong while reading this file.'));
       }
     })();
     return () => {
@@ -199,9 +199,9 @@ export function Processing({ source, onDone, onCancel }: { source: Source; onDon
     return (
       <div className="center stagger" style={{ gap: 16, padding: '0 28px' }}>
         <Lera size={96} mood="oops" />
-        <h2 style={{ fontSize: 22, fontWeight: 700 }}>I couldn’t read that one</h2>
+        <h2 style={{ fontSize: 22, fontWeight: 700 }}>{tr('I couldn’t read that one')}</h2>
         <p className="muted" style={{ lineHeight: 1.5 }}>{error}</p>
-        <Button3D onClick={onCancel}>Choose another file</Button3D>
+        <Button3D onClick={onCancel}>{tr('Choose another file')}</Button3D>
       </div>
     );
   }
@@ -212,13 +212,13 @@ export function Processing({ source, onDone, onCancel }: { source: Source; onDon
     return (
       <div className="center stagger" style={{ gap: 14, padding: '0 24px' }}>
         <Lera size={110} mood="celebrate" />
-        <h2 style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.2 }}>Your notes are ready</h2>
+        <h2 style={{ fontSize: 24, fontWeight: 700, lineHeight: 1.2 }}>{tr('Your notes are ready')}</h2>
         <p className="muted" style={{ fontSize: 15.5 }}>{doc.title}</p>
         <div className="row" style={{ gap: 10, alignSelf: 'stretch', justifyContent: 'center' }}>
           {[
-            [doc.units.length, doc.units.length === 1 ? 'unit' : 'units'],
-            [topics, topics === 1 ? 'lesson' : 'lessons'],
-            [exercises, exercises === 1 ? 'exercise' : 'exercises'],
+            [doc.units.length, tn(doc.units.length, 'unit', 'units')],
+            [topics, tn(topics, 'lesson', 'lessons')],
+            [exercises, tn(exercises, 'exercise', 'exercises')],
           ].map(([n, label], i) => (
             <div key={label} className="stat" style={{ animationDelay: `${200 + i * 110}ms` }}>
               <b>{n}</b>
@@ -230,7 +230,7 @@ export function Processing({ source, onDone, onCancel }: { source: Source; onDon
           <p className="found">
             <Icon name="check" size={16} stroke={3} />
             <span>
-              Chapters and sections taken from {doc.tocVia === 'outline' ? 'the file’s own table of contents' : 'the printed contents page'}
+              {tr('Chapters and sections taken from')}{' '}{doc.tocVia === 'outline' ? 'the file’s own table of contents' : 'the printed contents page'}
               {doc.skippedPages ? ` · ${doc.skippedPages} ${doc.skippedPages === 1 ? 'page' : 'pages'} of cover and front matter left out` : ''}.
             </span>
           </p>
@@ -242,11 +242,11 @@ export function Processing({ source, onDone, onCancel }: { source: Source; onDon
         ))}
         {exercises === 0 && doc.warnings.length === 0 && (
           <p className="warn">
-            <Icon name="alert" size={17} /> <span>I didn’t find exercises in this file, so Practice will use problems written for each topic.</span>
+            <Icon name="alert" size={17} /> <span>{tr('I didn’t find exercises in this file, so Practice will use problems written for each topic.')}</span>
           </p>
         )}
         <Button3D sheen onClick={() => onDone(doc)}>
-          Start at the beginning <Icon name="arrow" size={18} />
+          {tr('Start at the beginning')}{' '}<Icon name="arrow" size={18} />
         </Button3D>
         {doc.units[0]?.topics[0] && <span className="faint" style={{ fontSize: 13, textAlign: 'center' }}>{doc.units[0].title} · {doc.units[0].topics[0].title}</span>}
       </div>
@@ -257,17 +257,17 @@ export function Processing({ source, onDone, onCancel }: { source: Source; onDon
     <div className="center" style={{ gap: 18, padding: '0 28px' }}>
       <Lera size={104} mood="thinking" interactive={false} />
       <div>
-        <h2 style={{ fontSize: 22, fontWeight: 700 }}>Reading your notes…</h2>
+        <h2 style={{ fontSize: 22, fontWeight: 700 }}>{tr('Reading your notes…')}</h2>
         <p className="faint" style={{ fontSize: 13.5, marginTop: 4, wordBreak: 'break-word' }}>{source.name}</p>
       </div>
       <div style={{ alignSelf: 'stretch' }}>
-        <Bar value={progress} label="Reading progress" />
+        <Bar value={progress} label={tr('Reading progress')} />
       </div>
       <ul className="stages">
         {STAGES.map((s, i) => (
           <li key={s.id} data-state={i < stage ? 'done' : i === stage ? 'now' : 'todo'}>
             <span className="tick">{i < stage ? <Icon name="check" size={14} stroke={3} /> : null}</span>
-            {s.label}
+            {tr(s.label)}
           </li>
         ))}
       </ul>
@@ -281,10 +281,10 @@ export function UploadScreen() {
   return (
     <div className="screen" data-dir="1">
       <div className="topbar">
-        <button className="iconbtn" onClick={back} aria-label="Back">
+        <button className="iconbtn" onClick={back} aria-label={tr('Back')}>
           <Icon name="back" />
         </button>
-        <h1>Add notes</h1>
+        <h1>{tr('Add notes')}</h1>
       </div>
       <div className="scroll" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', paddingBottom: 30 }}>
         {source ? (

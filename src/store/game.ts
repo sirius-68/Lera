@@ -1,4 +1,5 @@
 import { ConceptState, AttemptRecord, AppState } from './types';
+import { msg, t } from '../i18n';
 import { addDays, dayOf, streak } from './learner';
 
 /**
@@ -25,7 +26,7 @@ export function xpByDay(state: GameState): Map<string, number> {
 
 export const totalXp = (state: GameState): number => [...xpByDay(state).values()].reduce((s, n) => s + n, 0);
 
-const TITLES = ['Starter', 'Explorer', 'Solver', 'Thinker', 'Analyst', 'Strategist', 'Master', 'Sage'];
+const TITLES = [msg('Starter'), msg('Explorer'), msg('Solver'), msg('Thinker'), msg('Analyst'), msg('Strategist'), msg('Master'), msg('Sage')];
 
 export interface Level {
   level: number;
@@ -41,14 +42,14 @@ export function levelOf(xp: number): Level {
   while (25 * (level + 1) * level <= xp) level++;
   const floor = 25 * level * (level - 1);
   const next = 25 * (level + 1) * level;
-  return { level, title: TITLES[Math.min(TITLES.length - 1, level - 1)], into: xp - floor, need: next - floor };
+  return { level, title: t(TITLES[Math.min(TITLES.length - 1, level - 1)]), into: xp - floor, need: next - floor };
 }
 
 export const GOALS = [
-  { xp: 15, label: 'Casual', sub: 'about 5 minutes a day' },
-  { xp: 30, label: 'Regular', sub: 'about 10 minutes a day' },
-  { xp: 50, label: 'Serious', sub: 'about 15 minutes a day' },
-  { xp: 80, label: 'Intense', sub: '20 minutes or more' },
+  { xp: 15, label: msg('Casual'), sub: msg('about 5 minutes a day') },
+  { xp: 30, label: msg('Regular'), sub: msg('about 10 minutes a day') },
+  { xp: 50, label: msg('Serious'), sub: msg('about 15 minutes a day') },
+  { xp: 80, label: msg('Intense'), sub: msg('20 minutes or more') },
 ];
 
 export function longestStreak(attempts: AttemptRecord[]): number {
@@ -121,17 +122,17 @@ export function badges(state: Pick<AppState, 'attempts' | 'read' | 'concepts' | 
   const xp = totalXp(state);
   const mk = (id: string, title: string, desc: string, icon: string, tone: Badge['tone'], have: number, need: number): Badge => ({ id, title, desc, icon, tone, have: Math.min(have, need), need, earned: have >= need });
   return [
-    mk('first', 'First steps', 'Solve your first problem', 'check', 'ok', solved.length, 1),
-    mk('streak3', 'On a roll', 'Practise 3 days in a row', 'flame', 'flame', best, 3),
-    mk('clean5', 'Clean sheet', '5 problems with no marks', 'sparkle', 'brand', clean, 5),
-    mk('closed', 'Gap closed', 'Fix an idea that was marked as a gap', 'target', 'ok', closed, 1),
-    mk('streak7', 'Full week', 'Practise 7 days in a row', 'flame', 'flame', best, 7),
-    mk('solo10', 'On my own', '10 solves without a hint', 'bulb', 'gold', solo, 10),
-    mk('comeback', 'Comeback', 'Recover after a wrong line', 'refresh', 'brand', comeback, 1),
-    mk('reader', 'Bookworm', 'Read 5 lessons', 'book', 'brand', Object.keys(state.read).length, 5),
-    mk('keeper', 'Collector', 'Save, highlight or note 5 things', 'bookmark', 'gold', kept, 5),
-    mk('calc', 'Rate of change', 'Solve 5 calculus problems', 'chart', 'ok', calc, 5),
-    mk('xp500', 'Half a thousand', 'Earn 500 XP', 'sparkle', 'gold', xp, 500),
-    mk('streak30', 'Habit', 'Practise 30 days in a row', 'flame', 'flame', best, 30),
+    mk('first', t('First steps'), t('Solve your first problem'), 'check', 'ok', solved.length, 1),
+    mk('streak3', t('On a roll'), t('Practise 3 days in a row'), 'flame', 'flame', best, 3),
+    mk('clean5', t('Clean sheet'), t('{0} problems with no marks', { 0: 5 }), 'sparkle', 'brand', clean, 5),
+    mk('closed', t('Gap closed'), t('Fix an idea that was marked as a gap'), 'target', 'ok', closed, 1),
+    mk('streak7', t('Full week'), t('Practise 7 days in a row'), 'flame', 'flame', best, 7),
+    mk('solo10', t('On my own'), t('{0} solves without a hint', { 0: 10 }), 'bulb', 'gold', solo, 10),
+    mk('comeback', t('Comeback'), t('Recover after a wrong line'), 'refresh', 'brand', comeback, 1),
+    mk('reader', t('Bookworm'), t('Read 5 lessons'), 'book', 'brand', Object.keys(state.read).length, 5),
+    mk('keeper', t('Collector'), t('Save, highlight or note 5 things'), 'bookmark', 'gold', kept, 5),
+    mk('calc', t('Rate of change'), t('Solve 5 calculus problems'), 'chart', 'ok', calc, 5),
+    mk('xp500', t('Half a thousand'), t('Earn 500 XP'), 'sparkle', 'gold', xp, 500),
+    mk('streak30', t('Habit'), t('Practise 30 days in a row'), 'flame', 'flame', best, 30),
   ];
 }

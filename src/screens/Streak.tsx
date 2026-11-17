@@ -7,6 +7,7 @@ import { back, go } from '../store/nav';
 import { canPinWidget, hasWidget, pinWidget } from '../store/widget';
 import { Button3D, CountUp, Ring, haptic, toast } from '../ui/kit';
 import { Icon } from '../ui/icons';
+import { msg, t } from '../i18n';
 
 const MILESTONES = [3, 7, 14, 30, 50, 100];
 
@@ -61,8 +62,8 @@ export function StreakScreen() {
     <div className="screen streak-screen" data-dir="1">
       <div className="streak-hero" ref={hero}>
         <div className="topbar" style={{ color: '#fff' }}>
-          <button className="iconbtn onflame" onClick={back} aria-label="Back"><Icon name="back" /></button>
-          <h1 style={{ color: '#fff' }}>Streak</h1>
+          <button className="iconbtn onflame" onClick={back} aria-label={t('Back')}><Icon name="back" /></button>
+          <h1 style={{ color: '#fff' }}>{t('Streak')}</h1>
         </div>
         <div className="streak-main" ref={main}>
           <div className={`flame-wrap ${doneToday ? 'lit' : ''}`}>
@@ -70,9 +71,9 @@ export function StreakScreen() {
             <Icon name="flame" size={92} fill />
             <b><CountUp to={days} /></b>
           </div>
-          <p className="streak-line">{days === 0 ? 'Solve one problem to light it' : `day${days === 1 ? '' : 's'} in a row`}</p>
+          <p className="streak-line">{days === 0 ? t('Solve one problem to light it') : `day${days === 1 ? '' : 's'} in a row`}</p>
           <p className="streak-sub">
-            {doneToday ? 'Today is done. Come back tomorrow to keep it alive.' : days > 0 ? 'Solve one problem today to keep your streak.' : 'A streak starts with a single problem.'}
+            {doneToday ? t('Today is done. Come back tomorrow to keep it alive.') : days > 0 ? t('Solve one problem today to keep your streak.') : t('A streak starts with a single problem.')}
           </p>
         </div>
         <div className="week">
@@ -89,7 +90,7 @@ export function StreakScreen() {
         <div className="stagger" style={{ padding: `${heroH + 18}px 20px 30px`, display: 'flex', flexDirection: 'column', gap: 14 }}>
           {!doneToday && (
             <div className="center">
-              <Button3D sheen onClick={() => go({ name: 'practice' })}><Icon name="flame" size={18} fill /> {days > 0 ? 'Keep my streak' : 'Start my streak'}</Button3D>
+              <Button3D sheen onClick={() => go({ name: 'practice' })}><Icon name="flame" size={18} fill /> {days > 0 ? t('Keep my streak') : t('Start my streak')}</Button3D>
             </div>
           )}
 
@@ -98,9 +99,9 @@ export function StreakScreen() {
               <b style={{ fontSize: 17 }}>{Math.min(999, xpToday)}</b>
             </Ring>
             <div className="grow">
-              <span className="label">Today’s goal</span>
-              <b style={{ display: 'block', fontSize: 17, marginTop: 2 }}>{xpToday >= goal ? 'Goal reached' : `${goal - xpToday} XP to go`}</b>
-              <p className="muted" style={{ fontSize: 13.5 }}>{xpToday} of {goal} XP · a clean solve is worth 15+</p>
+              <span className="label">{t('Today’s goal')}</span>
+              <b style={{ display: 'block', fontSize: 17, marginTop: 2 }}>{xpToday >= goal ? t('Goal reached') : `${goal - xpToday} XP to go`}</b>
+              <p className="muted" style={{ fontSize: 13.5 }}>{t('{0} of {1} XP · a clean solve is worth 15+', { 0: xpToday, 1: goal })}</p>
             </div>
           </section>
 
@@ -108,22 +109,22 @@ export function StreakScreen() {
 
           <section className="card">
             <div className="row" style={{ justifyContent: 'space-between' }}>
-              <span className="label">Level {lv.level} · {lv.title}</span>
+              <span className="label">{t('Level {0} · {1}', { 0: lv.level, 1: lv.title })}</span>
               <span className="xp-tag"><CountUp to={xp} /> XP</span>
             </div>
             <div className="xpbar" style={{ marginTop: 10 }}><i style={{ width: `${(lv.into / lv.need) * 100}%` }} /></div>
-            <p className="faint" style={{ fontSize: 12.5, marginTop: 6 }}>{lv.need - lv.into} XP to level {lv.level + 1}</p>
+            <p className="faint" style={{ fontSize: 12.5, marginTop: 6 }}>{t('{0} XP to level {1}', { 0: lv.need - lv.into, 1: lv.level + 1 })}</p>
           </section>
 
           <div className="row" style={{ gap: 10 }}>
-            <div className="stat grow"><b><CountUp to={best} /></b><span>longest streak</span></div>
-            <div className="stat grow"><b><CountUp to={new Set(attempts.map((a) => a.day)).size} /></b><span>days practised</span></div>
-            <div className="stat grow"><b>{nextMilestone}</b><span>next milestone</span></div>
+            <div className="stat grow"><b><CountUp to={best} /></b><span>{t('longest streak')}</span></div>
+            <div className="stat grow"><b><CountUp to={new Set(attempts.map((a) => a.day)).size} /></b><span>{t('days practised')}</span></div>
+            <div className="stat grow"><b>{nextMilestone}</b><span>{t('next milestone')}</span></div>
           </div>
 
           <section className="card">
-            <span className="label">Last five weeks</span>
-            <div className="month" role="img" aria-label="Days practised over the last five weeks">
+            <span className="label">{t('Last five weeks')}</span>
+            <div className="month" role="img" aria-label={t('Days practised over the last five weeks')}>
               {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <span key={i} className="month-h">{d}</span>)}
               {month.map((d) => (
                 <i key={d.day} className={`${d.today ? 'today' : ''} ${d.future ? 'future' : ''}`} data-on={d.active ? '' : undefined} style={d.active ? { opacity: 0.45 + 0.55 * (d.xp / peak) } : undefined} title={`${d.day}: ${d.xp} XP`}>
@@ -135,7 +136,7 @@ export function StreakScreen() {
 
           <section>
             <div className="row" style={{ justifyContent: 'space-between' }}>
-              <span className="label">Badges</span>
+              <span className="label">{t('Badges')}</span>
               <span className="faint" style={{ fontSize: 13 }}>{earned} of {all.length}</span>
             </div>
             <div className="badges">
@@ -153,7 +154,7 @@ export function StreakScreen() {
           {attempts.length === 0 && (
             <div className="center" style={{ gap: 8, paddingTop: 4 }}>
               <Lera size={72} mood="curious" />
-              <p className="muted" style={{ maxWidth: 270, lineHeight: 1.5 }}>Nothing here yet, your first solved problem lights the flame and earns your first badge.</p>
+              <p className="muted" style={{ maxWidth: 270, lineHeight: 1.5 }}>{t('Nothing here yet, your first solved problem lights the flame and earns your first badge.')}</p>
             </div>
           )}
         </div>
@@ -166,25 +167,25 @@ export function StreakScreen() {
 /* ───────────── the home-screen widget, shown as it changes the longer it is ignored ───────────── */
 
 const WIDGETS: { mood: Mood; tone: string; line: string; when: string; fill?: boolean; flame?: 'alert' | 'out'; n?: number }[] = [
-  { mood: 'strong', tone: 'green', line: 'Streak safe!', when: 'Done today' },
-  { mood: 'happy', tone: 'blue', line: 'Get started early!', when: 'Morning' },
-  { mood: 'pleading', tone: 'violet', line: 'Got 3 minutes?', when: 'Afternoon', fill: true },
-  { mood: 'scared', tone: 'orange', line: 'Save your streak!', when: 'Evening', flame: 'alert' },
-  { mood: 'menace', tone: 'maroon', line: 'Now or never!', when: 'Before midnight', fill: true, flame: 'alert' },
-  { mood: 'cry', tone: 'ice', line: 'It’s gone… start again?', when: 'Streak lost', flame: 'out', n: 0 },
-  { mood: 'bored', tone: 'violet', line: 'I’m waiting…', when: 'Days later', fill: true, flame: 'out', n: 0 },
-  { mood: 'dusty', tone: 'dust', line: 'A week. I have cobwebs.', when: 'A week', flame: 'out', n: 0 },
-  { mood: 'ghost', tone: 'mist', line: 'Remember me?', when: 'A month', flame: 'out', n: 0 },
-  { mood: 'fossil', tone: 'stone', line: 'Lera, fossil. Dig me up?', when: 'A year', flame: 'out', n: 0 },
-  { mood: 'sleepy', tone: 'night', line: 'Dreaming of x²…', when: 'At night' },
-  { mood: 'laugh', tone: 'purple', line: 'Hey, that tickles!', when: 'When you tap her' },
+  { mood: 'strong', tone: 'green', line: msg('Streak safe!'), when: msg('Done today') },
+  { mood: 'happy', tone: 'blue', line: msg('Get started early!'), when: msg('Morning') },
+  { mood: 'pleading', tone: 'violet', line: msg('Got 3 minutes?'), when: msg('Afternoon'), fill: true },
+  { mood: 'scared', tone: 'orange', line: msg('Save your streak!'), when: msg('Evening'), flame: 'alert' },
+  { mood: 'menace', tone: 'maroon', line: msg('Now or never!'), when: msg('Before midnight'), fill: true, flame: 'alert' },
+  { mood: 'cry', tone: 'ice', line: msg('It’s gone… start again?'), when: msg('Streak lost'), flame: 'out', n: 0 },
+  { mood: 'bored', tone: 'violet', line: msg('I’m waiting…'), when: msg('Days later'), fill: true, flame: 'out', n: 0 },
+  { mood: 'dusty', tone: 'dust', line: msg('A week. I have cobwebs.'), when: msg('A week'), flame: 'out', n: 0 },
+  { mood: 'ghost', tone: 'mist', line: msg('Remember me?'), when: msg('A month'), flame: 'out', n: 0 },
+  { mood: 'fossil', tone: 'stone', line: msg('Lera, fossil. Dig me up?'), when: msg('A year'), flame: 'out', n: 0 },
+  { mood: 'sleepy', tone: 'night', line: msg('Dreaming of x²…'), when: msg('At night') },
+  { mood: 'laugh', tone: 'purple', line: msg('Hey, that tickles!'), when: msg('When you tap her') },
 ];
 
 export function WidgetTile({ w, days, live }: { w: (typeof WIDGETS)[number]; days: number; live?: boolean }) {
   return (
     <div className={`wg wg-${w.tone} ${w.fill ? 'fill' : ''} ${live ? 'live' : ''}`}>
       <b className={w.flame ?? ''}><Icon name="flame" size={19} fill /> {w.n ?? Math.max(1, days)}</b>
-      <span>{w.line}</span>
+      <span>{t(w.line)}</span>
       <i><Lera size={w.fill ? 150 : 84} mood={w.mood} interactive={false} /></i>
     </div>
   );
@@ -200,33 +201,33 @@ function WidgetCard({ days }: { days: number }) {
   }, []);
   const add = (wide: boolean) => {
     haptic(6);
-    if (!(canPinWidget() && pinWidget(wide))) toast('Long-press your home screen, choose Widgets, then Lera.', 4200);
+    if (!(canPinWidget() && pinWidget(wide))) toast(t('Long-press your home screen, choose Widgets, then Lera.'), 4200);
   };
   return (
     <section className="card wg-card">
       <div className="row" style={{ justifyContent: 'space-between' }}>
-        <span className="label">Home-screen widget</span>
-        <span className="chip plain">{WIDGETS[at].when}</span>
+        <span className="label">{t('Home-screen widget')}</span>
+        <span className="chip plain">{t(WIDGETS[at].when)}</span>
       </div>
       <div className="wg-hero"><WidgetTile key={at} w={WIDGETS[at]} days={days} live /></div>
-      <p className="muted" style={{ fontSize: 13.5, textAlign: 'center' }}>My mood follows the day, then the days you’re away. Tap me on the widget and I react.</p>
+      <p className="muted" style={{ fontSize: 13.5, textAlign: 'center' }}>{t('My mood follows the day, then the days you’re away. Tap me on the widget and I react.')}</p>
       <div className="wg-row" data-noswipe>
         {WIDGETS.map((w) => (
           <figure key={w.when} className="wg-cell">
             <WidgetTile w={w} days={days} />
-            <figcaption>{w.when}</figcaption>
+            <figcaption>{t(w.when)}</figcaption>
           </figure>
         ))}
       </div>
       {inApp ? (
         <>
           <div className="row" style={{ gap: 10 }}>
-            <Button3D small variant="secondary" style={{ flex: 1 }} onClick={() => add(false)}><Icon name="plus" size={17} /> Small</Button3D>
-            <Button3D small variant="secondary" style={{ flex: 1 }} onClick={() => add(true)}><Icon name="plus" size={17} /> Wide</Button3D>
+            <Button3D small variant="secondary" style={{ flex: 1 }} onClick={() => add(false)}><Icon name="plus" size={17} />{' '}{t('Small')}</Button3D>
+            <Button3D small variant="secondary" style={{ flex: 1 }} onClick={() => add(true)}><Icon name="plus" size={17} />{' '}{t('Wide')}</Button3D>
           </div>
         </>
       ) : (
-        <p className="faint" style={{ fontSize: 13 }}>In the Android app: long-press your home screen, choose Widgets, then Lera.</p>
+        <p className="faint" style={{ fontSize: 13 }}>{t('In the Android app: long-press your home screen, choose Widgets, then Lera.')}</p>
       )}
     </section>
   );

@@ -5,6 +5,7 @@ import { parseLine } from './parse';
 import { nextStep, solutionSteps } from './steps';
 import { calcAnalyze, calcAnswer, calcHint, calcPath, isCalc } from './calc/check';
 import { AttemptAnalysis, CheckedLine, ConceptId, Diagnosis, Problem, SolutionStep, StepTag } from './types';
+import { msg, t } from '../i18n';
 
 /**
  * Read a student's working, line by line.
@@ -43,7 +44,7 @@ export function analyze(problem: Problem, rawLines: string[]): AttemptAnalysis {
     if (prep.mode === 'expr') {
       const chain = exprChain(st);
       if (!chain) {
-        lines.push({ text, status: 'unchecked', st, latex, note: 'This problem is an expression, so there’s no need for an inequality here.' });
+        lines.push({ text, status: 'unchecked', st, latex, note: t('This problem is an expression, so there’s no need for an inequality here.') });
         continue;
       }
       // "a = b = c" on one line is several steps; find the first link that breaks
@@ -75,7 +76,7 @@ export function analyze(problem: Problem, rawLines: string[]): AttemptAnalysis {
         status: 'unchecked',
         st,
         latex,
-        note: 'Write the whole line with its = sign so I can follow it.',
+        note: t('Write the whole line with its = sign so I can follow it.'),
       });
       continue;
     }
@@ -114,8 +115,8 @@ export function analyze(problem: Problem, rawLines: string[]): AttemptAnalysis {
       code: 'long-way',
       concept: problem.concepts[0] ?? 'simplest-form',
       severity: 'strategy',
-      title: 'Right answer, long road.',
-      message: `You got there in ${steps} lines; it can be done in ${cleanSteps}. Nothing was wrong, there’s just a shorter route worth seeing.`,
+      title: t('Right answer, long road.'),
+      message: t('You got there in {0} lines; it can be done in {1}. Nothing was wrong, there’s just a shorter route worth seeing.', { 0: steps, 1: cleanSteps }),
     });
   }
 
@@ -147,8 +148,8 @@ function buildLine(
       code: 'unknown',
       concept: prep.problem.concepts[0] ?? 'arithmetic',
       severity: 'gap',
-      title: 'This line doesn’t follow from the one above.',
-      message: 'Something changed between these two lines that shouldn’t have.',
+      title: t('This line doesn’t follow from the one above.'),
+      message: t('Something changed between these two lines that shouldn’t have.'),
     };
   }
   if (!diag.fix) {
@@ -192,7 +193,7 @@ function detectApproach(prep: Prepared, lines: CheckedLine[]): string | undefine
       const stillBrackets = anyNode(first, (n) => (n.t === 'mul' && n.args.some((a) => a.t === 'add')) || (n.t === 'neg' && n.arg.t === 'add'));
       return stillBrackets ? 'divide first' : 'expand first';
     }
-    return sts.length <= 2 ? 'isolate directly' : 'one move per line';
+    return sts.length <= 2 ? t('isolate directly') : t('one move per line');
   }
   if (kind === 'system') {
     return lines.some((l) => /=/.test(l.text) && l.st?.kind === 'rel' && l.st.rels.length === 1 && l.st.rels[0].lhs.t === 'var') ? 'substitution' : 'elimination';
@@ -203,23 +204,23 @@ function detectApproach(prep: Prepared, lines: CheckedLine[]): string | undefine
 /* ───────────── hints ───────────── */
 
 const NUDGE: Record<StepTag, string> = {
-  'clear-fractions': 'The fractions are making this harder than it needs to be. What could you multiply everything by to get rid of them?',
-  expand: 'There are brackets in the way. What does the number outside do to each term inside?',
-  collect: 'Some terms on the same side are the same kind. What happens if you combine them?',
-  move: 'You want the unknown on one side and plain numbers on the other. Which term could you move, and what happens to its sign?',
-  divide: 'The unknown is being multiplied by a number. What undoes multiplying?',
-  'standard-form': 'Quadratics are easiest when one side is zero. What would you move across?',
-  factor: 'Can you write this as two brackets multiplied together?',
-  'common-factor': 'Look at what every term has in common. Can you take it outside a bracket?',
-  'zero-product': 'If two things multiply to make zero, what must be true about one of them?',
-  sqrt: 'What undoes squaring, and how many answers does it give?',
-  formula: 'This one won’t split into neat brackets. Which formula works for every quadratic?',
-  substitute: 'Start by swapping each letter for its value. Use brackets around negatives.',
-  evaluate: 'Which operation has to happen first here?',
-  cancel: 'Is there a factor that appears on both the top and the bottom?',
-  system: 'Could you add or subtract the two equations so that one letter disappears?',
-  calc: 'Which rule fits the shape of this one?',
-  final: 'You’re nearly there. What does the last line need to look like?',
+  'clear-fractions': msg('The fractions are making this harder than it needs to be. What could you multiply everything by to get rid of them?'),
+  expand: msg('There are brackets in the way. What does the number outside do to each term inside?'),
+  collect: msg('Some terms on the same side are the same kind. What happens if you combine them?'),
+  move: msg('You want the unknown on one side and plain numbers on the other. Which term could you move, and what happens to its sign?'),
+  divide: msg('The unknown is being multiplied by a number. What undoes multiplying?'),
+  'standard-form': msg('Quadratics are easiest when one side is zero. What would you move across?'),
+  factor: msg('Can you write this as two brackets multiplied together?'),
+  'common-factor': msg('Look at what every term has in common. Can you take it outside a bracket?'),
+  'zero-product': msg('If two things multiply to make zero, what must be true about one of them?'),
+  sqrt: msg('What undoes squaring, and how many answers does it give?'),
+  formula: msg('This one won’t split into neat brackets. Which formula works for every quadratic?'),
+  substitute: msg('Start by swapping each letter for its value. Use brackets around negatives.'),
+  evaluate: msg('Which operation has to happen first here?'),
+  cancel: msg('Is there a factor that appears on both the top and the bottom?'),
+  system: msg('Could you add or subtract the two equations so that one letter disappears?'),
+  calc: msg('Which rule fits the shape of this one?'),
+  final: msg('You’re nearly there. What does the last line need to look like?'),
 };
 
 export interface HintLadder {

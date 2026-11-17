@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import './lera.css';
+import { t as tr } from '../i18n';
 
 /**
  * Lera, alive.
@@ -357,7 +358,7 @@ export function Lera({ size = 96, mood = 'idle', interactive = true, sleepAfter 
       style={{ width: size, height: size * 1.16 }}
       role={interactive ? 'button' : 'img'}
       tabIndex={interactive ? 0 : undefined}
-      aria-label={shown === 'sleepy' ? 'Lera, asleep and dreaming of formulas. Tap to wake her.' : 'Lera'}
+      aria-label={shown === 'sleepy' ? tr('Lera, asleep and dreaming of formulas. Tap to wake her.') : 'Lera'}
       onClick={tap}
       onKeyDown={(e: ReactKeyboardEvent) => {
         if (e.key === 'Enter' || e.key === ' ') {

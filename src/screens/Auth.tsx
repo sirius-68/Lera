@@ -5,6 +5,7 @@ import { checkResetCode, confirmReset, passwordProblem, requestReset, signIn, si
 import { Button3D, haptic } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import '../styles/onb.css';
+import { msg, t } from '../i18n';
 
 /**
  * Create a profile, sign in, or reset a forgotten password.
@@ -16,9 +17,9 @@ import '../styles/onb.css';
 export type AuthMode = 'signup' | 'signin' | 'forgot';
 
 const COPY: Record<AuthMode, { title: string; sub: string; cta: string }> = {
-  signup: { title: 'Create a free profile to save your plan', sub: 'Your streak and notes stay yours.', cta: 'Create profile' },
-  signin: { title: 'Welcome back', sub: 'Sign in to pick up where you left off.', cta: 'Sign in' },
-  forgot: { title: 'Reset your password', sub: 'Enter your email and I’ll send a confirmation code.', cta: 'Send code' },
+  signup: { title: msg('Create a free profile to save your plan'), sub: msg('Your streak and notes stay yours.'), cta: msg('Create profile') },
+  signin: { title: msg('Welcome back'), sub: msg('Sign in to pick up where you left off.'), cta: msg('Sign in') },
+  forgot: { title: msg('Reset your password'), sub: msg('Enter your email and I’ll send a confirmation code.'), cta: msg('Send code') },
 };
 
 export function AuthPanel({ mode: first, name = '', onDone, onSkip }: { mode: AuthMode; name?: string; onDone: () => void; onSkip?: () => void }) {
@@ -39,7 +40,7 @@ export function AuthPanel({ mode: first, name = '', onDone, onSkip }: { mode: Au
   const resetting = mode === 'forgot';
   const needsPassword = !resetting || stage === 'new';
   const needsEmail = !resetting || stage === 'email';
-  const copy = COPY[mode];
+  const copy = { title: t(COPY[mode].title), sub: t(COPY[mode].sub), cta: t(COPY[mode].cta) };
   const weak = mode !== 'signin' && needsPassword && password.length > 0 ? passwordProblem(password) : null;
   const ready = resetting
     ? stage === 'email' ? validEmail(email) : stage === 'code' ? /^\d{6}$/.test(code) : !passwordProblem(password)
@@ -98,8 +99,8 @@ export function AuthPanel({ mode: first, name = '', onDone, onSkip }: { mode: Au
     finishWith(res.email);
   };
 
-  const sub = !resetting ? copy.sub : stage === 'email' ? copy.sub : stage === 'code' ? `Enter the 6-digit code sent to ${email.trim()}.` : 'Code confirmed. Choose a new password.';
-  const cta = done ? 'Done' : !resetting ? copy.cta : stage === 'email' ? 'Send code' : stage === 'code' ? 'Confirm code' : 'Set new password';
+  const sub = !resetting ? copy.sub : stage === 'email' ? copy.sub : stage === 'code' ? t('Enter the 6-digit code sent to {0}.', { 0: email.trim() }) : t('Code confirmed. Choose a new password.');
+  const cta = done ? t('Done') : !resetting ? copy.cta : stage === 'email' ? t('Send code') : stage === 'code' ? t('Confirm code') : t('Set new password');
 
   return (
     <form
@@ -117,7 +118,7 @@ export function AuthPanel({ mode: first, name = '', onDone, onSkip }: { mode: Au
       {resetting && stage === 'code' && (
         <>
           {shown && !server && (
-            <p className="auth-local">No email service is connected to this build yet, so your code is shown here instead: <b>{shown}</b></p>
+            <p className="auth-local">{t('No email service is connected to this build yet, so your code is shown here instead:')}{' '}<b>{shown}</b></p>
           )}
           <label className={`auth-field code ${focus === 'email' ? 'on' : ''}`}>
             <Icon name="lock" size={19} />
@@ -130,7 +131,7 @@ export function AuthPanel({ mode: first, name = '', onDone, onSkip }: { mode: Au
               onFocus={() => setFocus('email')}
               onBlur={() => setFocus(null)}
               onChange={(e: { target: { value: string } }) => { setCode(e.target.value.replace(/\D/g, '').slice(0, 6)); setError(null); }}
-              aria-label="Confirmation code"
+              aria-label={t('Confirmation code')}
             />
           </label>
         </>
@@ -142,12 +143,12 @@ export function AuthPanel({ mode: first, name = '', onDone, onSkip }: { mode: Au
           type="email"
           inputMode="email"
           autoComplete="email"
-          placeholder="Email"
+          placeholder={t('Email')}
           value={email}
           onFocus={() => setFocus('email')}
           onBlur={() => setFocus(null)}
           onChange={(e: { target: { value: string } }) => { setEmail(e.target.value); setError(null); }}
-          aria-label="Email"
+          aria-label={t('Email')}
         />
         {validEmail(email) && <span className="auth-ok"><Icon name="check" size={13} stroke={3.4} /></span>}
       </label>}
@@ -158,14 +159,14 @@ export function AuthPanel({ mode: first, name = '', onDone, onSkip }: { mode: Au
           <input
             type={show ? 'text' : 'password'}
             autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-            placeholder={mode === 'forgot' ? 'New password' : 'Password'}
+            placeholder={mode === 'forgot' ? t('New password') : t('Password')}
             value={password}
             onFocus={() => setFocus('password')}
             onBlur={() => setFocus(null)}
             onChange={(e: { target: { value: string } }) => { setPassword(e.target.value); setError(null); }}
-            aria-label={mode === 'forgot' ? 'New password' : 'Password'}
+            aria-label={mode === 'forgot' ? t('New password') : t('Password')}
           />
-          <button type="button" className="auth-eye" onClick={() => { haptic(4); setShow(!show); }} aria-label={show ? 'Hide password' : 'Show password'}>
+          <button type="button" className="auth-eye" onClick={() => { haptic(4); setShow(!show); }} aria-label={show ? t('Hide password') : t('Show password')}>
             <Icon name="eye" size={19} />
           </button>
         </label>
@@ -176,12 +177,12 @@ export function AuthPanel({ mode: first, name = '', onDone, onSkip }: { mode: Au
       <Button3D type="submit" sheen={ready} disabled={!ready} busy={busy} variant={done ? 'ok' : 'primary'}>{cta}</Button3D>
 
       <div className="auth-links">
-        {mode === 'signin' && <button type="button" className="linkbtn" onClick={() => swap('forgot')}>Forgot password?</button>}
-        {mode === 'signup' && <span>Existing user? <button type="button" className="linkbtn" onClick={() => swap('signin')}>Sign in</button></span>}
-        {mode === 'signin' && <span>New here? <button type="button" className="linkbtn" onClick={() => swap('signup')}>Create a profile</button></span>}
-        {resetting && stage === 'code' && <button type="button" className="linkbtn" onClick={() => { setStage('email'); setCode(''); setShown(null); setError(null); }}>Send a new code</button>}
-        {resetting && <button type="button" className="linkbtn" onClick={() => swap('signin')}>Back to sign in</button>}
-        {onSkip && mode === 'signup' && <button type="button" className="linkbtn quiet" onClick={onSkip}>Continue without a profile</button>}
+        {mode === 'signin' && <button type="button" className="linkbtn" onClick={() => swap('forgot')}>{t('Forgot password?')}</button>}
+        {mode === 'signup' && <span>{t('Existing user?')}{' '}<button type="button" className="linkbtn" onClick={() => swap('signin')}>{t('Sign in')}</button></span>}
+        {mode === 'signin' && <span>{t('New here?')}{' '}<button type="button" className="linkbtn" onClick={() => swap('signup')}>{t('Create a profile')}</button></span>}
+        {resetting && stage === 'code' && <button type="button" className="linkbtn" onClick={() => { setStage('email'); setCode(''); setShown(null); setError(null); }}>{t('Send a new code')}</button>}
+        {resetting && <button type="button" className="linkbtn" onClick={() => swap('signin')}>{t('Back to sign in')}</button>}
+        {onSkip && mode === 'signup' && <button type="button" className="linkbtn quiet" onClick={onSkip}>{t('Continue without a profile')}</button>}
       </div>
     </form>
   );
