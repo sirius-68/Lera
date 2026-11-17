@@ -15,7 +15,7 @@ test('a line is looked up by its English, with its values put in afterwards', ()
   setLang('ru');
   assert.equal(t('Next lesson'), 'Следующий урок');
   assert.equal(t('Part {0} of {1}', { 0: 6, 1: 8 }), 'Часть 6 из 8');
-  assert.equal(t('Divide both sides by {0}.', { 0: '$-3$' }), 'Раздели обе части на $-3$.');
+  assert.equal(t('Subtract {0} from both sides, so the {1} term is left on its own.', { 0: '$-3$', 1: 'x' }), 'Вычти $-3$ из обеих частей, чтобы слагаемое с x осталось одно.');
   setLang('fr');
   assert.equal(t('Part {0} of {1}', { 0: 6, 1: 8 }), 'Partie 6 sur 8');
   assert.equal(t('A line nobody translated'), 'A line nobody translated');
