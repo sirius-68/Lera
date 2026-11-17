@@ -50,3 +50,6 @@
 .kbd-extra button.tpl .lo { align-self: flex-end; margin-bottom: 7px; }
 .kbd-extra button.tpl svg { height: 24px; width: 9px; overflow: visible; }
 .kbd-extra button.tpl svg path { fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; }
+
+/* a space typed between words */
+.mf-tok.sp { display: inline-block; width: 0.38em; }

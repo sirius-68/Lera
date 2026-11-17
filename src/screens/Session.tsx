@@ -2,7 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { aiCheckOpen, aiDiagnose, aiSimplify } from '../ai/tasks';
 import { aiReady } from '../ai/providers';
 import { analyze, cleanPath, hintLadder, HintLadder } from '../engine/analyze';
-import { confirmsStep, isCalc } from '../engine/calc/check';
+import { calcLatex, confirmsStep, isCalc } from '../engine/calc/check';
+import { parseLine } from '../engine/parse';
 import { conceptOf } from '../engine/concepts';
 import { PLAIN } from '../engine/concepts-calc';
 import { AttemptAnalysis, CheckedLine, Diagnosis, Problem } from '../engine/types';
@@ -45,7 +46,7 @@ const chipTone = (s: Diagnosis['severity']): string => (s === 'gap' ? 'gap' : s 
 
 function Keyboard({ vars, onKey, onTpl, onDelete, onEnter, onMove, ready, calc }: { vars: string[]; onKey: (s: string) => void; onTpl: (kind: Kind, then?: string) => void; onDelete: () => void; onEnter: () => void; onMove: (d: -1 | 1) => void; ready: boolean; calc?: boolean }) {
   const [a, b] = [vars[0] ?? 'x', vars[1] ?? (vars[0] === 'y' ? 'x' : 'y')];
-  type Key = { k: string; ins?: string; tone?: string; label?: string; tpl?: Kind; then?: string };
+  type Key = { k: string; ins?: string; tone?: string; label?: string; tpl?: Kind; then?: string; wide?: number };
   // calculus swaps the inequality column for the functions it needs
   const calcRows: Key[][] = [
     [{ k: a, tone: 'var' }, { k: 'e', tone: 'var' }, { k: '(' }, { k: ')' }, { k: 'x²', tpl: 'pow', then: '2', label: tr('squared') }, { k: '⌫', tone: 'fn', label: tr('Delete') }],
@@ -66,6 +67,8 @@ function Keyboard({ vars, onKey, onTpl, onDelete, onEnter, onMove, ready, calc }
   const [caps, setCaps] = useState(false);
   const letterRows: Key[][] = ['abcdef', 'ghijkl', 'mnopqr', 'stuvwx'].map((row) => [...row].map((ch) => ({ k: caps ? ch.toUpperCase() : ch, tone: 'var' })));
   letterRows.push([{ k: caps ? 'Y' : 'y', tone: 'var' }, { k: caps ? 'Z' : 'z', tone: 'var' }, { k: '⇧', tone: caps ? 'go' : 'fn', label: tr('Capital letters') }, { k: 'θ', ins: 'θ', tone: 'var' }, { k: '⌫', tone: 'fn', label: tr('Delete') }, { k: '↵', tone: 'go', label: tr('Check this line') }]);
+  // a sentence needs a space and its punctuation: written answers are typed here too
+  letterRows.push([{ k: ',' }, { k: '.' }, { k: '␣', ins: ' ', wide: 3, label: tr('Space') }, { k: '?' }]);
   const rows = abc ? letterRows : calc ? calcRows : algebraRows;
   void b;
   return (
@@ -103,6 +106,7 @@ function Keyboard({ vars, onKey, onTpl, onDelete, onEnter, onMove, ready, calc }
           <button
             key={key.k}
             className={`key ${key.tone ?? ''} ${key.tone === 'go' && ready ? 'ready' : ''}`}
+            style={key.wide ? { gridColumn: `span ${key.wide}` } : undefined}
             aria-label={key.label ?? key.k}
             // keep the caret in the working line while tapping keys
             onPointerDown={(e: { preventDefault(): void }) => e.preventDefault()}
@@ -258,8 +262,9 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     return (problem.variable ? [problem.variable, ...found.filter((v) => v !== problem.variable)] : found).slice(0, 2);
   }, [problem]);
 
+  // a mistake stays on the record even if the line is deleted; half a rule only counts if the attempt ends that way
   analysis.lines.forEach((l, i) => {
-    if (isChecked(i) && l.status === 'wrong' && l.diag) seen.current.set(`${l.diag.code}:${l.diag.concept}`, l.diag);
+    if (isChecked(i) && l.status === 'wrong' && l.diag && !l.diag.halfDone) seen.current.set(`${l.diag.code}:${l.diag.concept}`, l.diag);
   });
 
   useEffect(() => {
@@ -734,50 +739,157 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
 
 function OpenWork({ problem, last, onDone }: { problem: Problem; last: boolean; onDone: (r: Result) => void }) {
   const ai = useStore((s) => s.ai);
-  const [text, setText] = useState('');
+  const [lines, setLines] = useState<string[]>([]);
+  const [input, setInput] = useState('');
+  const [gaps, setGaps] = useState(false);
   const [busy, setBusy] = useState(false);
   const [verdict, setVerdict] = useState<{ correct: boolean; feedback: string } | null>(null);
+  const fieldRef = useRef<MathFieldHandle | null>(null);
+  const scroller = useRef<HTMLDivElement | null>(null);
   const started = useRef(Date.now());
+  const text = (problem.original ?? '') + ' ' + problem.prompt;
+  // calculus keys when the question is about calculus, the algebra keys otherwise
+  const calc = /∫|integra|derivativ|differentia|limit|\blim\b|интеграл|производн|предел|intégr|dérivé|limite/i.test(text);
+  /** Every line written, with the one still in the box. */
+  const all = (): string[] => (input.trim() ? [...lines, input.trim()] : lines).filter((l) => l.trim());
+
+  useEffect(() => {
+    scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' });
+    if (!verdict) fieldRef.current?.focus();
+  }, [lines.length, verdict]);
+
   const done = (ok: boolean, skipped = false) =>
-    onDone({ problem, verdict: ok ? 'solved' : 'unfinished', marks: [], hintRung: 0, seconds: (Date.now() - started.current) / 1000, steps: text.split('\n').filter(Boolean).length, cleanSteps: 0, skipped });
+    onDone({ problem, verdict: ok ? 'solved' : 'unfinished', marks: [], hintRung: 0, seconds: (Date.now() - started.current) / 1000, steps: all().length, cleanSteps: 0, skipped });
+
+  /** The tick: the line in the box becomes a line of the answer, and a fresh box opens below it. */
+  const commit = () => {
+    const t = input.trim();
+    if (!t || verdict) return;
+    if (gaps) {
+      toast(tr('One of the boxes is still empty. Fill it in, or delete it.'));
+      return;
+    }
+    setLines([...lines, t]);
+    fieldRef.current?.clear();
+    setInput('');
+  };
+  const commitRef = useRef(commit);
+  commitRef.current = commit;
+
+  const pullBack = () => {
+    if (!lines.length) return;
+    fieldRef.current?.setText(lines[lines.length - 1]);
+    setLines(lines.slice(0, -1));
+  };
+
   const check = async () => {
+    const working = all();
+    if (!working.length) return;
     setBusy(true);
     try {
-      const v = await aiCheckOpen(ai, problem, text.split('\n').filter((l) => l.trim()));
-      if (v) setVerdict(v);
-      else toast(tr('The AI reply couldn’t be read. Try again.'));
+      const v = await aiCheckOpen(ai, problem, working);
+      if (v) {
+        if (input.trim()) commit();
+        setVerdict(v);
+      } else toast(tr('The AI reply couldn’t be read. Try again.'));
     } catch (e) {
       toast(e instanceof Error ? e.message : tr('The AI check failed.'));
     }
     setBusy(false);
   };
+
   return (
     <>
-      <div className="scroll ws">
+      <div className="scroll ws" ref={scroller}>
         <div className="problem">
           <span className="chip"><Icon name="file" size={13} />{' '}{tr('From your notes · written answer')}</span>
           <p className="prompt" style={{ fontSize: 17, lineHeight: 1.5 }}><RichText text={problem.original ?? promptText(problem.prompt)} /></p>
         </div>
-        <textarea className="field" style={{ minHeight: 150, margin: '4px 0 10px', resize: 'none' }} placeholder={tr('Write your working here, one step per line…')} value={text} onChange={(e: { target: { value: string } }) => setText(e.target.value)} aria-label={tr('Your working')} />
+        <ol className="lines">
+          {lines.map((line, i) => (
+            <li key={`${i}:${line}`} className="line unchecked">
+              <span className="line-row" style={{ cursor: 'default' }}>
+                <span className="n">{i + 1}</span>
+                {/* a line the engine can read is drawn as maths; a line of words stays words */}
+                <span className="grow" style={{ textAlign: 'left' }}>{readsAsMaths(line) ? <MathView text={line} block /> : <span className="open-words">{line}</span>}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+        {!verdict && (
+          <div className="entry">
+            <span className="n">{lines.length + 1}</span>
+            <div className="grow">
+              <MathField
+                ref={fieldRef}
+                label={tr('Line {0} of your working', { 0: lines.length + 1 })}
+                placeholder={lines.length ? tr('Next line…') : tr('Write your first line…')}
+                onChange={(t, hasGaps) => {
+                  setInput(t);
+                  setGaps(hasGaps);
+                }}
+                onEnter={() => commitRef.current()}
+                onEmptyDelete={pullBack}
+              />
+            </div>
+          </div>
+        )}
         {verdict ? (
           <div className={`diag ${verdict.correct ? 'okc' : 'slip'}`}>
             <span className={`chip ${verdict.correct ? 'ok' : 'slip'}`}>{verdict.correct ? tr('Looks right') : tr('Not yet')}</span>
-            <p style={{ marginTop: 8, lineHeight: 1.5, fontSize: 14.5 }}>{verdict.feedback}</p>
+            <p style={{ marginTop: 8, lineHeight: 1.5, fontSize: 14.5 }}><RichText text={verdict.feedback} /></p>
             <p className="faint" style={{ fontSize: 12.5, marginTop: 6 }}>{tr('Checked by the AI model you connected, not by the built-in engine.')}</p>
           </div>
         ) : (
           <p className="ws-note"><Icon name="question" size={16} /> <span>{aiReady(ai) ? tr('Word problems are checked by the AI model you connected.') : tr('The built-in engine checks algebra line by line, but it can’t mark a word problem. Connect an AI model in Settings to have these checked, or mark it yourself.')}</span></p>
         )}
       </div>
-      <div className="ws-foot" style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
-        {aiReady(ai) && !verdict && <Button3D busy={busy} disabled={!text.trim()} onClick={check}>{tr('Check my answer')}</Button3D>}
-        <Button3D variant={verdict?.correct ? 'ok' : 'secondary'} onClick={() => done(verdict ? verdict.correct : !!text.trim())}>
-          {verdict ? (last ? tr('Finish') : tr('Next problem')) : tr('I’ve done this one')}
-        </Button3D>
-        {!verdict && <button className="linkbtn" onClick={() => done(false, true)}>{tr('Skip')}</button>}
-      </div>
+      {verdict ? (
+        <div className="ws-foot">
+          <Button3D variant={verdict.correct ? 'ok' : 'primary'} sheen onClick={() => done(verdict.correct)}>
+            {last ? tr('Finish') : tr('Next problem')} <Icon name="arrow" size={19} />
+          </Button3D>
+        </div>
+      ) : (
+        <div className="ws-keys">
+          <div className="row ws-tools">
+            {aiReady(ai) && (
+              <button className="tool go" disabled={busy || !all().length} onClick={check}>
+                <Icon name="check" size={16} stroke={3} />{' '}{busy ? tr('Checking…') : tr('Check my answer')}
+              </button>
+            )}
+            <button className="tool" disabled={!all().length} onClick={() => done(true)}>{tr('I’ve done this one')}</button>
+            <span className="grow" />
+            <button className="tool" onClick={() => done(false, true)}>{tr('Skip')}</button>
+          </div>
+          <Keyboard
+            vars={calc ? [problem.variable ?? 'x'] : ['x', 'y']}
+            onKey={(k) => (k === '+C' ? (fieldRef.current?.insert('+'), fieldRef.current?.insert('C')) : fieldRef.current?.insert(k))}
+            onTpl={(kind, then) => {
+              fieldRef.current?.template(kind, problem.variable ?? 'x');
+              if (then) {
+                fieldRef.current?.insert(then);
+                fieldRef.current?.move(1);
+              }
+            }}
+            onDelete={() => {
+              if (!fieldRef.current?.del()) pullBack();
+            }}
+            onEnter={commit}
+            onMove={(d) => fieldRef.current?.move(d)}
+            ready={!!input.trim()}
+            calc={calc}
+          />
+        </div>
+      )}
     </>
   );
+}
+
+/** Can this line be drawn as maths, or is it a sentence? */
+function readsAsMaths(line: string): boolean {
+  if (/[a-zA-Zа-яА-Я]{4,}/.test(line.replace(/\b(?:sin|cos|tan|sec|csc|cot|sqrt|ln|log|lim|exp|pi)\b/g, ''))) return false;
+  return calcLatex(line) !== null || parseLine(line).ok;
 }
 
 /* ───────────── the session around the problems ───────────── */

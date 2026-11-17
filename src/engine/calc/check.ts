@@ -1,7 +1,7 @@
 import { AnalyzeOptions, AttemptAnalysis, CheckedLine, ConceptId, Diagnosis, Problem, ProblemKind, SolutionStep } from '../types';
 import { CalcParseError, E, Flaw, Indefinite, N, V, add, constantRatio, diff, div, equiv, ev, has, mentions, mul, neg, nice, numText, parseCalc, pending, pow, pre, simp, subst, toLatex, toText } from './expr';
 import { IntFlaw, integrate, integrateRaw, integrateWith, toPoly, polyToExpr } from './integrate';
-import { msg, t } from '../../i18n';
+import { getLang, msg, t } from '../../i18n';
 import { definiteRoute, derivativeRoute, handText, integralRoute, limitRoute } from './route';
 
 /**
@@ -390,9 +390,9 @@ export function calcAnalyze(problem: Problem, rawLines: string[], opts: AnalyzeO
     const diag = diagnose(p, problem, bad);
     // half a rule, on the last side of the line: a step on the way, not a false claim
     const ai = diag.code === 'unknown' ? opts.aiSteps?.[text] : undefined;
-    if (ai) return { kind: 'false', text, latex: parsed.latex, last, first: parsed.sides[0], sides: parsed.sides, bad, diag: { ...diag, fix: ai.fix ?? diag.fix }, unfinished: true, note: ai.note };
+    if (ai) return { kind: 'false', text, latex: parsed.latex, last, first: parsed.sides[0], sides: parsed.sides, bad, diag: { ...diag, fix: ai.fix ?? diag.fix, halfDone: true }, unfinished: true, note: ai.note };
     const unfinished = diag.code in UNFINISHED && badAt === parsed.sides.length - 1;
-    return { kind: 'false', text, latex: parsed.latex, last, first: parsed.sides[0], sides: parsed.sides, bad, diag: unfinished ? { ...diag, fix: completedText(p, bad, diag.code) } : diag, unfinished };
+    return { kind: 'false', text, latex: parsed.latex, last, first: parsed.sides[0], sides: parsed.sides, bad, diag: unfinished ? { ...diag, fix: completedText(p, bad, diag.code), halfDone: true } : diag, unfinished };
   });
 
   // 2. decide each line in the light of the whole attempt
@@ -660,7 +660,8 @@ function limitSteps(p: Prep): SolutionStep[] {
 const pathCache = new Map<string, SolutionStep[]>();
 
 export function calcPath(problem: Problem): SolutionStep[] {
-  const key = `${problem.kind}|${problem.given}`;
+  // the reasons are written in the app's language, so a route is kept per language
+  const key = `${getLang()}|${problem.kind}|${problem.given}`;
   const hit = pathCache.get(key);
   if (hit) return hit;
   const p = prepCalc(problem);
@@ -711,7 +712,7 @@ export function calcHint(problem: Problem, rawLines: string[]): CalcHint | null 
   const good = trueLines.length;
   const step = path[nextIndex(path, trueLines[trueLines.length - 1]?.text, good, p.v)];
   const shape = p.mode === 'derivative' ? shapeOf(p.body, p.v).shape : 'any';
-  const nudge = a.remaining && good > 0 ? a.remaining : NUDGES[p.mode][shape] ?? NUDGES[p.mode].any ?? '';
+  const nudge = a.remaining && good > 0 ? a.remaining : t(NUDGES[p.mode][shape] ?? NUDGES[p.mode].any ?? '');
   return { nudge, method: step.why, line: step.line, concept: problem.concepts[0] };
 }
 

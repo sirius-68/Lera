@@ -63,6 +63,30 @@ const soleVariable = (e: E, hint?: string): string => {
 
 let counter = 0;
 
+/** Where a worked example's own working starts: a new sentence that begins "Let u = …", "Solution", "Using …". */
+const WORKING = /[.;!?:]\s+(?=(?:let|solution|using|by|hint|use|set|put|substitut\w*|we\s+(?:have|get|use)|first|step\s*1|пусть|решение|положим|используя|сначала|soit|posons|on\s+pose|en\s+utilisant|solution)\b)/i;
+const TO_INF = /^(?:∞|inf|infinity|бесконечност\w*|l[’']infini)$/i;
+/** "the limit of X as x approaches a", in words. */
+const LIMIT_WORDS = /(?:the\s+)?limit\s+of\s+(.+?)\s+as\s+([a-z])\s*(?:→|->|approaches|tends\s+to|goes\s+to)\s*(-?\s*[\w./∞]+)/i;
+
+/**
+ * The question in a line from the notes, without the working that follows it: the text before a sentence that starts
+ * the solution ("Let u = …", "Solution", "Using …"), and before an = that follows a whole ∫, d/dx or lim.
+ */
+export function questionOf(text: string): string {
+  let q = text;
+  const cut = WORKING.exec(q);
+  if (cut && cut.index > 0) q = q.slice(0, cut.index + 1);
+  const eq = q.indexOf('=');
+  if (eq > 0) {
+    const before = q.slice(0, eq);
+    const at = before.search(/∫|\blim\b|\bd\s*\/\s*d[a-z]\b/i);
+    const e = at >= 0 ? tryParse(tidy(before.slice(at))) : null;
+    if (e && pending(e)) q = before;
+  }
+  return q.trim();
+}
+
 /**
  * "Differentiate f(x) = x³ + 2x", "∫ 3x² dx", "Find lim x→2 (x² − 4)/(x − 2)".
  * `inherited` is the instruction above a list ("Evaluate each integral:").
@@ -74,7 +98,12 @@ export function buildCalcProblem(text: string, inherited: string | undefined, to
   const wantsL = WANTS_LIMIT.test(whole);
   if (!wantsD && !wantsI && !wantsL) return null;
 
-  let body = tidy(text);
+  let body = tidy(questionOf(text));
+  const lw = LIMIT_WORDS.exec(body);
+  if (lw && !/\blim\b/i.test(body)) {
+    const to = lw[3].replace(/\s+/g, '');
+    body = `lim ${lw[2]}→${TO_INF.test(to) ? '∞' : to} (${tidy(lw[1])})`;
+  }
   let range: [string, string] | null = null;
   const rm = RANGE.exec(body);
   if (rm) {

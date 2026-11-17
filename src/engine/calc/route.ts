@@ -1,5 +1,5 @@
 import { SolutionStep } from '../types';
-import { E, N, V, add, diff, div, ev, fn, has, isVar, mul, neg, nice, numText, pow, signOf, simp, subst, toText } from './expr';
+import { E, N, V, add, diff, div, ev, fn, has, isVar, mul, neg, nice, numText, pow, signOf, simp, subst, toLatex, toText } from './expr';
 import { insides, inTermsOf, integrate, outer, polyToExpr, toPoly } from './integrate';
 import { t } from '../../i18n';
 
@@ -35,12 +35,13 @@ function look(e: E): E {
       // (−sin 4x) · 4 reads better as −(sin 4x · 4)
       const negs = a.filter((x) => x.t === 'neg');
       if (negs.length === 1 && a.length > 1) return neg(look(mul(...a.map((x) => (x.t === 'neg' ? x.a : x)))));
-      const fr = a.filter((x) => x.t === '/');
-      if (fr.length === 1 && a.length > 1 && a.every((x) => x.t !== 'int' && x.t !== 'd')) {
-        const f = fr[0] as Extract<E, { t: '/' }>;
-        const rest = a.filter((x) => x !== f);
-        const top = f.n.t === 'n' && f.n.v === 1 ? mul(...rest) : mul(...rest, f.n);
-        return div(top, f.d);
+      // every fraction in a product drawn as one: ½ · e²ˣ/2 is e²ˣ/(2 · 2), never two fractions side by side
+      const fr = a.filter((x): x is Extract<E, { t: '/' }> => x.t === '/');
+      if (fr.length >= 1 && a.length > 1 && a.every((x) => x.t !== 'int' && x.t !== 'd')) {
+        const rest = a.filter((x) => x.t !== '/');
+        const tops = fr.map((f) => f.n).filter((n) => !(n.t === 'n' && n.v === 1));
+        const top = rest.length + tops.length ? mul(...rest, ...tops) : N(1);
+        return div(top, mul(...fr.map((f) => f.d)));
       }
       return { t: '*', a };
     }
@@ -326,7 +327,7 @@ function intMove(node: Int, uName: string): IMove | null {
       ];
       const [minus, vb] = signOf(vv);
       const by = minus ? add(neg(mul(u, vb)), I(flat(du, vb), v)) : add(mul(u, vv), neg(I(flat(du, vv), v)));
-      return { rule: 'parts', by, aside: steps, formula: '∫ u dv = uv - ∫ v du', why: t('Put u, v and du into the formula. What is left is a simpler integral.') };
+      return { rule: 'parts', by, aside: steps, formula: '\\int u\\,dv = uv - \\int v\\,du', why: t('Put u, v and du into the formula. What is left is a simpler integral.') };
     }
   }
   return { rule: 'whole', by: whole.F };
@@ -360,9 +361,9 @@ function intWhy(rule: IRule, moves: { node: Int; m: IMove }[], v: string): { why
   const ns = [...new Set(moves.map((x) => x.m.n).filter((n): n is number => n !== undefined))].map(nText);
   switch (rule) {
     case 'sum':
-      return { why: t('Integrate a sum one term at a time: split it into one integral for each term.'), rule: '∫ (f + g) dx = ∫ f dx + ∫ g dx' };
+      return { why: t('Integrate a sum one term at a time: split it into one integral for each term.'), rule: `\\int (f + g)\\,d${v} = \\int f\\,d${v} + \\int g\\,d${v}` };
     case 'out':
-      return { why: t('A number multiplying the function can wait outside the integral. Take it out, and integrate only what is left.'), rule: '∫ k f(x) dx = k ∫ f(x) dx' };
+      return { why: t('A number multiplying the function can wait outside the integral. Take it out, and integrate only what is left.'), rule: `\\int k\\,f(${v})\\,d${v} = k \\int f(${v})\\,d${v}` };
     case 'rewrite':
       return { why: t('Write it as a power of {0}, so the power rule can be used. Here the power is {1}.', { 0: v, 1: ns.join(', ') }) };
     case 'expand':
@@ -370,17 +371,17 @@ function intWhy(rule: IRule, moves: { node: Int; m: IMove }[], v: string): { why
     case 'split':
       return { why: t('Split the fraction: divide each term on top by the bottom. Now each piece is one you know.') };
     case 'number':
-      return { why: t('The integral of a plain number k is k{0}: differentiate k{1} and you get k back.', { 0: v, 1: v }), rule: `∫ k d${v} = k${v} + C` };
+      return { why: t('The integral of a plain number k is k{0}: differentiate k{1} and you get k back.', { 0: v, 1: v }), rule: `\\int k\\,d${v} = k${v} + C` };
     case 'power':
       return {
         why: ns.length === 1 ? t('**Power rule**: add 1 to the power, then divide by the new power. Here n = {0}, so the new power is {0} + 1.', { 0: ns[0] }) : t('**Power rule** for each term: add 1 to the power, then divide by the new power. Here {0}.', { 0: ns.map((n) => `n = ${n}`).join(', ') }),
-        rule: `∫ ${v}^n d${v} = ${v}^(n+1)/(n+1) + C`,
+        rule: `\\int ${v}^{n}\\,d${v} = \\frac{${v}^{n+1}}{n+1} + C \\quad (n \\neq -1)`,
       };
     case 'log':
-      return { why: t('The power rule cannot divide by 0, so 1/{0} is the exception. Its integral is the natural log of the size of {1}, shown in the rule, because that has derivative 1/{2}.', { 0: v, 1: v, 2: v }), rule: `∫ 1/${v} d${v} = ln|${v}| + C` };
+      return { why: t('The power rule cannot divide by 0, so 1/{0} is the exception. Its integral is the natural log of the size of {1}, shown in the rule, because that has derivative 1/{2}.', { 0: v, 1: v, 2: v }), rule: `\\int \\frac{1}{${v}}\\,d${v} = \\ln|${v}| + C` };
     case 'table': {
       const one = moves[0];
-      const entry = moves.map(({ node, m }) => `∫ ${toText(node.a)} d${v} = ${show(m.by)} + C`)[0];
+      const entry = moves.map(({ node, m }) => `\\int ${toLatex(node.a)}\\,d${v} = ${toLatex(look(m.by))} + C`)[0];
       return { why: one && moves.length === 1 ? t('This one is in the table of standard integrals: run the table of derivatives backwards.') : t('These are in the table of standard integrals: run the table of derivatives backwards.'), rule: entry };
     }
     case 'linear':
@@ -458,7 +459,7 @@ export function definiteRoute(body: E, v: string, lo: number, hi: number, value:
   const filled = (x: number): string => show(subst(F, v, x < 0 ? neg(N(-x)) : N(x)));
   steps.push({ tag: 'calc', aside: true, line: `${filled(hi)} = ${numText(top)}`, why: t('Put the top limit, {0} = {1}, into the antiderivative.', { 0: v, 1: numText(hi) }) });
   steps.push({ tag: 'calc', aside: true, line: `${filled(lo)} = ${numText(bottom)}`, why: t('Put the bottom limit, {0} = {1}, into the antiderivative.', { 0: v, 1: numText(lo) }) });
-  steps.push({ tag: 'calc', line: `${numText(top)} - ${bottom < 0 ? `(${numText(bottom)})` : numText(bottom)}`, why: t('**Top minus bottom**, never the other way round. (No + C is needed: it would cancel here.)'), rule: '∫[a,b] f(x) dx = F(b) - F(a)' });
+  steps.push({ tag: 'calc', line: `${numText(top)} - ${bottom < 0 ? `(${numText(bottom)})` : numText(bottom)}`, why: t('**Top minus bottom**, never the other way round. (No + C is needed: it would cancel here.)'), rule: `\\int_a^b f(${v})\\,d${v} = F(b) - F(a)` });
   steps.push({ tag: 'final', line: numText(value), why: t('Do the subtraction. A definite integral comes to one number.') });
   return steps;
 }
@@ -526,7 +527,7 @@ function derMove(node: Der, top: boolean): DMove | null {
     }
   }
   if (f.t === '/' && has(f.n, v) && has(f.d, v)) {
-    return { rule: 'quotient', by: div(add(mul(D(f.n, v), f.d), neg(mul(f.n, D(f.d, v)))), pow(f.d, N(2))), why: t('One function divided by another: **quotient rule**. The top is ${0}$ and the bottom is ${1}$. Always start with the derivative of the top.', { 0: toText(f.n), 1: toText(f.d) }), formula: "(u/v)' = (u'v - uv')/v^2" };
+    return { rule: 'quotient', by: div(add(mul(D(f.n, v), f.d), neg(mul(f.n, D(f.d, v)))), pow(f.d, N(2))), why: t('One function divided by another: **quotient rule**. The top is ${0}$ and the bottom is ${1}$. Always start with the derivative of the top.', { 0: toText(f.n), 1: toText(f.d) }), formula: "\\left(\\frac{u}{v}\\right)' = \\frac{u'v - uv'}{v^2}" };
   }
   if (f.t === '/' && f.n.t === 'n' && f.n.v === 1 && has(f.d, v)) return { rule: 'rewrite', by: D(pow(f.d, N(-1)), v), n: -1 };
 
@@ -538,7 +539,7 @@ function derMove(node: Der, top: boolean): DMove | null {
     const block = '§';
     const asBlock = swap(f, inner, V(block));
     const outer = subst(simp(diff(asBlock, block)), block, inner);
-    return { rule: 'chain', by: mul(outer, D(inner, v)), why: t('A function inside a function: **chain rule**. Treat ${0}$ as one block. Differentiate the outside and leave the block alone, then multiply by the derivative of the block.', { 0: toText(inner) }), formula: "(f(g(x)))' = f'(g(x)) g'(x)" };
+    return { rule: 'chain', by: mul(outer, D(inner, v)), why: t('A function inside a function: **chain rule**. Treat ${0}$ as one block. Differentiate the outside and leave the block alone, then multiply by the derivative of the block.', { 0: toText(inner) }), formula: `\\big(f(g(${v}))\\big)' = f'(g(${v}))\\,g'(${v})` };
   }
   return { rule: 'whole', by: simp(diff(f, v)) };
 }
@@ -549,7 +550,7 @@ function derWhy(rule: DRule, moves: { node: Der; m: DMove }[], v: string): { why
     case 'sum':
       return { why: t('Differentiate a sum one term at a time.'), rule: "(f + g)' = f' + g'" };
     case 'out':
-      return { why: t('A number multiplying the function just waits in front. Take it out and differentiate what is left.'), rule: "(k f)' = k f'" };
+      return { why: t('A number multiplying the function just waits in front. Take it out and differentiate what is left.'), rule: "(k\\,f)' = k\\,f'" };
     case 'rewrite':
       return { why: t('Write it as a power, so the power rule can be used. Here the power is {0}.', { 0: ns.join(', ') }) };
     case 'number':
@@ -559,10 +560,10 @@ function derWhy(rule: DRule, moves: { node: Der; m: DMove }[], v: string): { why
     case 'power':
       return {
         why: ns.length === 1 ? t('**Power rule**: bring the power down in front, then make the power one smaller. Here n = {0}.', { 0: ns[0] }) : t('**Power rule** for each term: bring the power down in front, then make the power one smaller. Here {0}.', { 0: ns.map((n) => `n = ${n}`).join(', ') }),
-        rule: `d/d${v}(${v}^n) = n ${v}^(n-1)`,
+        rule: `\\frac{d}{d${v}}\\,${v}^{n} = n\\,${v}^{n-1}`,
       };
     case 'table': {
-      const entry = moves.map(({ node, m }) => `d/d${v}(${toText(node.a)}) = ${show(m.by)}`)[0];
+      const entry = moves.map(({ node, m }) => `\\frac{d}{d${v}}\\left[${toLatex(node.a)}\\right] = ${toLatex(look(m.by))}`)[0];
       return { why: moves.length === 1 ? t('This one is in the table of standard derivatives.') : t('These are in the table of standard derivatives.'), rule: entry };
     }
     case 'product':
@@ -704,7 +705,7 @@ export function limitRoute(body: E, v: string, to: number, L: number): SolutionS
   const lh = div(simp(diff(body.n, v)), simp(diff(body.d, v)));
   return [
     tryIt,
-    { tag: 'calc', line: `lim ${v}→${numText(to)} (${show(lh)})`, why: t('Substituting gives 0/0. **L’Hôpital’s rule**: differentiate the top and the bottom separately (not as a quotient), then try the limit again.'), rule: "lim f/g = lim f'/g'" },
+    { tag: 'calc', line: `lim ${v}→${numText(to)} (${show(lh)})`, why: t('Substituting gives 0/0. **L’Hôpital’s rule**: differentiate the top and the bottom separately (not as a quotient), then try the limit again.'), rule: "\\lim \\frac{f}{g} = \\lim \\frac{f'}{g'}" },
     { tag: 'calc', line: at(lh), why: t('Now put {0} = {1} into the new top and bottom.', { 0: v, 1: numText(to) }) },
     { tag: 'final', line: answer, why: t('Work out the numbers.') },
   ];

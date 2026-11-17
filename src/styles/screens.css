@@ -190,7 +190,8 @@
 .route li .muted { display: block; font-size: 13.5px; line-height: 1.4; margin-top: 1px; }
 /* working on the side (u = …, a value put in): indented, as on paper */
 .route li.aside { margin-left: 30px; padding-left: 12px; border-left: 2px solid var(--line); font-size: 16px; }
-.route li.aside::before { display: none; }
+.route li.aside::before, .route li.route-end::before { display: none; }
+.route li.route-end { padding-left: 0; font-size: 14px; }
 .route-rule { display: block; margin-bottom: 4px; padding: 6px 10px; border-radius: 10px; background: var(--tint); font-size: 15px; }
 .route-rule .faint { display: block; font-size: 11.5px; letter-spacing: 0.02em; text-transform: uppercase; }
 .ws-foot { padding: 12px 20px calc(14px + var(--safe-b)); display: flex; justify-content: center; background: #fff; border-top: 1.5px solid var(--line); animation: rise 0.4s var(--ease) both; }
@@ -323,3 +324,7 @@
 /* "Explain it" on a worked example: the engine's own steps, under the example */
 .ex-explain { margin-top: 12px; padding-top: 10px; border-top: 1.5px dashed var(--line); }
 .ex-explain .linkbtn { margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; }
+
+/* a written answer: a line of words in the same boxes as a line of maths */
+.open-words { font-size: 16px; line-height: 1.45; color: var(--ink); }
+.tool:disabled { opacity: 0.45; pointer-events: none; }

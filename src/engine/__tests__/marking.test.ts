@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { analyze, answerOf, cleanPath } from '../analyze';
 import { ALL_CONCEPTS, practiceFor } from '../generate';
-import { buildCalcProblem } from '../../ingest/calc';
+import { buildCalcProblem, questionOf } from '../../ingest/calc';
 import { confirmsStep, isCalc } from '../calc/check';
 import { Problem, ProblemKind } from '../types';
 import { recordAttempt } from '../../store/learner';
@@ -136,7 +136,7 @@ test('∫ from 0 to 2 of 3x^2 is explained: antiderivative, top, bottom, subtrac
 
 /* ───────────── reading questions ───────────── */
 
-test.todo('"the integral of …" in words is read as an integral', () => {
+test('"the integral of …" in words is read as an integral', () => {
   const p = buildCalcProblem('Evaluate the integral of 2x cos(x^2). Let u = x^2, du = 2x dx.', undefined, 't', '');
   assert.equal(p?.kind, 'integral');
   assert.equal(p?.given.replace(/\s+/g, ''), '∫2xcos(x^2)dx');
@@ -168,4 +168,15 @@ test('a line the checker could not name becomes a step only with a confirmed AI 
   const aiSteps = { [odd]: { note: 'Next: something.', fix: 'x^3' } };
   assert.equal(analyze(p, [odd, 'x^3 + C'], { done: true, aiSteps }).lines[0].status, 'step');
   assert.equal(analyze(p, [odd], { done: true, aiSteps }).lines[0].status, 'wrong');
+});
+
+test('"the limit of … as x approaches …" in words is read as a limit', () => {
+  const p = buildCalcProblem('Find the limit of (x^2 - 4)/(x - 2) as x approaches 2.', undefined, 't', '');
+  assert.equal(p?.kind, 'limit');
+});
+
+test('the working after an example question is not part of the question', () => {
+  assert.equal(questionOf('Evaluate ∫ 2x cos(x^2) dx. Let u = x^2, du = 2x dx.'), 'Evaluate ∫ 2x cos(x^2) dx.');
+  assert.equal(questionOf('∫ 2x dx = x^2 + C'), '∫ 2x dx');
+  assert.equal(questionOf('Find the area bounded by y = x^2 and y = 4.'), 'Find the area bounded by y = x^2 and y = 4.');
 });

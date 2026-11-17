@@ -93,6 +93,8 @@ export interface Diagnosis {
   message: string;
   /** A correct version of this line, linear text. */
   fix?: string;
+  /** Half a rule left unfinished (not a rule broken): a mark only if the attempt ends that way. */
+  halfDone?: boolean;
 }
 
 export type LineStatus =
@@ -155,6 +157,6 @@ export interface SolutionStep {
   tag: StepTag;
   /** Working on the side (u = …, du = …, a value put in): not a line that stands for the whole problem. */
   aside?: boolean;
-  /** The general rule this step uses, as a formula, shown before the step. */
+  /** The general rule this step uses, as a LaTeX formula, shown before the step. */
   rule?: string;
 }

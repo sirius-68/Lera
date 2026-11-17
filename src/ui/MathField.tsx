@@ -104,7 +104,7 @@ export const MathField = forwardRef<MathFieldHandle, Props>(function MathField({
         out.push(
           <span
             key={i}
-            className={`mf-tok ${/^[a-zA-Z]$/.test(it) ? 'var' : /^[+\-*/=<>]|<=|>=$/.test(it) ? 'op' : ''}`}
+            className={`mf-tok ${it === ' ' ? 'sp' : /^[a-zA-Z]$/.test(it) ? 'var' : /^[+\-*/=<>]|<=|>=$/.test(it) ? 'op' : ''}`}
             onClick={(e: ReactMouseEvent<HTMLElement>) => {
               // left half of a symbol puts the cursor before it, right half after
               const r = e.currentTarget.getBoundingClientRect();

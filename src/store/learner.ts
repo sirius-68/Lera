@@ -1,3 +1,4 @@
+import { questionOf } from '../ingest/calc';
 import { conceptOf } from '../engine/concepts';
 import { practiceFor, seedFrom } from '../engine/generate';
 import { AttemptAnalysis, ConceptId, Problem } from '../engine/types';
@@ -219,8 +220,9 @@ export interface Session {
  */
 /** A worked example from the notes as a question to try: its own first line (or title) read as a problem. */
 export function exampleProblem(block: Extract<Block, { t: 'example' }>, index: number, topicId: string): Problem | null {
+  // the question only: the example's own working ("Let u = …", "Solution") is not part of it
   for (const src of [block.lines[0], block.title, `${block.lines[0] ?? ''} ${block.lines[1] ?? ''}`]) {
-    const found = src ? parseExercises(plain(src), undefined, topicId).problems[0] : undefined;
+    const found = src ? parseExercises(questionOf(plain(src)), undefined, topicId).problems[0] : undefined;
     if (found) return { ...found, id: `${topicId}:ex${index}`, source: 'notes' };
   }
   return null;
