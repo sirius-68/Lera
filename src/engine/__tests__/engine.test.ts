@@ -172,7 +172,7 @@ test('special answers', () => {
 test('the long way round is not punished', () => {
   const a = analyze(P('linear', '3x + 4 = 19'), ['3x + 4 - 4 = 19 - 4', '3x + 0 = 15', '3x = 15', '3x/3 = 15/3', 'x = 5']);
   assert.equal(a.verdict, 'solved');
-  assert.ok(!a.marks.some((m) => m.severity === 'gap'));
+  assert.equal(a.marks.length, 0);
 });
 
 test('clean paths end at the answer', () => {

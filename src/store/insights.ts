@@ -59,8 +59,6 @@ export interface LearnerModel {
     revealRate: number;
     /** Slips (knows the rule, fumbled it) against gaps (the rule is missing): which kind of mistake dominates. */
     mistakes: 'careless' | 'conceptual' | 'mixed' | 'few';
-    /** Lines written per solved problem against the shortest route: above 1.4 means the long way round. */
-    stepsVsShortest: number | null;
     /** Times the answer was given with no working. */
     answerOnly: number;
     /** Questions asked to Lera. */
@@ -137,8 +135,6 @@ export function learnerModel(s: Input, now: Date = new Date()): LearnerModel {
   const gaps = recent.reduce((n, a) => n + a.marks.filter((m) => m.severity === 'gap').length, 0);
   const slips = recent.reduce((n, a) => n + a.marks.filter((m) => m.severity === 'slip').length, 0);
   const mistakes: LearnerModel['style']['mistakes'] = gaps + slips < 3 ? 'few' : slips >= gaps * 2 ? 'careless' : gaps >= slips * 2 ? 'conceptual' : 'mixed';
-  const solved = recent.filter((a) => a.verdict === 'solved' && a.cleanSteps > 0);
-  const stepsVsShortest = solved.length >= 3 ? Math.round((solved.reduce((n, a) => n + a.steps / a.cleanSteps, 0) / solved.length) * 100) / 100 : null;
 
   const tally = new Map<string, { code: string; concept: ConceptId; title: string; count: number }>();
   for (const a of recent) {
@@ -202,7 +198,7 @@ export function learnerModel(s: Input, now: Date = new Date()): LearnerModel {
       daysSinceLast,
     },
     skill: { cleanRate: Math.round(cleanRate * 100) / 100, trend: Math.round(trend * 100) / 100, pace, level: level as LearnerModel['skill']['level'] },
-    style: { hintReliance: Math.round(hintReliance * 100) / 100, revealRate: Math.round(revealRate * 100) / 100, mistakes, stepsVsShortest, answerOnly: events.filter((e) => e.t === 'answer_only').length, questions: events.filter((e) => e.t === 'ask').length },
+    style: { hintReliance: Math.round(hintReliance * 100) / 100, revealRate: Math.round(revealRate * 100) / 100, mistakes, answerOnly: events.filter((e) => e.t === 'answer_only').length, questions: events.filter((e) => e.t === 'ask').length },
     topErrors,
     weakest,
     strongest,

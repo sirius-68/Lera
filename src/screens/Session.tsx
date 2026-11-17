@@ -37,7 +37,7 @@ interface Result {
 
 const SOURCE_LABEL: Record<Problem['source'], string> = { notes: msg('From your notes'), generated: msg('Fresh practice'), review: msg('Coming back') };
 
-const SEVERITY_LABEL: Record<Diagnosis['severity'], string> = { gap: msg('Gap'), slip: msg('Slip'), notation: msg('Notation'), strategy: msg('Route'), incomplete: msg('Not finished') };
+const SEVERITY_LABEL: Record<Diagnosis['severity'], string> = { gap: msg('Gap'), slip: msg('Slip'), notation: msg('Notation'), incomplete: msg('Not finished') };
 
 const chipTone = (s: Diagnosis['severity']): string => (s === 'gap' ? 'gap' : s === 'slip' ? 'slip' : 'info');
 
@@ -158,7 +158,7 @@ function DiagnosisCard({ diag, onReview, onFix, fixShown, aiNote, onSense }: { d
         <b className="grow" style={{ fontSize: 14.5, lineHeight: 1.3 }}><RichText text={diag.title} /></b>
       </div>
       <p style={{ fontSize: 14.5, lineHeight: 1.5, marginTop: 8 }}><TermText text={aiNote ?? diag.message} /></p>
-      {diag.severity !== 'strategy' && (
+      {(
         <div className="sense" data-state={sense ?? 'ask'}>
           {sense === null && (
             <>
@@ -506,7 +506,6 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
   };
 
   const marks = marksNow();
-  const strategy = analysis.marks.find((m) => m.severity === 'strategy');
   const hintText = hint ? (rung <= 1 ? hint.nudge : rung === 2 ? hint.method : tr('Here is the next line. Read it, then write it yourself:')) : '';
 
   return (
@@ -645,7 +644,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
               <div className="solved-banner">
                 <span className="big-tick"><Icon name="check" size={26} stroke={3.2} /></span>
                 <div>
-                  <b>{marks.length ? tr('Solved, with a detour') : rung >= 3 ? tr('Solved, with the line shown') : tr('Solved')}</b>
+                  <b>{rung >= 3 ? tr('Solved, with the line shown') : tr('Solved')}</b>
                   <p className="muted" style={{ fontSize: 14 }}>
                     {analysis.steps} {analysis.steps === 1 ? 'line' : 'lines'}
                     {analysis.approach ? ` · ${analysis.approach}` : ''}
@@ -659,10 +658,10 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
               </div>
             )}
 
-            {marks.filter((m) => m.severity !== 'strategy').length > 0 && (
+            {marks.length > 0 && (
               <div className="card">
                 <span className="label">{tr('What I noticed')}</span>
-                {marks.filter((m) => m.severity !== 'strategy').map((m) => (
+                {marks.map((m) => (
                   <button key={m.code + m.concept} className="noticed" onClick={() => openOverlay({ name: 'review', concept: m.concept })}>
                     <span className={`chip ${chipTone(m.severity)}`}>{tr(SEVERITY_LABEL[m.severity])}</span>
                     <span className="grow"><RichText text={m.title} /></span>
@@ -672,7 +671,6 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
               </div>
             )}
 
-            {strategy && <p className="ws-note info"><Icon name="swap" size={16} /> <span><RichText text={strategy.message} /></span></p>}
 
             {clean.length > 0 && (
               <div className="card">
@@ -910,7 +908,7 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
   const concepts = useStore((s) => s.concepts);
   const done = results.filter((r) => !r.skipped);
   const solved = done.filter((r) => r.verdict === 'solved').length;
-  const clean = done.filter((r) => r.verdict === 'solved' && r.marks.filter((m) => m.severity !== 'strategy').length === 0 && r.hintRung < 3).length;
+  const clean = done.filter((r) => r.verdict === 'solved' && r.marks.length === 0 && r.hintRung < 3).length;
   const seconds = results.reduce((s, r) => s + r.seconds, 0);
   const marks = new Map<string, Diagnosis>();
   for (const r of results) for (const m of r.marks) if (m.severity === 'gap' || m.severity === 'slip') marks.set(`${m.severity}:${m.concept}`, m);
@@ -925,7 +923,7 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
   const goal = useStore((s) => s.profile.dailyXp) || 30;
   const xpToday = xpByDay({ attempts, read }).get(today) ?? 0;
   // what this session was worth, by the same rules as the log
-  const earned = done.reduce((sum, r) => sum + (r.verdict === 'solved' ? 10 + (r.marks.filter((m) => m.severity !== 'strategy').length === 0 && r.hintRung < 3 ? 5 : 0) + (r.problem.source === 'review' ? 5 : 0) + (r.hintRung === 0 ? 2 : 0) : 2), 0);
+  const earned = done.reduce((sum, r) => sum + (r.verdict === 'solved' ? 10 + (r.marks.length === 0 && r.hintRung < 3 ? 5 : 0) + (r.problem.source === 'review' ? 5 : 0) + (r.hintRung === 0 ? 2 : 0) : 2), 0);
   const lv = levelOf(totalXp({ attempts, read }));
   const days = streak(attempts);
   const touched = new Set(list.map((m) => m.concept));

@@ -34,7 +34,7 @@ export function daysBetween(a: string, b: string): number {
 }
 
 const blank = (id: ConceptId): ConceptState => ({
-  id, gaps: 0, slips: 0, strategy: 0, hints: 0, clean: 0, outstanding: false, rushing: false, cleanDays: [], slipDays: [], stage: 0,
+  id, gaps: 0, slips: 0, hints: 0, clean: 0, outstanding: false, rushing: false, cleanDays: [], slipDays: [], stage: 0,
 });
 
 /** Days until a concept comes back, by how many times it has held. */
@@ -114,8 +114,6 @@ export function recordAttempt(
       }
       c.rushing = c.slips >= 3 && c.slipDays.length >= 1;
       marked.add(mk.concept);
-    } else if (mk.severity === 'strategy') {
-      c.strategy++;
     }
   }
 
@@ -405,14 +403,7 @@ export function insights(state: Pick<AppState, 'attempts' | 'concepts'>): Insigh
     out.push({ tone: 'gap', text: worst.gaps === 1 ? tr('**{0}** has been marked once. That’s the one thing worth your time right now.', { 0: conceptOf(worst.id).title }) : tr('**{0}** has been marked {1} times. That’s the one thing worth your time right now.', { 0: conceptOf(worst.id).title, 1: worst.gaps }) });
   }
 
-  // steps and hints
-  // only clean solves say something about route length; wrong lines would inflate the count
-  const solved = attempts.filter((a) => a.verdict === 'solved' && a.cleanSteps > 0 && a.marks.length === 0);
-  if (solved.length >= 3) {
-    const ratio = solved.reduce((s, a) => s + a.steps / a.cleanSteps, 0) / solved.length;
-    if (ratio >= 1.6) out.push({ tone: 'strategy', text: tr('You write about **{0}× as many lines** as the shortest route. Nothing wrong with that, it’s also why your slips are easy to find.', { 0: ratio.toFixed(1) }) });
-    else if (ratio <= 0.8) out.push({ tone: 'slip', text: tr('You skip lines when a step feels obvious. Most slips hide in exactly those skipped lines.') });
-  }
+  // hints (nothing is ever said about how many lines someone writes: any valid route is a good one)
   const hinted = attempts.filter((a) => a.hintRung > 0);
   if (hinted.length >= 2) {
     const avg = hinted.reduce((s, a) => s + a.hintRung, 0) / hinted.length;

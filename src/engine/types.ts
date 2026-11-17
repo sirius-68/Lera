@@ -78,10 +78,10 @@ export interface Problem {
  *  gap        doesn't know the rule            → review + back in the queue
  *  slip       knows it, mis-executed           → nudge only
  *  notation   sloppy, not wrong                → named, no review
- *  strategy   valid but costly                 → shown after the answer lands
  *  incomplete stopped short                    → prompted before submit
+ * Nothing is ever marked for the route or the number of lines: any valid route is a good route.
  */
-export type Severity = 'gap' | 'slip' | 'notation' | 'strategy' | 'incomplete';
+export type Severity = 'gap' | 'slip' | 'notation' | 'incomplete';
 
 export interface Diagnosis {
   code: string;

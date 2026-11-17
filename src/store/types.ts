@@ -97,7 +97,6 @@ export interface ConceptState {
   id: ConceptId;
   gaps: number;
   slips: number;
-  strategy: number;
   hints: number;
   /** Problems on this concept solved with no mark against it. */
   clean: number;

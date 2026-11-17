@@ -106,19 +106,10 @@ export function analyze(problem: Problem, rawLines: string[], opts: AnalyzeOptio
     } else verdict = 'wrong';
   } else if (lines.length) verdict = 'unfinished';
 
+  // marks are for a rule broken, never for how many lines it took
   const marks: Diagnosis[] = lines.filter((l) => l.status === 'wrong' && l.diag).map((l) => l.diag as Diagnosis);
   const steps = checked.length;
   const cleanSteps = clean.length;
-
-  if (verdict === 'solved' && cleanSteps > 0 && steps >= cleanSteps + 3 && steps >= cleanSteps * 2) {
-    marks.push({
-      code: 'long-way',
-      concept: problem.concepts[0] ?? 'simplest-form',
-      severity: 'strategy',
-      title: t('Right answer, long road.'),
-      message: t('You got there in {0} lines; it can be done in {1}. Nothing was wrong, there’s just a shorter route worth seeing.', { 0: steps, 1: cleanSteps }),
-    });
-  }
 
   return { lines, verdict, marks, approach: detectApproach(prep, lines), steps, cleanSteps, remaining };
 }

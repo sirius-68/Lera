@@ -65,7 +65,7 @@ test('a broken rule is wrong at once, even while writing', () => {
   assert.deepEqual(statuses(P('derivative', 'd/dx(x^2 sin(x))'), ['2x cos(x)'], false), ['wrong']);
 });
 
-test.todo('a long, correct solution of an equation gets no marks and no remark about length', () => {
+test('a long, correct solution of an equation gets no marks and no remark about length', () => {
   const p: Problem = { id: 'l', kind: 'linear', prompt: 'Solve for x', given: '2(x + 3) = 14', concepts: ['distributive'], source: 'generated', variable: 'x' };
   const lines = ['2(x + 3) = 14', '2x + 6 = 14', '2x + 6 - 6 = 14 - 6', '2x + 0 = 8', '2x = 8', '2x/2 = 8/2', '1x = 4', 'x = 4', 'x = 4', 'x = 4'];
   const a = analyze(p, lines, { done: true });
