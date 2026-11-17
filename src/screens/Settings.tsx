@@ -83,13 +83,19 @@ export function SettingsScreen() {
           <section className="col" style={{ gap: 8 }}>
             <span className="label">{t('Language')}</span>
             <div className="chips-row">
-              {LANGS.map((l) => (
-                <button key={l.id} className={`chip-toggle ${profile.language === l.id ? 'on' : ''}`} aria-pressed={profile.language === l.id} onClick={() => { haptic(5); actions.setProfile({ language: l.id }); }}>
-                  {profile.language === l.id && <Icon name="check" size={14} stroke={3} />} {l.label}
-                </button>
-              ))}
+              <button className={`chip-toggle ${!profile.langSet ? 'on' : ''}`} aria-pressed={!profile.langSet} onClick={() => { haptic(5); actions.setProfile({ langSet: false }); }}>
+                {!profile.langSet && <Icon name="check" size={14} stroke={3} />} {t('Phone language')}
+              </button>
+              {LANGS.map((l) => {
+                const on = !!profile.langSet && profile.language === l.id;
+                return (
+                  <button key={l.id} data-asis className={`chip-toggle ${on ? 'on' : ''}`} aria-pressed={on} onClick={() => { haptic(5); actions.setProfile({ language: l.id, langSet: true }); }}>
+                    {on && <Icon name="check" size={14} stroke={3} />} {l.label}
+                  </button>
+                );
+              })}
             </div>
-            <p className="faint" style={{ fontSize: 13 }}>{t('The app, and Lera’s answers, use this language.')}{profile.language !== 'en' ? ` ${t('Some screens are still in English while the translation is finished.')}` : ''}</p>
+            <p className="faint" style={{ fontSize: 13 }}>{t('The app, and Lera’s answers, use this language. With “Phone language”, Lera follows your phone: French, Russian, or English for anything else.')}</p>
           </section>
 
           <section className="col" style={{ gap: 8 }}>

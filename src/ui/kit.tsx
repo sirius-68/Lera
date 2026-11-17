@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { line } from '../i18n';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
 import { Lera, Mood } from '../mascot/Lera';
 import { MathView, tokenize } from './math';
@@ -342,7 +343,7 @@ export function Confetti({ fire }: { fire: number }) {
 /** Break a sentence into words, keeping `$maths$` and `**bold**` in one piece each. */
 function words(text: string): { t: 'text' | 'math' | 'bold'; s: string }[] {
   const out: { t: 'text' | 'math' | 'bold'; s: string }[] = [];
-  for (const tok of tokenize(text)) {
+  for (const tok of tokenize(line(text))) {
     if (tok.t !== 'text') out.push({ t: tok.t, s: tok.s });
     else for (const w of tok.s.match(/\S+\s*|\s+/g) ?? []) out.push({ t: 'text', s: w });
   }

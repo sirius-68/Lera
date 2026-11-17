@@ -7,6 +7,8 @@ export interface Profile {
   email: string;
   age?: number;
   language: string;
+  /** True once a language was picked in Settings; until then the app follows the phone's own. */
+  langSet?: boolean;
   /** Answers from the onboarding quiz, in order. */
   goal?: string;
   /** School, university, self-taught, returning — from onboarding. */

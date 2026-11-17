@@ -210,8 +210,6 @@ export const FR: Record<string, string> = {
   'Finishing an answer': 'Terminer une réponse',
   // language and translating a document
   Language: 'Langue',
-  'The app, and Lera’s answers, use this language.': 'L’application et les réponses de Lera utilisent cette langue.',
-  'Some screens are still in English while the translation is finished.': 'Certains écrans sont encore en anglais en attendant la fin de la traduction.',
   'This file is in {from}. Your app is in {to}.': 'Ce fichier est en {from}. Ton application est en {to}.',
   'Translate it to {to} first?': 'Le traduire d’abord en {to} ?',
   'Lera translates the words and keeps every formula, number and exercise exactly as written.': 'Lera traduit le texte et garde chaque formule, nombre et exercice exactement comme dans le fichier.',

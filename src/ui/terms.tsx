@@ -1,4 +1,5 @@
 import { useEffect, useSyncExternalStore } from 'react';
+import { line } from '../i18n';
 import type { ReactNode } from 'react';
 import { GLOSSARY } from '../ingest/glossary';
 import { openOverlay } from '../store/nav';
@@ -41,7 +42,7 @@ export function TermText({ text }: { text: string }) {
   const used = new Set<string>();
   return (
     <>
-      {tokenize(text).map((tok, i) => {
+      {tokenize(line(text)).map((tok, i) => {
         if (tok.t === 'math') return <MathView key={i} text={tok.s} />;
         if (tok.t === 'bold') return <strong key={i}>{tok.s}</strong>;
         const out: ReactNode[] = [];

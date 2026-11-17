@@ -199,8 +199,6 @@ export const RU: Record<string, string> = {
   'Finishing an answer': 'Довести ответ до конца',
   // language and translating a document
   Language: 'Язык',
-  'The app, and Lera’s answers, use this language.': 'На этом языке работают приложение и ответы Леры.',
-  'Some screens are still in English while the translation is finished.': 'Некоторые экраны пока на английском: перевод ещё не закончен.',
   'This file is in {from}. Your app is in {to}.': 'Этот файл на языке: {from}. Приложение на языке: {to}.',
   'Translate it to {to} first?': 'Сначала перевести его ({to})?',
   'Lera translates the words and keeps every formula, number and exercise exactly as written.': 'Лера переводит текст и оставляет каждую формулу, число и упражнение в точности как в файле.',

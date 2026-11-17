@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
-import { setLang } from './i18n';
+import { effectiveLang, setLang } from './i18n';
+import { hostConfig } from './host';
 import { HomeScreen, LessonsScreen, PracticeScreen, ProgressScreen } from './screens/Main';
 import { LessonScreen } from './screens/Lesson';
 import { AuthGate } from './screens/Auth';
@@ -48,7 +49,7 @@ function Screen({ route, dir }: { route: Route; dir: number }) {
 
 export function App() {
   // the language is set before anything below is drawn; changing it redraws the whole app in the new one
-  const lang = useStore((s) => s.profile.language);
+  const lang = useStore((s) => effectiveLang(s.profile, hostConfig?.lang ?? navigator.language));
   setLang(lang);
   const onboarded = useStore((s) => s.profile.onboarded);
   const lockedOut = useStore((s) => !!s.profile.email && s.profile.signedIn === false);

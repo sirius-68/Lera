@@ -4,6 +4,7 @@ import './styles/base.css';
 import './styles/screens.css';
 import './styles/v2.css';
 import { App } from './App';
+import { translatePage } from './i18n/dom';
 import { actions, getState, isHydrated, onChange } from './store';
 import { go } from './store/nav';
 import { setWidgetTestMode, syncWidget, takeWidgetAction } from './store/widget';
@@ -39,6 +40,7 @@ window.addEventListener('resize', () => {
 });
 
 const el = document.getElementById('root');
+translatePage();
 if (el) createRoot(el).render(<App />);
 
 if (inHost) {

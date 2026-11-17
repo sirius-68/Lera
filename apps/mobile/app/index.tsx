@@ -1,5 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
-import { setLang } from '@core/i18n';
+import { getLocales } from 'expo-localization';
+import { effectiveLang, setLang } from '@core/i18n';
 import { memo, useEffect, useRef, useState } from 'react';
 import { AppState as Phone, BackHandler, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { Easing, FadeInDown, FadeOutDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -43,7 +44,7 @@ export default function Shell() {
   const toast = useShell((s) => s.toast);
   const locked = useApp(gated);
   // the tabs are drawn in the app's language; changing it in Settings redraws them
-  const lang = useApp((s) => s.profile.language);
+  const lang = useApp((s) => effectiveLang(s.profile, getLocales()[0]?.languageTag));
   setLang(lang);
   const covering = ready && (locked || deep);
 
