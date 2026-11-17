@@ -27,11 +27,12 @@ jobs:
           distribution: temurin
           java-version: 17
 
-      - name: Shared logic tests, and every line has a French and a Russian translation
+      - name: Shared logic tests, every line has a French and a Russian translation, and the shared screens typecheck
         run: |
           npm install --no-audit --no-fund
           npm test
           npm run i18n
+          npm run typecheck
 
       - name: Install the app
         working-directory: apps/mobile
