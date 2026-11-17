@@ -1,18 +1,13 @@
-import { useState } from 'react';
-import { aiPractice, PracticeLevel } from '../ai/tasks';
+import { useEffect, useRef, useState } from 'react';
+import { aiPractice } from '../ai/tasks';
 import { Problem } from '../engine/types';
-import { msg, t } from '../i18n';
+import { t } from '../i18n';
+import { Lera } from '../mascot/Lera';
 import { plain } from '../ingest/structure';
-import { LeraDoc, Topic } from '../ingest/types';
-import { actions, useStore } from '../store';
+import { Topic } from '../ingest/types';
+import { actions, getState, useStore } from '../store';
 import { Icon } from '../ui/icons';
-import { Button3D, Seg, haptic } from '../ui/kit';
-
-const LEVELS: { id: PracticeLevel; label: string }[] = [
-  { id: 'easier', label: msg('Easier') },
-  { id: 'same', label: msg('Like my notes') },
-  { id: 'harder', label: msg('Harder') },
-];
+import { Button3D, haptic } from '../ui/kit';
 
 /** The words of one lesson, for the model to write problems from. */
 function lessonNotes(topic: Topic): string {
@@ -27,33 +22,15 @@ function lessonNotes(topic: Topic): string {
   return out.join('\n');
 }
 
-/** A whole file, cut down to what each lesson is about. */
-const fileNotes = (doc: LeraDoc): string =>
-  doc.units.flatMap((u) => u.topics.map((tp) => `## ${tp.title}\n${lessonNotes(tp).slice(0, 420)}`)).join('\n\n');
-
-/**
- * "Ask Lera to write problems": new practice for this lesson, made from the notes themselves.
- * The level and how many are chosen here; what comes back is kept with the lesson and handed to `onMade`.
- */
-export function MorePractice({ topic, doc, onMade }: { topic: Topic; doc?: LeraDoc; onMade: (problems: Problem[]) => void }) {
-  const ai = useStore((s) => s.ai);
-  const [level, setLevel] = useState<PracticeLevel>('same');
-  const [count, setCount] = useState<'3' | '5' | '8'>('5');
-  const [scope, setScope] = useState<'section' | 'file'>('section');
+/** Asks Lera's AI for problems on a lesson and keeps what comes back with that lesson. */
+function useWriter(topic: Topic, onMade: (problems: Problem[]) => void) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (ai.provider === 'none') {
-    return <p className="faint" style={{ fontSize: 13.5, lineHeight: 1.45 }}>{t('Lera’s AI is not connected in this build, so she cannot write new problems yet.')}</p>;
-  }
-
-  const make = async () => {
-    haptic(6);
+  const write = async (wish?: string) => {
     setBusy(true);
     setError(null);
     try {
-      const whole = scope === 'file' && doc;
-      const made = await aiPractice(ai, { topicId: topic.id, title: whole ? doc.title : topic.title, notes: whole ? fileNotes(doc) : lessonNotes(topic), level, count: Number(count) });
+      const made = await aiPractice(getState().ai, { topicId: topic.id, title: topic.title, notes: lessonNotes(topic), wish });
       if (!made.length) setError(t('Nothing usable came back. Try again.'));
       else {
         actions.addExercises(topic.id, made);
@@ -65,22 +42,69 @@ export function MorePractice({ topic, doc, onMade }: { topic: Topic; doc?: LeraD
       setBusy(false);
     }
   };
+  return { busy, error, write };
+}
+
+/**
+ * A lesson whose part of the file has no exercises: Lera writes the practice from the notes, straight away,
+ * with nothing to set up. Shown while she does, and if it did not work.
+ */
+export function WritePractice({ topic, onMade }: { topic: Topic; onMade: (problems: Problem[]) => void }) {
+  const aiOn = useStore((s) => s.ai.provider !== 'none');
+  const { busy, error, write } = useWriter(topic, onMade);
+  const started = useRef(false);
+  useEffect(() => {
+    if (!aiOn || started.current) return;
+    started.current = true;
+    void write();
+    // once, when the screen opens
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiOn]);
 
   return (
+    <div className="center" style={{ gap: 12, padding: '10px 10px 18px' }}>
+      <Lera size={96} mood={busy ? 'writing' : error ? 'confused' : 'reading'} />
+      <h2 style={{ fontSize: 21, textAlign: 'center' }}>{busy ? t('Writing practice from your notes…') : t('No exercises in this part of your notes')}</h2>
+      <p className="muted" style={{ lineHeight: 1.5, textAlign: 'center' }}>
+        {busy
+          ? t('This section has no exercises of its own, so I am making some from what it teaches.')
+          : !aiOn
+            ? t('Lera’s AI is not connected in this build, so she cannot write practice for it yet.')
+            : error ?? ''}
+      </p>
+      {aiOn && !busy && error && <Button3D small onClick={() => { haptic(6); void write(); }}>{t('Try again')}</Button3D>}
+    </div>
+  );
+}
+
+/** "Ask Lera for more practice": one box, in the learner's own words. No settings. */
+export function MorePractice({ topic, onMade }: { topic: Topic; onMade: (problems: Problem[]) => void }) {
+  const aiOn = useStore((s) => s.ai.provider !== 'none');
+  const { busy, error, write } = useWriter(topic, onMade);
+  const [wish, setWish] = useState('');
+  if (!aiOn) return null;
+  const send = () => {
+    if (busy) return;
+    haptic(6);
+    void write(wish.trim() || undefined);
+  };
+  return (
     <section className="card more-practice">
-      <span className="label">{t('Ask Lera to write problems')}</span>
-      <p className="muted" style={{ fontSize: 13.5, lineHeight: 1.45 }}>{t('New problems made from these notes. They are kept with the lesson and checked like the rest.')}</p>
-      <Seg options={LEVELS.map((l) => ({ id: l.id, label: t(l.label) }))} value={level} onChange={setLevel} />
-      <Seg options={[{ id: '3', label: '3' }, { id: '5', label: '5' }, { id: '8', label: '8' }]} value={count} onChange={setCount} />
-      {doc && doc.units.some((u) => u.topics.length > 1) && (
-        <Seg options={[{ id: 'section', label: t('This section') }, { id: 'file', label: t('Whole file') }]} value={scope} onChange={setScope} />
-      )}
-      {error && <p className="auth-note bad" role="alert">{error}</p>}
-      <div className="center">
-        <Button3D small disabled={busy} onClick={make}>
-          <Icon name="sparkle" size={16} /> {busy ? t('Writing problems…') : t('Write problems')}
-        </Button3D>
+      <span className="label">{t('Ask Lera for more practice')}</span>
+      <div className="wish">
+        <input
+          value={wish}
+          onChange={(e: { target: { value: string } }) => setWish(e.target.value)}
+          onKeyDown={(e: { key: string }) => e.key === 'Enter' && send()}
+          placeholder={t('What would you like? e.g. harder ones, or more like example 2')}
+          aria-label={t('What would you like to practise?')}
+          disabled={busy}
+        />
+        <button className="wish-go" onClick={send} disabled={busy} aria-label={t('Write problems')}><Icon name={busy ? 'refresh' : 'arrow'} size={18} /></button>
       </div>
+      <p className={`faint ${error ? 'bad' : ''}`} style={{ fontSize: 13, lineHeight: 1.4 }} role={error ? 'alert' : undefined}>
+        {error ?? (busy ? t('Writing problems…') : t('Leave it empty for five more like the ones in your notes.'))}
+      </p>
     </section>
   );
 }

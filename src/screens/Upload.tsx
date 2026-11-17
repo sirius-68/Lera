@@ -242,7 +242,7 @@ export function Processing({ source, onDone, onCancel }: { source: Source; onDon
         ))}
         {exercises === 0 && doc.warnings.length === 0 && (
           <p className="warn">
-            <Icon name="alert" size={17} /> <span>{tr('I didn’t find exercises in this file, so Practice will use problems written for each topic.')}</span>
+            <Icon name="alert" size={17} /> <span>{tr('I didn’t find exercises in this file, so I will write the practice from each section when you open it.')}</span>
           </p>
         )}
         <Button3D sheen onClick={() => onDone(doc)}>

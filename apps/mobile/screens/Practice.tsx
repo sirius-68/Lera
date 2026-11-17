@@ -37,9 +37,10 @@ export function PracticeScreen() {
   const later = queue.filter((q) => q.inDays > 0);
   const state = { concepts, solved };
   const topics = docs.flatMap((d) => d.units.flatMap((u) => u.topics));
-  // Lera's own problems run from beginner to advanced; 'mixed' takes them as they come
-  const [level, setLevel] = useState<'0' | '1' | '2' | '3'>('0');
-  const quick = (id: ConceptId) => go({ name: 'session', problems: practiceFor(id, 4, seedFrom(`${dayOf()}:${id}:${Date.now() % 991}`), 'generated', level === '0' ? undefined : (Number(level) as 1 | 2 | 3)), title: CONCEPTS[id].title });
+  const aiOn = useApp((s) => !!s.aiOn);
+  // what the file itself set as exercises (written answers count only when the AI is there to check them)
+  const found = topics.flatMap((tp) => tp.exercises).filter((e) => !e.made && (aiOn || e.kind !== 'open'));
+  const quick = (id: ConceptId) => go({ name: 'session', problems: practiceFor(id, 4, seedFrom(`${dayOf()}:${id}:${Date.now() % 991}`)), title: CONCEPTS[id].title });
   const shownSubject = mine.includes(subject) ? subject : mine[0];
   const [tab, setTab] = useState<'review' | 'lessons' | 'ideas'>(queue.length ? 'review' : topics.length ? 'lessons' : 'ideas');
   const ideas = ALL_CONCEPTS.filter((id) => subjectOf(id) === shownSubject);
@@ -118,21 +119,38 @@ export function PracticeScreen() {
               <Button3D small icon="upload" onPress={() => go({ name: 'upload' })}>Upload notes</Button3D>
             </View>
           ) : (
-            topics.map((topic) => (
-              <RowBtn key={topic.id} onPress={() => go({ name: 'session', topicId: topic.id })}>
-                <Dot status={topicStatus(topic, state)} />
-                <View style={{ flex: 1 }}>
-                  <T w={700} s={14.5}>{topic.title}</T>
-                  <T s={13} c={C.ink2}>{practiceIds(topic).length ? t('{a}/{b} from your notes solved', { a: practiceIds(topic).filter((id) => solved[id]).length, b: practiceIds(topic).length }) : t('No exercises in this section yet')}</T>
+            <View style={{ gap: 14 }}>
+              {/* every exercise the file has, in one place: what the upload screen counted is what is here */}
+              {found.length > 0 && (
+                <RowBtn onPress={() => go({ name: 'session', problems: [...found.filter((e) => !solved[e.id]), ...found.filter((e) => solved[e.id])].slice(0, 8), title: t('From your notes') })}>
+                  <View style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: C.tint, alignItems: 'center', justifyContent: 'center' }}><Icon name="pencil" size={17} color={C.brandD} /></View>
+                  <View style={{ flex: 1 }}>
+                    <T w={700} s={14.5}>{t('Exercises from your notes')}</T>
+                    <T s={13} c={C.ink2}>{t('{a}/{b} solved', { a: found.filter((e) => solved[e.id]).length, b: found.length })}</T>
+                  </View>
+                  <Icon name="play" size={15} fill />
+                </RowBtn>
+              )}
+              {docs.flatMap((d) => d.units).filter((u) => u.topics.length > 0).map((u) => (
+                <View key={u.id} style={{ gap: 2 }}>
+                  <Label>{u.title}</Label>
+                  {u.topics.map((topic) => (
+                    <RowBtn key={topic.id} onPress={() => go({ name: 'session', topicId: topic.id })}>
+                      <Dot status={topicStatus(topic, state)} />
+                      <View style={{ flex: 1 }}>
+                        <T w={700} s={14.5}>{topic.title}</T>
+                        <T s={13} c={C.ink2}>{practiceIds(topic).length ? t('{a}/{b} from your notes solved', { a: practiceIds(topic).filter((id) => solved[id]).length, b: practiceIds(topic).length }) : aiOn ? t('Lera writes the practice from this section') : t('No exercises in this section yet')}</T>
+                      </View>
+                      <Icon name="play" size={15} fill />
+                    </RowBtn>
+                  ))}
                 </View>
-                <Icon name="play" size={15} fill />
-              </RowBtn>
-            ))
+              ))}
+            </View>
           )}
         </Keep>
 
         <Keep on={tab === 'ideas'} style={{ gap: 10 }}>
-          <Seg options={[{ id: '0', label: t('All') }, { id: '1', label: t('Beginner') }, { id: '2', label: t('Medium') }, { id: '3', label: t('Advanced') }]} value={level} onChange={setLevel} />
           {mine.length > 1 && <Seg options={mine.map((s) => ({ id: s, label: SUBJECT_LABEL[s] }))} value={shownSubject} onChange={setSubject} />}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {ideas.map((id) => {

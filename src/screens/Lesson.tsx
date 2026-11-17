@@ -859,7 +859,7 @@ function TopicPractice({ topic, doc }: { topic: Topic; doc: LeraDoc }) {
   const done = problems.filter((e) => solved[e.id]).length;
   const text =
     n === 0
-      ? tr('I found no exercise or example I can check in this part of your notes. I can write some from it.')
+      ? aiOn ? tr('This part of your notes has no exercises of its own, so I will write the practice from what it teaches.') : tr('I found no exercise or example I can check in this part of your notes.')
       : done === n
         ? tr('You’ve solved all **{0}** problems from this part of your notes. I can write new ones.', { 0: n })
         : done ? tn(n, 'I found **{n}** exercise in this part of your notes, {done} solved. Write every line; I read the working.', 'I found **{n}** exercises in this part of your notes, {done} solved. Write every line; I read the working.', { done }) : tn(n, 'I found **{n}** exercise in this part of your notes. Write every line; I read the working.', 'I found **{n}** exercises in this part of your notes. Write every line; I read the working.');
@@ -868,13 +868,11 @@ function TopicPractice({ topic, doc }: { topic: Topic; doc: LeraDoc }) {
     <div className="scroll">
       <div className="stagger" style={{ padding: '6px 20px 28px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <LeraSays size={54} text={text} mood={done === n && n > 0 ? 'proud' : 'idle'} />
-        {n > 0 && (
-          <div className="center">
-            <Button3D sheen onClick={() => go({ name: 'session', topicId: topic.id })}>
-              <Icon name="play" size={17} fill />{' '}{tr('Start practice')}
-            </Button3D>
-          </div>
-        )}
+        <div className="center">
+          <Button3D sheen onClick={() => go({ name: 'session', topicId: topic.id })}>
+            <Icon name="play" size={17} fill />{' '}{tr('Start practice')}
+          </Button3D>
+        </div>
 
         {n > 0 && (
           <section>
@@ -901,7 +899,7 @@ function TopicPractice({ topic, doc }: { topic: Topic; doc: LeraDoc }) {
           </section>
         )}
 
-        <MorePractice topic={topic} doc={doc} onMade={(made) => go({ name: 'session', topicId: topic.id, problems: made, title: topic.title })} />
+        <MorePractice topic={topic} onMade={(made) => go({ name: 'session', topicId: topic.id, problems: made, title: topic.title })} />
 
         {topic.concepts.length > 0 && (
           <section>

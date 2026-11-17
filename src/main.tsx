@@ -70,6 +70,8 @@ function startHostLink(): void {
       sent[k] = s[k];
       patch[k] = k === 'docs' ? slimDocs(s.docs) : s[k];
     });
+    const aiOn = s.ai.provider !== 'none';
+    if (sent.aiOn !== aiOn) patch.aiOn = sent.aiOn = aiOn;
     if (Object.keys(patch).length) post({ t: 'state', patch });
   };
   const queue = () => {

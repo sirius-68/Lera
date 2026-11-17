@@ -149,6 +149,8 @@ export interface AttemptRecord {
 }
 
 export interface AppState {
+  /** Whether Lera's AI is connected. Only on the copy the native tabs keep: they are never sent the AI settings themselves. */
+  aiOn?: boolean;
   version: 1;
   profile: Profile;
   ai: AiConfig;

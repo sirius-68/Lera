@@ -186,8 +186,20 @@ function verbKind(verb: string | undefined): ProblemKind | undefined {
 
 let exerciseCounter = 0;
 
+/** Words that say a question is about an idea, not a sum to work through: its answer is written, and the AI checks it. */
+const WORDY = /\b(converg|diverg|series|sequence|prove|show that|explain|justify|why\b|sketch|state\b|define|true or false|сходит|расходит|докаж|объясн)/i;
+
+/** A question kept exactly as the notes wrote it, to be answered in writing. */
+export function openProblem(text: string, topicId: string): Problem {
+  const original = text.trim().replace(NUMBERING, '').replace(EXERCISE_LEAD, '').trim();
+  return { id: `${topicId}-e${++exerciseCounter}`, kind: 'open', prompt: original, given: '', concepts: conceptsForText(original).slice(0, 2), source: 'notes', topicId, original };
+}
+
 /** One exercise from one piece of text, or null if there is no exercise in it. */
 export function buildProblem(text: string, inherited: string | undefined, topicId: string): Problem | null {
+  // a question about convergence, a proof or an explanation is answered in writing, however much maths it quotes;
+  // so is "find the limit of a_n = …" when it is not written as a limit the engine can take
+  if (WORDY.test(text) || (/\blimit\b/i.test(text) && !/\blim\b|\\lim/.test(text))) return openProblem(text, topicId);
   // a question written in LaTeX is read in the engine's own notation, and still shown the way it was written
   if (hasTex(text)) {
     const typed = texToPlain(text);
@@ -432,6 +444,8 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
   // 3. build the tree
   const units: Unit[] = [];
   let unit: Unit | null = null;
+  /** Chapters in which an exercise heading has already been met. */
+  const headsIn = new Set<Unit>();
   let topic: Topic | null = null;
   let inExercises = false;
   let inExample: Extract<Block, { t: 'example' }> | null = null;
@@ -518,7 +532,15 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
       continue;
     }
     if (tg.role === 'exercises') {
-      ensureTopic();
+      // at the end of a chapter with several lessons, the practice section is a stop of its own ("Practice problems"),
+      // so its exercises are found under that name and not buried in whichever lesson came last
+      // (a lesson with its own exercise heading keeps them: that is told apart by there being more lessons to come
+      // in the chapter, or an exercise heading earlier in it)
+      let last = true;
+      for (let k = i + 1; k < tagged.length && tagged[k].role !== 'unit'; k++) if (tagged[k].role === 'topic') last = false;
+      if (unit && unit.topics.length >= 2 && last && !headsIn.has(unit)) startTopic(cleanHeading(text));
+      else ensureTopic();
+      if (unit) headsIn.add(unit);
       resetFlow();
       inExercises = true;
       continue;
@@ -538,7 +560,10 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
     if (inExercises) {
       // "Expand and simplify." / "Solve each equation:" set the task for the items that follow
       const short = bare.split(/\s+/).length <= 7;
-      if (VERB.test(bare) && !extractMath(text) && (short || /:$/.test(text) || /\b(following|each|these|below)\b/i.test(text))) {
+      // maths written in LaTeX, or with an integral, a limit or d/dx in it, is a question and not a heading for the ones below
+      const hasMaths = !!extractMath(text) || hasTex(text) || /[∫=]|\blim\b|d\/d[a-z]/.test(text);
+      const item = NUMBERING.test(text) || !!tg.para.list || EXERCISE_LEAD.test(text);
+      if (VERB.test(bare) && !hasMaths && !(item && WORDY.test(bare)) && (short || /:$/.test(text) || /\b(following|each|these|below)\b/i.test(text))) {
         instruction = bare;
         continue;
       }
@@ -546,6 +571,9 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
       if (res.problems.length) {
         t.exercises.push(...res.problems);
         if (res.instruction) instruction = res.instruction;
+      } else if (item && bare.length >= 6) {
+        // a numbered question the engine cannot work through is still a question: it is kept as a written answer
+        t.exercises.push(openProblem(text, t.id));
       } else if (VERB.test(bare) || /:$/.test(text)) {
         instruction = bare;
       }

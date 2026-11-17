@@ -9,11 +9,10 @@ import { AttemptAnalysis, CheckedLine, Diagnosis, Problem } from '../engine/type
 import { Lera, Mood } from '../mascot/Lera';
 import { actions, getState, useStore } from '../store';
 import { badges, levelOf, totalXp, weekStrip, xpByDay } from '../store/game';
-import { MorePractice } from './MorePractice';
+import { WritePractice } from './MorePractice';
 import { addDays, buildSession, dayOf, findTopic, Session, streak } from '../store/learner';
 import { weaknesses } from '../store/weakness';
 import { back, openOverlay, replace, Route, setBackGuard } from '../store/nav';
-import { practiceFor, seedFrom } from '../engine/generate';
 import { Button3D, Confetti, CountUp, LeraSays, Ring, haptic, toast } from '../ui/kit';
 import { CelebrationFlow, Scene } from '../ui/Celebrate';
 import { Icon } from '../ui/icons';
@@ -806,30 +805,14 @@ export function SessionScreen({ route }: { route: Extract<Route, { name: 'sessio
     return () => setBackGuard(null);
   }, [phase, results.length, total, leaving]);
 
-  // a lesson whose part of the file has nothing to practise: say so, and offer to write some, rather than fill in with something else
+  // a lesson whose part of the file has no exercises: Lera writes the practice from the notes, with nothing to set up
   const emptyTopic = total === 0 && route.topicId ? findTopic(getState().docs, route.topicId)?.topic ?? null : null;
   if (emptyTopic) {
-    const doc = getState().docs.find((d) => d.units.some((u) => u.topics.some((x) => x.id === emptyTopic.id)));
-    const idea = emptyTopic.concepts[0];
     return (
       <div className="screen" data-dir="1">
         <div className="topbar"><button className="iconbtn" onClick={back} aria-label={tr('Close')}><Icon name="close" /></button></div>
-        <div className="scroll" style={{ padding: '0 20px 28px' }}>
-          <div className="center" style={{ gap: 12, padding: '10px 10px 18px' }}>
-            <Lera size={92} mood="reading" />
-            <h2 style={{ fontSize: 21, textAlign: 'center' }}>{tr('Nothing to practise in this section yet')}</h2>
-            <p className="muted" style={{ lineHeight: 1.5, textAlign: 'center' }}>{tr('Practice here comes only from your file, and this part has no exercise or example I can check.')}</p>
-          </div>
-          <div className="col" style={{ gap: 14 }}>
-            <MorePractice topic={emptyTopic} doc={doc} onMade={(made) => replace({ name: 'session', topicId: emptyTopic.id, problems: made, title: emptyTopic.title })} />
-            {idea && (
-              <div className="center">
-                <Button3D small variant="secondary" onClick={() => replace({ name: 'session', problems: practiceFor(idea, 4, seedFrom(`${dayOf()}:${idea}:${Date.now() % 991}`)), title: conceptOf(idea).title })}>
-                  {tr('Practise the idea with Lera’s own problems')}
-                </Button3D>
-              </div>
-            )}
-          </div>
+        <div className="scroll" style={{ padding: '0 20px 28px', justifyContent: 'center' }}>
+          <WritePractice topic={emptyTopic} onMade={(made) => replace({ name: 'session', topicId: emptyTopic.id, problems: made, title: emptyTopic.title })} />
         </div>
       </div>
     );

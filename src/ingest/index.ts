@@ -24,6 +24,7 @@ function sniff(bytes: Uint8Array, name: string): 'pdf' | 'docx' | 'doc' | 'text'
 /** Plain text and Markdown: blank lines separate paragraphs, # marks headings. */
 export function readText(text: string, fileName: string): RawDoc {
   const paras: RawPara[] = [];
+  let titled = false;
   let buffer: string[] = [];
   const flush = () => {
     if (buffer.length) paras.push({ text: cleanText(buffer.join(' ')) });
@@ -38,7 +39,10 @@ export function readText(text: string, fileName: string): RawDoc {
     const h = /^(#{1,4})\s+(.*)$/.exec(line);
     if (h) {
       flush();
-      paras.push({ text: cleanText(h[2]), level: h[1].length - 1 });
+      // the first "# …" is the title of the notes; any later one is a chapter
+      const top = h[1].length === 1;
+      paras.push({ text: cleanText(h[2]), level: top && !titled ? 0 : top ? 1 : h[1].length });
+      if (top) titled = true;
       continue;
     }
     const li = /^([-*•]|\d{1,2}[.)])\s+(.*)$/.exec(line);

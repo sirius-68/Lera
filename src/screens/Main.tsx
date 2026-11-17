@@ -291,7 +291,7 @@ const DAY_PART = { morning: msg('in the morning'), afternoon: msg('in the aftern
 /** "3/8 from your notes solved", or that the lesson's part of the file has nothing to practise yet. */
 function practiceLine(topic: Topic, solved: Record<string, unknown>, aiOn: boolean): string {
   const own = topicProblems(topic, aiOn);
-  return own.length ? tr('{a}/{b} from your notes solved', { a: own.filter((e) => solved[e.id]).length, b: own.length }) : tr('No exercises in this section yet');
+  return own.length ? tr('{a}/{b} from your notes solved', { a: own.filter((e) => solved[e.id]).length, b: own.length }) : aiOn ? tr('Lera writes the practice from this section') : tr('No exercises in this section yet');
 }
 
 const STATUS_LABEL = { new: msg('Not started'), gap: msg('Has a gap'), shaky: msg('In progress'), solid: msg('Mastered') } as const;
@@ -427,6 +427,7 @@ export function PracticeScreen() {
   const docs = useStore((s) => s.docs);
   const concepts = useStore((s) => s.concepts);
   const aiOn = useStore((s) => s.ai.provider !== 'none');
+  const found = useMemo(() => docs.flatMap((d) => d.units.flatMap((u) => u.topics.flatMap((tp) => tp.exercises))).filter((e) => !e.made && (aiOn || e.kind !== 'open')), [docs, aiOn]);
   const solved = useStore((s) => s.solved);
   const profile = useStore((s) => s.profile);
   const mine: Subject[] = profile.subjects?.length ? profile.subjects : ['algebra'];
@@ -436,9 +437,7 @@ export function PracticeScreen() {
   const later = queue.filter((q) => q.inDays > 0);
   const state = { concepts, solved };
   const topics = docs.flatMap((d) => d.units.flatMap((u) => u.topics));
-  // Lera's own problems run from beginner to advanced; 'mixed' takes them as they come
-  const [level, setLevel] = useState<'0' | '1' | '2' | '3'>('0');
-  const quick = (id: ConceptId) => go({ name: 'session', problems: practiceFor(id, 4, seedFrom(`${dayOf()}:${id}:${Date.now() % 991}`), 'generated', level === '0' ? undefined : (Number(level) as 1 | 2 | 3)), title: conceptOf(id).title });
+  const quick = (id: ConceptId) => go({ name: 'session', problems: practiceFor(id, 4, seedFrom(`${dayOf()}:${id}:${Date.now() % 991}`)), title: conceptOf(id).title });
   const shownSubject = mine.includes(subject) ? subject : mine[0];
   const [tab, setTab] = useState<'review' | 'lessons' | 'ideas'>(queue.length ? 'review' : topics.length ? 'lessons' : 'ideas');
   const ideas = ALL_CONCEPTS.filter((id) => subjectOf(id) === shownSubject);
@@ -512,6 +511,17 @@ export function PracticeScreen() {
             </section>
           )}
 
+          {tab === 'lessons' && found.length > 0 && (
+            // every exercise the file has, in one place: what the upload screen counted is what is here
+            <button className="noticed" style={{ borderTop: 0 }} onClick={() => go({ name: 'session', problems: [...found.filter((e) => !solved[e.id]), ...found.filter((e) => solved[e.id])].slice(0, 8), title: tr('From your notes') })}>
+              <Icon name="pencil" size={18} />
+              <span className="grow">
+                <b style={{ fontSize: 14.5 }}>{tr('Exercises from your notes')}</b>
+                <span className="muted" style={{ fontSize: 13, display: 'block' }}>{tr('{0}/{1} solved', { 0: found.filter((e) => solved[e.id]).length, 1: found.length })}</span>
+              </span>
+              <Icon name="play" size={15} fill />
+            </button>
+          )}
           {tab === 'lessons' && topics.length > 0 && (
             <section className="col" style={{ gap: 8 }}>
               {topics.map((t) => (
@@ -528,7 +538,6 @@ export function PracticeScreen() {
           )}
 
           {tab === 'ideas' && <section className="col" style={{ gap: 10 }}>
-            <Seg options={[{ id: '0', label: tr('All') }, { id: '1', label: tr('Beginner') }, { id: '2', label: tr('Medium') }, { id: '3', label: tr('Advanced') }]} value={level} onChange={setLevel} />
             {mine.length > 1 && <Seg options={mine.map((s) => ({ id: s, label: tr(SUBJECT_LABEL[s]) }))} value={shownSubject} onChange={setSubject} />}
             <div className="idea-grid">
               {ideas.map((id) => (
