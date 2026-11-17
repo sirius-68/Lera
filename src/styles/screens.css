@@ -290,7 +290,7 @@
 .reveal.alt { background: #fff; border: 1.5px solid var(--line-d); color: var(--ink); }
 
 /* what the AI writes: formulas on their own line, lists, small headings, tables */
-.md-math { margin: 8px 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; text-align: center; }
+.md-math { margin: 8px 0; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; text-align: center; white-space: nowrap; }
 .md-math::-webkit-scrollbar { display: none; }
 .md-h { font-weight: 700; margin-top: 6px; }
 .md-list { margin: 6px 0; padding-left: 22px; display: flex; flex-direction: column; gap: 5px; }

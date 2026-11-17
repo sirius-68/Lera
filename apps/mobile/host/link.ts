@@ -48,7 +48,6 @@ const subscribe = (l: () => void) => (subs.add(l), () => subs.delete(l));
 
 export const getApp = (): AppState => state;
 export const getShell = (): Shell => shell;
-export const onAppChange = subscribe;
 /** A slice of the learner's state. The selector must return a stable reference. */
 export const useApp = <T,>(sel: (s: AppState) => T): T => useSyncExternalStore(subscribe, () => sel(state), () => sel(state));
 export const useShell = <T,>(sel: (s: Shell) => T): T => useSyncExternalStore(subscribe, () => sel(shell), () => sel(shell));

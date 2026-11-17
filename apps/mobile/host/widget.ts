@@ -25,7 +25,6 @@ if (mod) {
   };
 }
 
-export const hasWidgets = mod !== null;
 /** undefined when this phone has no widgets at all (the web screens then hide the buttons). */
 export const canPin = (): boolean | undefined => {
   try {

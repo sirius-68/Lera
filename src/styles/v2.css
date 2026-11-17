@@ -350,6 +350,10 @@ button.unit-banner:active { transform: translateY(3px); }
 .ex-math { font-size: 18px; padding: 2px 0; overflow-x: auto; scrollbar-width: none; }
 .rd-math { overflow-x: auto; scrollbar-width: none; }
 .reader .katex { white-space: nowrap; }
+.mathv.long { display: inline; }
+.reader .mathv.long .katex { white-space: normal; }
+.rd-math .mathv.long, .ex-math .mathv.long, .md-math .mathv.long { display: inline-block; }
+.rd-math .mathv.long .katex, .ex-math .mathv.long .katex { white-space: nowrap; }
 
 /* ───────── notebook, in the app's own voice ───────── */
 .nb-hero { position: relative; overflow: hidden; border-radius: 26px; padding: 16px; color: #fff; background: radial-gradient(130% 120% at 0% 0%, #8f88ff 0%, var(--brand) 48%, #4b43c9 100%); box-shadow: 0 5px 0 var(--brand-dd), 0 16px 30px rgba(74, 66, 200, 0.26); }

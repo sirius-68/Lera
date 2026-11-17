@@ -2,6 +2,7 @@ import { conceptsOfCalc, prepCalc } from '../engine/calc/check';
 import { E, ev, has, parseCalc, pending, pre, toText, tryParse } from '../engine/calc/expr';
 import { PROMPTS } from '../engine/generate';
 import { mathLatex } from '../engine/latex';
+import { hasTex } from '../engine/tex';
 import { Problem, ProblemKind } from '../engine/types';
 import { Block } from './types';
 
@@ -204,7 +205,7 @@ const TERM = /^[0-9a-zA-Z()^.]{1,14}$/;
  * Wrap each run that contains a power in $…$ so the lesson typesets it. Only runs the engine can read are wrapped.
  */
 export function markInlineMath(text: string): string {
-  if (text.includes('$') || !text.includes('^')) return text;
+  if (text.includes('$') || !text.includes('^') || hasTex(text)) return text;
   const words = text.split(' ');
   const strip = (w: string): string => w.replace(/[.,;:!?]+$/, '');
   const isTerm = (w: string): boolean => TERM.test(w) && !ENGLISH.has(w.toLowerCase()) && (w.includes('^') || /^[0-9.]+$/.test(w) || /^[0-9]*[a-zA-Z]{1,3}$/.test(w) || /^\(?[0-9a-zA-Z^+\-−]+\)?$/.test(w));

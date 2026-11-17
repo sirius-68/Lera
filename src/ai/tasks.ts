@@ -217,7 +217,9 @@ export async function aiStructure(
     for (const t of u.topics) {
       const fromExercises = [...new Set(t.exercises.flatMap((e) => e.concepts))];
       const fromTitle = conceptByTitle.get(t.title.toLowerCase()) ?? [];
-      const titleSpecific = fromTitle.filter((c) => !(fromTitle.length === 2 && fromTitle[0] === 'like-terms' && fromTitle[1] === 'inverse-operations'));
+      // the pair every topic gets when its title says nothing in particular is no use on its own
+      const generic = fromTitle.length === 2 && fromTitle[0] === 'like-terms' && fromTitle[1] === 'inverse-operations';
+      const titleSpecific = generic ? [] : fromTitle;
       t.concepts = [...new Set([...titleSpecific, ...fromExercises])].slice(0, 4);
       if (t.concepts.length === 0) t.concepts = fromTitle.slice(0, 2);
     }

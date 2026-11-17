@@ -35,12 +35,6 @@ type Step =
 
 const HELLO: Mood[] = ['wave', 'wink', 'writing', 'detective', 'wizard', 'starstruck', 'teacher', 'thumbsup'];
 
-const LANGS = [
-  { id: 'en', label: 'English' },
-  { id: 'ru', label: 'Русский' },
-  { id: 'fr', label: 'Français' },
-];
-
 const SUBJECTS: { id: Subject; title: string; sub: string; sample: string; tone: string }[] = [
   { id: 'algebra', title: 'Algebra', sub: 'Equations, brackets, factorising', sample: '3x + 4 = 19', tone: 'a' },
   { id: 'calc1', title: 'Calculus 1', sub: 'Limits and derivatives', sample: 'd/dx(x^2 sin(x))', tone: 'b' },
@@ -169,15 +163,12 @@ export function Onboarding() {
   const [found, setFound] = useState(false);
   const [source, setSource] = useState<Source | null>(null);
   const [built, setBuilt] = useState(0);
-  const [tour, setTour] = useState(true);
   const [cheer, setCheer] = useState(false);
   const [helloAt, setHelloAt] = useState(0);
 
   const calc = subjects.includes('calc1') || subjects.includes('calc2');
   // the graph scene is only for people doing calculus
-  const all: Step[] = ['hello', 'how', 'subjects', 'stage', 'goal', 'path', 'spot', 'feel', 'struggle', 'return', 'check', 'plain', 'daily', ...(calc ? (['graph'] as Step[]) : []), 'when', 'reward', 'name', ...(profile.email ? [] : (['account'] as Step[])), 'plan', 'remind', ...(hasWidget() ? (['widget'] as Step[]) : []), 'upload', 'done'];
-  // "Skip the tour" keeps the questions and drops the moving pictures
-  const order = tour ? all : all.filter((s) => !['how', 'path', 'return', 'plain', 'graph', 'reward'].includes(s));
+  const order: Step[] = ['hello', 'how', 'subjects', 'stage', 'goal', 'path', 'spot', 'feel', 'struggle', 'return', 'check', 'plain', 'daily', ...(calc ? (['graph'] as Step[]) : []), 'when', 'reward', 'name', ...(profile.email ? [] : (['account'] as Step[])), 'plan', 'remind', ...(hasWidget() ? (['widget'] as Step[]) : []), 'upload', 'done'];
 
   useEffect(() => {
     if (step !== 'splash') return;

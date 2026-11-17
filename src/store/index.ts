@@ -3,6 +3,7 @@ import { pickLang } from '../i18n';
 import { BUILD_AI } from '../ai/config';
 import { AttemptAnalysis, ConceptId, Problem } from '../engine/types';
 import { LeraDoc } from '../ingest/types';
+import { repairDoc } from '../ingest/repair';
 import { hostConfig } from '../host';
 import { idbAll, idbAvailable, idbClear, idbDelete, idbPut } from './docdb';
 import { withEvent } from './insights';
@@ -55,7 +56,7 @@ function load(): AppState {
     if (data.version !== 1) return emptyState();
     const base = emptyState();
     // the AI backend comes from the build, never from what an older version stored
-    return { ...base, ...data, profile: { ...base.profile, ...data.profile }, ai: { ...BUILD_AI } };
+    return { ...base, ...data, docs: (data.docs ?? []).map(repairDoc), profile: { ...base.profile, ...data.profile }, ai: { ...BUILD_AI } };
   } catch {
     // private windows and sandboxed previews can refuse storage; the app still runs, it just won't remember
     return emptyState();
@@ -95,7 +96,10 @@ function hydrate(): void {
       // notes an older version kept in localStorage move across once
       const legacy = state.docs.filter((d) => !stored.some((x) => x.id === d.id));
       for (const d of legacy) await idbPut(d);
-      const docs = [...legacy, ...stored].sort((a, b) => (a.addedAt < b.addedAt ? 1 : -1));
+      const kept = [...legacy, ...stored].sort((a, b) => (a.addedAt < b.addedAt ? 1 : -1));
+      // notes read by an earlier version are put right once, and kept that way
+      const docs = kept.map(repairDoc);
+      for (let i = 0; i < docs.length; i++) if (docs[i] !== kept[i]) await idbPut(docs[i]);
       docsInIdb = true;
       state = { ...state, docs, activeDocId: docs.some((d) => d.id === state.activeDocId) ? state.activeDocId : docs[0]?.id };
     })
@@ -171,7 +175,8 @@ export const actions = {
     setState((s) => ({ profile: { ...s.profile, onboarded: true, createdAt: s.profile.createdAt ?? new Date().toISOString() } }));
   },
 
-  addDoc(doc: LeraDoc): void {
+  addDoc(added: LeraDoc): void {
+    const doc = repairDoc(added);
     if (docsInIdb) store(idbPut(doc));
     setState((s) => ({
       docs: [doc, ...s.docs.filter((d) => d.id !== doc.id)],

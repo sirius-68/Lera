@@ -5,11 +5,11 @@ import {
 import { Frac, MathError, fIsInt, fIsZero, gcdBig } from './frac';
 import { parseLine } from './parse';
 import {
-  Rat, evalNum, pConstValue, pDegree, pIsConst, pPrimitive, pProportional, pUniCoeffs, pVars, rEq, rSub, toRat,
+  Rat, evalNum, pIsConst, pPrimitive, pProportional, pUniCoeffs, pVars, rEq, rSub, toRat,
   uniDeg, uniGcd,
 } from './poly';
 import {
-  SolSet, polyRoots, relationHoldsAt, sameSol, sameTruthSet, solveEquation, solveLinearSystem, statementSolutions,
+  SolSet, polyRoots, relationHoldsAt, sameSol, sameTruthSet, solveLinearSystem, statementSolutions,
 } from './solve';
 import { Problem } from './types';
 

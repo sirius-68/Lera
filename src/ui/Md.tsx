@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { isTexLine } from '../engine/tex';
-import { MathView, RichText } from './math';
+import { Fit, MathView, RichText } from './math';
 
 /**
  * A message as the AI writes it: paragraphs, formulas on their own line (`$$…$$`, or a line that is only
@@ -74,7 +74,7 @@ export function Md({ text }: { text: string }) {
     const display = /^\$\$(.+)\$\$$/.exec(t);
     if (display || isTexLine(t)) {
       flush();
-      out.push(<div key={out.length} className="md-math"><MathView text={display ? display[1] : t} block /></div>);
+      out.push(<Fit key={out.length} className="md-math"><MathView text={display ? display[1] : t} /></Fit>);
       continue;
     }
     if (isRow(t) && lines[i + 1] !== undefined && isRule(lines[i + 1])) {

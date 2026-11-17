@@ -1,5 +1,5 @@
 import { CONCEPTS } from '../engine/concepts';
-import { PREREQS, SUBJECT_LABEL, subjectOf } from '../engine/concepts-calc';
+import { PREREQS } from '../engine/concepts-calc';
 import { ConceptId } from '../engine/types';
 import { LeraDoc, Topic } from '../ingest/types';
 import { daysBetween, dayOf, statusOf } from './learner';

@@ -14,7 +14,7 @@ import { byDay, confidence, dayOf, docMastery, dueNow, findTopic, insights, revi
 import { go, openOverlay, Route } from '../store/nav';
 import { AttemptRecord } from '../store/types';
 import { Weakness, weaknesses } from '../store/weakness';
-import { Bar, Button3D, confirmDialog, CountUp, LeraSays, Ring, Seg, haptic, toast } from '../ui/kit';
+import { Bar, Button3D, confirmDialog, CountUp, Ring, Seg, haptic, toast } from '../ui/kit';
 import { Icon } from '../ui/icons';
 import { MathView, RichText } from '../ui/math';
 

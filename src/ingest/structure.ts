@@ -1,5 +1,5 @@
 import { Statement, statementToText, statementVars, walk, Node } from '../engine/ast';
-import { cleanTex, hasTex, isTexLine, markTex } from '../engine/tex';
+import { cleanTex, hasTex, isTexLine } from '../engine/tex';
 import { finalForm, isCollected, prepare } from '../engine/check';
 import { cleanPath } from '../engine/analyze';
 import { CONCEPTS, conceptsForText } from '../engine/concepts';
@@ -301,9 +301,9 @@ function cellMath(cell: string): string {
   return formula ? `$${cell}$` : inlineMath(cell);
 }
 
+/** Powers in prose are marked for the engine; LaTeX is kept exactly as written (every screen finds and draws it). */
 function inlineMath(text: string): string {
-  if (!hasTex(text)) return markInlineMath(text);
-  return isTexLine(plain(text)) ? text : markTex(text);
+  return hasTex(text) ? text : markInlineMath(text);
 }
 
 /** The problems in a line of text: "Solve 3x + 2 = 11", or several parts (a) (b) (c) under one instruction. */
@@ -330,6 +330,8 @@ interface Tagged {
 function headingLevel(p: RawPara): number | undefined {
   const text = p.text;
   if (p.list) return undefined;
+  // a formula is never a heading, however large or bold the file set it: "V = \pi\int_a^b [R(x)]^2\,dx"
+  if (isTexLine(plain(text))) return undefined;
   if (p.level !== undefined) return p.level;
   if (text.length > 110) return undefined;
   if (HEADING_WORD.test(text)) return 1;
@@ -561,7 +563,10 @@ export function structureDoc(raw: RawDoc, now: Date = new Date()): LeraDoc {
     const exm = EXAMPLE_LEAD.exec(text);
     if (exm) {
       const rest = text.slice(exm[0].length).trim();
-      inExample = { t: 'example', title: exm[2] ? `Example ${exm[2]}` : 'Example', lines: rest ? [inlineMath(rest)] : [] };
+      // "Example 2 (disk). Rotate…": the words in brackets name the example
+      const tag = /^\(([^)]{1,40})\)[.:]?\s*/.exec(rest);
+      const body = tag ? rest.slice(tag[0].length) : rest;
+      inExample = { t: 'example', title: `${exm[2] ? `Example ${exm[2]}` : 'Example'}${tag ? ` (${tag[1]})` : ''}`, lines: body ? [inlineMath(body)] : [] };
       pushBlock(inExample);
       instructionLive = false;
       continue;

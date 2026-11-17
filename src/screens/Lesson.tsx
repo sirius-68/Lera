@@ -15,7 +15,7 @@ import { Button3D, LeraSays, Seg, Sheet, haptic, toast } from '../ui/kit';
 import { Celebration } from '../ui/Celebrate';
 import { Icon } from '../ui/icons';
 import { Graph } from '../ui/Graph';
-import { MathView, tokenize } from '../ui/math';
+import { Fit, MathView, tokenize } from '../ui/math';
 import { Table } from '../ui/Md';
 import { AS_WRITTEN } from '../engine/latex';
 
@@ -186,7 +186,7 @@ function MathBlock({ text, steps, caption, index, ctx }: { text: string; steps?:
   const fnText = useMemo(() => (steps ? null : functionOfLine(text)), [text, steps]);
   return (
     <>
-      <div className={`rd-math ${steps ? 'worked' : ''}`}>
+      <Fit className={`rd-math ${steps ? 'worked' : ''}`}>
         {steps ? (
           // working over several rows: the expression, then each row that carries on from it, signs lined up
           <div className="rd-steps">
@@ -211,7 +211,7 @@ function MathBlock({ text, steps, caption, index, ctx }: { text: string; steps?:
             <Icon name="chart" size={15} /> {open ? 'Hide graph' : 'Graph it'}
           </button>
         )}
-      </div>
+      </Fit>
       {open && fnText && <Graph fns={[fnText]} />}
     </>
   );
@@ -237,7 +237,7 @@ function ExampleCard({ block, index, ctx }: { block: Extract<Block, { t: 'exampl
           <div key={i} className="ex-line">
             {isMathLine(plain(line)) || isTexLine(plain(line)) ? (
               // a line that is only maths is one piece: it is selected, highlighted and saved whole
-              <div className="ex-math"><SegText text={`$${plain(line)}$`} block={index} item={i} ctx={ctx} /></div>
+              <Fit className="ex-math"><SegText text={`$${AS_WRITTEN}${plain(line)}$`} block={index} item={i} ctx={ctx} /></Fit>
             ) : (
               <p className="rd-p" style={{ margin: 0 }}><SegText text={line} block={index} item={i} ctx={ctx} /></p>
             )}
@@ -640,6 +640,7 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
   const topics = doc.units.flatMap((u) => u.topics);
   const topicAt = topics.findIndex((t) => t.id === topic.id);
   const nextTopic = topics[topicAt + 1];
+  const prevTopic = topics[topicAt - 1];
   const nextUnit = nextTopic ? doc.units.find((u) => u.topics.some((t) => t.id === nextTopic.id)) : null;
   /** Move on; leaving the last lesson of a chapter gets its own moment first. */
   const toNext = () => {
@@ -705,7 +706,12 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
       {showTab === 'lesson' && (
         <div className="lesson-foot">
           <div className="row" style={{ gap: 10 }}>
-            {pages.length > 1 && <button className="page-back" onClick={() => goPage(at - 1)} disabled={at === 0} aria-label="Previous part"><Icon name="back" size={20} /></button>}
+            {at > 0 ? (
+              <button className="page-back" onClick={() => goPage(at - 1)} aria-label="Previous part"><Icon name="back" size={20} /></button>
+            ) : prevTopic ? (
+              // on a lesson's first part the arrow goes back to the lesson before it; with none before, it is not shown
+              <button className="page-back" onClick={() => replace({ name: 'lesson', topicId: prevTopic.id })} aria-label="Previous lesson"><Icon name="back" size={20} /></button>
+            ) : null}
             {!lastOne ? (
               <Button3D onClick={() => goPage(at + 1)}>
                 Continue <span style={{ opacity: 0.75, fontWeight: 500 }}>· {at + 1}/{pages.length}</span> <Icon name="arrow" size={18} />
