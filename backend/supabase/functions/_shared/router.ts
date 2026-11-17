@@ -90,8 +90,8 @@ export const TASKS: Record<string, Task> = {
   chat: { ladder: ['medium', 'hard'], maxTokens: 900 },
   // a word problem the engine cannot check: the model's judgement is the check, so the best one does it
   checkOpen: { ladder: ['hard'], maxTokens: 400, check: (r) => isObject(firstJson(r)) && typeof (firstJson(r) as { correct?: unknown }).correct === 'boolean' },
-  // a line the engine found not true and could not name: what was it trying to do? (the engine confirms any "step")
-  diagnose: { ladder: ['easy', 'medium'], maxTokens: 420, timeoutMs: 6_000, check: (r) => isObject(firstJson(r)) && typeof (firstJson(r) as { title?: unknown }).title === 'string' },
+  // judging a learner's lines: what each was trying to do, and whether it holds (the checker can veto)
+  judge: { ladder: ['easy', 'medium'], maxTokens: 900, timeoutMs: 9_000, check: (r) => isObject(firstJson(r)) && Array.isArray((firstJson(r) as { lines?: unknown }).lines) },
   // "That didn't make sense": the same point, more simply
   simplify: { ladder: ['easy', 'medium'], maxTokens: 350 },
 };

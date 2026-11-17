@@ -265,3 +265,20 @@ Pin these with tests before touching the engine:
 - The free Gemini plan answers reliably only with the smallest model. Anything that calls the AI needs a
   timeout and a working fallback, and nothing on the correct-answer path may wait for it.
 - The learner tests on a real Android phone. What cannot be checked there before handing over should be said so.
+
+## Follow-up, 17 Nov 2026: side working, and the AI as judge
+
+Reported from the phone: "let u = x² + 1" was marked as a slip. The checker took every line as the whole problem
+written another way, read "let" as l × e × t, and only asked the AI after the mark was shown.
+
+Built (`src/engine/calc/scope.ts`, `src/engine/judge.ts`):
+
+- Joining words (let, so, hence, it implies, ⇒, and French and Russian ones) are taken off before reading; a line
+  may hold several statements; a sentence of reasoning is read, not marked.
+- `u = …` names something for the rest of the attempt. `du = … dx`, `du/dx = …`, `u′ = …` are checked against it;
+  `dv = … dx` then `v = …` is checked (v must differentiate back to dv). A line in u is checked in x, with u put
+  back and du put back as u′ dx; an answer still in u is right but not finished.
+- The AI judges every line (router task `judge`, 9 s): intent, rule applied, risky shortcuts, poor habits. The
+  checker vetoes in both directions: a line it proved right is never marked (a habit may still be said, as a note);
+  a line it proved wrong is never passed (the AI names the mistake when the rules could not); where the rules
+  cannot tell, the AI decides. Without the AI the checker works alone, as before.

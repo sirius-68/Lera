@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { aiCheckOpen, aiDiagnose, aiSimplify } from '../ai/tasks';
+import { aiCheckOpen, aiJudge, aiSimplify } from '../ai/tasks';
+import { AiLine, checkerSays, withJudge } from '../engine/judge';
 import { aiReady } from '../ai/providers';
 import { analyze, cleanPath, hintLadder, HintLadder } from '../engine/analyze';
 import { calcLatex, confirmsStep, isCalc } from '../engine/calc/check';
@@ -144,7 +145,7 @@ function Mark({ line, pending }: { line: CheckedLine; pending?: boolean }) {
   return <span className="mark none" aria-label={tr('Not checked')} />;
 }
 
-function DiagnosisCard({ diag, onReview, onFix, fixShown, aiNote, onSense }: { diag: Diagnosis; onReview: () => void; onFix: () => void; fixShown: boolean; aiNote?: string; onSense: (ok: boolean) => Promise<string | null> }) {
+function DiagnosisCard({ diag, onReview, onFix, fixShown, onSense }: { diag: Diagnosis; onReview: () => void; onFix: () => void; fixShown: boolean; onSense: (ok: boolean) => Promise<string | null> }) {
   const concept = conceptOf(diag.concept);
   const [sense, setSense] = useState<'yes' | 'no' | null>(null);
   const [simpler, setSimpler] = useState<string | null>(null);
@@ -161,7 +162,7 @@ function DiagnosisCard({ diag, onReview, onFix, fixShown, aiNote, onSense }: { d
         <span className={`chip ${chipTone(diag.severity)}`}>{tr(SEVERITY_LABEL[diag.severity])}</span>
         <b className="grow" style={{ fontSize: 14.5, lineHeight: 1.3 }}><RichText text={diag.title} /></b>
       </div>
-      <p style={{ fontSize: 14.5, lineHeight: 1.5, marginTop: 8 }}><TermText text={aiNote ?? diag.message} /></p>
+      <p style={{ fontSize: 14.5, lineHeight: 1.5, marginTop: 8 }}><TermText text={diag.message} /></p>
       {(
         <div className="sense" data-state={sense ?? 'ask'}>
           {sense === null && (
@@ -225,7 +226,10 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
   const [revealed, setRevealed] = useState(false);
   const [compare, setCompare] = useState(false);
   const [shake, setShake] = useState(0);
-  const [aiNotes, setAiNotes] = useState<Record<string, string>>({});
+  /** The AI's judgement of each line, by its text; the checker's proofs still stand over it (engine/judge.ts). */
+  const [judged, setJudged] = useState<Record<string, AiLine>>({});
+  /** Lines the AI is reading right now. */
+  const [reading, setReading] = useState<Record<string, true>>({});
   /** Lines the AI read as a step, each confirmed true by the checker once completed. */
   const [aiSteps, setAiSteps] = useState<Record<string, { note: string; fix?: string }>>({});
   // 'line' marks each line as it lands; 'end' holds every mark back until the learner asks
@@ -249,9 +253,48 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
 
   /** How many lines there were when "Done" was last pressed: only then is a rule left half-done a mark. */
   const [doneAt, setDoneAt] = useState<number | null>(null);
-  const analysis = useMemo(() => analyze(problem, lines, { done: doneAt === lines.length, aiSteps }), [problem, lines, doneAt, aiSteps]);
+  const read = (all: string[], done: boolean): AttemptAnalysis => withJudge(problem, analyze(problem, all, { done, aiSteps }), judged);
+  const analysis = useMemo(() => read(lines, doneAt === lines.length), [problem, lines, doneAt, aiSteps, judged]);
   /** The attempt read as finished: for the record, and for leaving the problem. */
-  const finalAnalysis = (): AttemptAnalysis => (doneAt === lines.length ? analysis : analyze(problem, lines, { done: true, aiSteps }));
+  const finalAnalysis = (): AttemptAnalysis => (doneAt === lines.length ? analysis : read(lines, true));
+
+  /**
+   * Ask the AI to judge some lines, with the whole working and what the checker proved about each. Correct lines
+   * are ticked at once; the AI's word arrives after, and never overturns a proof.
+   */
+  const judgeLines = (all: string[], which: number[], a: AttemptAnalysis) => {
+    const st = getState();
+    if (!aiReady(st.ai)) return;
+    const want = which.filter((i) => all[i] && !judged[all[i]] && !reading[all[i]]);
+    if (!want.length) return;
+    setReading((r) => ({ ...r, ...Object.fromEntries(want.map((i) => [all[i], true as const])) }));
+    const stop = new AbortController();
+    const timer = setTimeout(() => stop.abort(), 9000);
+    const route = clean.filter((x) => !x.aside).map((x) => x.line).slice(0, 14);
+    aiJudge(st.ai, problem, all.map((text, i) => ({ text, checker: a.lines[i] ? checkerSays(a.lines[i]) : 'cannot be checked by the rules (judge it yourself)' })), want, route, stop.signal)
+      .then((res) => {
+        // a step stands only if the checker finds the completed line true
+        const steps: Record<string, { note: string; fix?: string }> = {};
+        for (const [text, j] of Object.entries(res)) if (j.verdict === 'step' && j.completesTo && j.note && confirmsStep(problem, j.completesTo)) steps[text] = { note: j.note, fix: j.completesTo };
+        if (Object.keys(steps).length) setAiSteps((m) => ({ ...m, ...steps }));
+        setJudged((m) => ({ ...m, ...res }));
+        // a line the rules could not check, now found wrong: open its card
+        const found = want.find((i) => res[all[i]]?.verdict === 'error' && a.lines[i]?.status === 'unchecked');
+        if (found !== undefined && isChecked(found)) {
+          setOpenDiag(found);
+          setMood('oops');
+        }
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        clearTimeout(timer);
+        setReading((r) => {
+          const n = { ...r };
+          for (const i of want) delete n[all[i]];
+          return n;
+        });
+      });
+  };
   const isChecked = (i: number): boolean => mode === 'line' || i < checkedCount;
   const allChecked = mode === 'line' || checkedCount >= lines.length;
   const solved = analysis.verdict === 'solved' && allChecked;
@@ -340,7 +383,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       return null;
     }
     const next = [...lines, text];
-    const a = analyze(problem, next, { done: false, aiSteps });
+    const a = read(next, false);
     const line = a.lines[a.lines.length - 1];
     if (!line || line.status === 'unreadable') {
       setNote(line?.note ?? tr('I couldn’t read that line. Check the brackets and signs.'));
@@ -375,29 +418,13 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     }
     setNote(line.status === 'unchecked' ? line.note ?? tr('I can’t compare this line with the one above, so I’ve left it unmarked.') : null);
     const idx = next.length - 1;
+    // the AI reads every line as it lands, alongside the checker
+    judgeLines(next, [idx], a);
     if (line.status === 'wrong') {
       setOpenDiag(idx);
       setMood(line.diag?.severity === 'gap' ? 'shocked' : 'oops');
       haptic([14, 40, 14]);
       setTimeout(() => setMood('thinking'), 1700);
-      const st = getState();
-      // the rules couldn't name it: ask the model what the line was trying to do, if one is connected.
-      // A "step" stands only if the checker finds the completed line true; anything else is put into words.
-      if (line.diag?.code === 'unknown' && aiReady(st.ai)) {
-        const prev = next[idx - 1] ?? problem.given;
-        const stop = new AbortController();
-        const timer = setTimeout(() => stop.abort(), 6000);
-        aiDiagnose(st.ai, problem, prev, text, stop.signal)
-          .then((d) => {
-            if (!d) return;
-            if (d.kind === 'step' && confirmsStep(problem, d.completesTo)) {
-              setAiSteps((m) => ({ ...m, [text]: { note: d.note, fix: d.completesTo } }));
-              setMood('happy');
-            } else setAiNotes((n) => ({ ...n, [text]: `**${d.title}** ${d.note}` }));
-          })
-          .catch(() => undefined)
-          .finally(() => clearTimeout(timer));
-      }
     } else if (a.verdict === 'solved') {
       setOpenDiag(null);
       setMood('celebrate');
@@ -427,8 +454,9 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
    */
   const reviewWork = (all: string[] = lines) => {
     if (!all.length || finished) return;
-    const a = analyze(problem, all, { done: true, aiSteps });
+    const a = read(all, true);
     setDoneAt(all.length);
+    judgeLines(all, all.map((_, i) => i), a);
     setCheckedCount(all.length);
     setHintOpen(false);
     const wrong = a.lines.map((l, i) => (l.status === 'wrong' ? i : -1)).filter((i) => i >= 0);
@@ -562,9 +590,12 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
                 <span className="grow" style={{ textAlign: 'left' }}>
                   {line.latex ? <MathView latex={line.latex} block /> : <MathView text={line.text} block />}
                 </span>
-                <Mark line={line} pending={!isChecked(i)} />
+                <Mark line={line} pending={!isChecked(i) || (line.status === 'unchecked' && !!reading[line.text])} />
               </button>
               {isChecked(i) && (line.status === 'step' || (line.aside && line.status === 'ok')) && line.note && <p className="line-next"><RichText text={line.note} /></p>}
+              {isChecked(i) && line.coach && (
+                <p className="line-coach"><Icon name="sparkle" size={13} /> <RichText text={line.coach} /></p>
+              )}
               {isChecked(i) && line.status === 'wrong' && line.diag && openDiag === i && (
                 <DiagnosisCard
                   diag={line.diag}
@@ -576,7 +607,6 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
                     // a connected model rewords the same point more simply; the engine's verdict stays the authority
                     return aiSimplify(st.ai, { concept: d.concept, title: d.title, message: d.message, plain: PLAIN[d.concept], problem, line: line.text, fix: d.fix });
                   }}
-                  aiNote={aiNotes[line.text]}
                   fixShown={!!fixShown[i]}
                   onFix={() => {
                     setFixShown({ ...fixShown, [i]: true });

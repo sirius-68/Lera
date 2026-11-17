@@ -1,3 +1,4 @@
+import type { AiLine } from '../engine/judge';
 import { CONCEPTS } from '../engine/concepts';
 import { getLang, langName } from '../i18n';
 import { ConceptId, Diagnosis, Problem } from '../engine/types';
@@ -274,26 +275,20 @@ ${describe(ctx)}`;
 }
 
 /** A second opinion in words for a step the rule-based diagnosis could not name. */
-/** A second opinion on a line the checker found not true but could not name. */
-export interface AiReading {
-  /** "step": a valid rule partly applied, the rest still to come. "error": a rule broken. */
-  kind: 'step' | 'error';
-  title: string;
-  /** The principle the line was using, in the app's language. */
-  principle: string;
-  /** What to do next (for a step) or what went wrong (for an error), in the app's language, no final answer. */
-  note: string;
-  /** The learner's own line with the missing move made, in plain typed maths. Only checked, never shown as an answer. */
-  completesTo: string;
-  concept: ConceptId;
-}
-
 /**
- * The checker found this line not true and could not say why. The model reads what the line was trying to do.
- * It may say "this is a step", but only the checker can agree: the caller accepts a step only when the checker
- * finds `completesTo` true. The model never decides that maths is right.
+ * The AI judges a learner's lines: what each one was trying to do (a name such as let u = …, a differential, a rule
+ * applied, a tidy-up, a sentence of reasoning) and whether it holds, plus any risky shortcut or poor habit. It is told
+ * what the checker proved, and the caller enforces the checker's veto (engine/judge.ts): the model can explain and
+ * judge what the rules cannot, never overturn a proof.
  */
-export async function aiDiagnose(config: AiConfig, problem: Problem, prevLine: string, wrongLine: string, signal?: AbortSignal): Promise<AiReading | null> {
+export async function aiJudge(
+  config: AiConfig,
+  problem: Problem,
+  lines: { text: string; checker: string }[],
+  which: number[],
+  route: string[],
+  signal?: AbortSignal,
+): Promise<Record<string, AiLine>> {
   const ids = Object.keys(CONCEPTS).join(', ');
   const reply = await chat(
     config,
@@ -301,19 +296,42 @@ export async function aiDiagnose(config: AiConfig, problem: Problem, prevLine: s
       {
         role: 'system',
         content: `${voice()}
-A checker has found that the student's line is not equal to the problem as it stands. Work out what the student was trying to do on this line.
-Either they applied part of a valid rule and the rest is still to come (kind "step"), or they broke a rule (kind "error").
-Return ONLY JSON: {"kind": "step" or "error", "title": string (max 9 words, states the rule), "principle": string (the rule or law the line was using, max 12 words), "note": string (max 40 words: for a step, what move is left; for an error, the exact place it goes wrong and why; never the final answer, never anything about the number of steps), "completes_to": string (the student's own line with the missing move made, plain typed maths like 3x^3/3 or 2x cos(x^2); for an error, the line as it should read), "concept": one of [${ids}]}`,
+You are judging a student's working, line by line, like a careful teacher.
+For each line, work out what the student was trying to do: name something (let u = ...), write a differential (du = ... dx), apply a rule, tidy up, or state a reason in words. Words such as let, so, hence, it implies, therefore only join lines and are never a mistake.
+Then decide whether the line holds. Look for: a rule or law applied wrongly, a sign or arithmetic slip, a step that does not follow, a shortcut that skipped something essential (a lost minus, a dropped dx or du, cancelling across a sum, a substitution not carried through, a missing + C on the final answer), and poor habits (writing = between things that are not equal, dropping brackets).
+Many routes are valid and small steps are good. Never comment on the number of steps and never suggest a shorter method.
+The rule-based checker's findings are given for each line. When it says "proved right", the maths is right: you may only add a pattern worth knowing. When it says "proved wrong", it is wrong: explain where and why. Otherwise the verdict is yours.
+Return ONLY JSON: {"lines": [{"n": line number, "verdict": "ok" | "step" | "error" | "unsure", "title": string (max 9 words, names the rule), "note": string (max 40 words; for an error, the exact place and why; for a step, the move that is left; otherwise empty; never the final answer), "pattern": string (optional, max 25 words, a risky shortcut or poor habit seen on this line, else empty), "completes_to": string (the line as it should read, or completed, in plain typed maths like 2x cos(x^2)), "concept": one of [${ids}], "severity": "gap" | "slip" | "notation"}]}
+Judge only the lines asked for.`,
       },
-      { role: 'user', content: `Problem: ${problem.prompt} ${problem.given}\nLine above: ${prevLine}\nStudent's line: ${wrongLine}` },
+      {
+        role: 'user',
+        content: `Problem: ${problem.prompt} ${problem.given}
+One valid route (others are just as good): ${route.join(' | ') || 'not known'}
+Working:
+${lines.map((l, i) => `${i + 1}. ${l.text}   [checker: ${l.checker}]`).join('\n')}
+Judge lines: ${which.map((i) => i + 1).join(', ')}`,
+      },
     ],
-    { task: 'diagnose', json: true, temperature: 0.1, maxTokens: 320, signal },
+    { task: 'judge', json: true, temperature: 0.1, maxTokens: 700, signal },
   );
-  const data = extractJson<{ kind?: string; title?: string; principle?: string; note?: string; completes_to?: string; message?: string; concept?: string }>(reply);
-  const note = data?.note ?? data?.message;
-  if (!data?.title || !note) return null;
-  const concept = (data.concept && data.concept in CONCEPTS ? data.concept : problem.concepts[0] ?? 'arithmetic') as ConceptId;
-  return { kind: data.kind === 'step' ? 'step' : 'error', title: data.title, principle: data.principle ?? '', note, completesTo: (data.completes_to ?? '').trim(), concept };
+  const data = extractJson<{ lines?: { n?: number; verdict?: string; title?: string; note?: string; pattern?: string; completes_to?: string; concept?: string; severity?: string }[] }>(reply);
+  const out: Record<string, AiLine> = {};
+  for (const r of data?.lines ?? []) {
+    const line = typeof r.n === 'number' ? lines[r.n - 1] : undefined;
+    if (!line || !which.includes((r.n as number) - 1)) continue;
+    const verdict = r.verdict === 'ok' || r.verdict === 'step' || r.verdict === 'error' ? r.verdict : 'unsure';
+    out[line.text] = {
+      verdict,
+      title: r.title?.trim() || undefined,
+      note: r.note?.trim() || undefined,
+      pattern: r.pattern?.trim() || undefined,
+      completesTo: r.completes_to?.trim() || undefined,
+      concept: r.concept && r.concept in CONCEPTS ? (r.concept as ConceptId) : undefined,
+      severity: r.severity === 'gap' || r.severity === 'notation' ? r.severity : 'slip',
+    };
+  }
+  return out;
 }
 
 /** For problems the engine cannot check (word problems): a judgement on the student's written answer. */

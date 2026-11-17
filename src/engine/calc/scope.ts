@@ -231,7 +231,16 @@ export function sideWork(stmt: string, scope: Scope): SideWork | null {
     };
     const a = asRate(lhs, L);
     const b = asRate(rhs, R);
-    const latex = `${lhs} = ${rhs}`.replace(/\bd([a-zA-Z])\b/g, '\\,d$1');
+    const texSide = (side: string, d: ReturnType<typeof differentialSide>): string => {
+      if (!d) {
+        const e = tryParse(side, v);
+        return e ? toLatex(e) : side;
+      }
+      if ('ratioOf' in d) return `\\frac{d${d.ratioOf}}{d${d.over}}`;
+      const c = d.coef === '1' ? null : tryParse(d.coef, v);
+      return `${c ? `${toLatex(c)}\\,` : d.coef === '-1' ? '-' : ''}d${d.of}`;
+    };
+    const latex = `${texSide(lhs, L)} = ${texSide(rhs, R)}`;
     // dv = e²ˣ dx before v has a meaning: it says what v′ has to be
     if (L && !('ratioOf' in L) && L.coef === '1' && a.letter && b.e) {
       scope.owed.set(a.letter, simp(b.e));

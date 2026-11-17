@@ -24,15 +24,15 @@ const env = { ANTHROPIC_API_KEY: 'sk-test' };
 const req = (task: string, user = 'hi', extra: Partial<ChatRequest> = {}): ChatRequest => ({ messages: [{ role: 'system', content: 'be Lera' }, { role: 'user', content: user }], lera: { task }, ...extra });
 
 test('each job starts at its own model', async () => {
-  const f = fake({ 'claude-haiku-5-5': '{"title":"Signs flip","message":"m"}', 'claude-sonnet-5-5': 'Hello', 'claude-opus-5-5': '{"correct":true,"feedback":""}' });
-  assert.equal((await route(req('diagnose'), env, f.fetcher)).model, 'anthropic/claude-haiku-5-5');
+  const f = fake({ 'claude-haiku-5-5': '{"lines":[{"n":1,"verdict":"ok"}]}', 'claude-sonnet-5-5': 'Hello', 'claude-opus-5-5': '{"correct":true,"feedback":""}' });
+  assert.equal((await route(req('judge'), env, f.fetcher)).model, 'anthropic/claude-haiku-5-5');
   assert.equal((await route(req('chat'), env, f.fetcher)).model, 'anthropic/claude-sonnet-5-5');
   assert.equal((await route(req('checkOpen'), env, f.fetcher)).model, 'anthropic/claude-opus-5-5');
 });
 
 test('an answer that fails its check goes to the next model up', async () => {
-  const f = fake({ 'claude-haiku-5-5': 'Sorry, I cannot', 'claude-sonnet-5-5': '{"title":"Divide every term","message":"m"}' });
-  const a = await route(req('diagnose'), env, f.fetcher);
+  const f = fake({ 'claude-haiku-5-5': 'Sorry, I cannot', 'claude-sonnet-5-5': '{"lines":[{"n":1,"verdict":"error"}]}' });
+  const a = await route(req('judge'), env, f.fetcher);
   assert.deepEqual(f.asked, ['claude-haiku-5-5', 'claude-sonnet-5-5']);
   assert.equal(a.model, 'anthropic/claude-sonnet-5-5');
 });

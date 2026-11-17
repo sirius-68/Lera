@@ -328,3 +328,7 @@
 /* a written answer: a line of words in the same boxes as a line of maths */
 .open-words { font-size: 16px; line-height: 1.45; color: var(--ink); }
 .tool:disabled { opacity: 0.45; pointer-events: none; }
+
+/* a habit or a risky shortcut the AI noticed on a line: said, never marked */
+.line-coach { margin: 4px 0 0 34px; font-size: 13px; line-height: 1.4; color: var(--brand-d); display: flex; gap: 5px; align-items: flex-start; }
+.line-coach svg { flex: none; margin-top: 2px; }

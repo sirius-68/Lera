@@ -119,6 +119,10 @@ export interface CheckedLine {
   trueToGiven?: boolean;
   /** Working on the side (a name such as u = x² + 1, a differential): checked on its own, not against the problem. */
   aside?: boolean;
+  /** Decided by the AI where the rules could not tell. */
+  judge?: 'ai';
+  /** A risky shortcut or a habit worth knowing, seen by the AI. Never a mark. */
+  coach?: string;
 }
 
 export type Verdict = 'solved' | 'unfinished' | 'wrong' | 'empty';
