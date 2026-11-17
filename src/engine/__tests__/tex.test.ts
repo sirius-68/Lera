@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { mathRuns, plainLatex } from '../mathtext';
-import { cleanTex, hasTex, isTexLine } from '../tex';
+import { cleanTex, hasTex, isTexLine, texToPlain } from '../tex';
+import { parseExercises } from '../../ingest/structure';
 
 /** The same sentence with `$…$` round each formula found (what is already inside dollars is left alone). */
 function markMath(text: string): string {
@@ -82,4 +83,17 @@ test('plain maths is drawn with real fractions, raised powers and roots', () => 
   assert.equal(plainLatex('(2/3)[(1 + x)^(3/2)] from 0 to 3 = (2/3)(8 − 1)'), '\\frac{2}{3} \\left[(1 + x)^{\\frac{3}{2}}\\right]_{0}^{3} = \\frac{2}{3} (8 - 1)');
   assert.equal(plainLatex('L = ∫ from 0 to 3 of √(1 + x) dx'), 'L = \\int _{0}^{3} \\sqrt{1 + x} \\,dx');
   assert.equal(plainLatex('f(1/2) + (1/2)^2 + dy/dx'), 'f \\left(\\frac{1}{2}\\right) + \\left(\\frac{1}{2}\\right)^{2} + \\frac{dy}{dx}');
+});
+
+test('a question written in LaTeX becomes a problem the engine can check', () => {
+  assert.equal(texToPlain('\\int_0^1 \\frac{x}{x^2+1}\\,dx'), '∫_0^1 ((x)/(x^2+1)) dx');
+  const kind = (q: string) => parseExercises(q, undefined, 't').problems[0]?.kind;
+  assert.equal(kind('Evaluate \\int 2x\\cos(x^2)\\,dx'), 'integral');
+  assert.equal(kind('Evaluate \\int_0^{\\pi} \\sin x\\,dx'), 'definite');
+  assert.equal(kind('Find \\frac{d}{dx}\\left(x^2\\sin x\\right)'), 'derivative');
+  assert.equal(kind('Evaluate \\lim_{x\\to 0}\\frac{\\sin x}{x}'), 'limit');
+  assert.equal(kind('Solve x^{2}-5x+6=0'), 'quadratic');
+  assert.equal(kind('Simplify \\frac{x^2-1}{x-1}'), 'simplify');
+  // shown the way the notes wrote it
+  assert.equal(parseExercises('Evaluate \\int x e^{x}\\,dx', undefined, 't').problems[0].original, 'Evaluate \\int x e^{x}\\,dx');
 });

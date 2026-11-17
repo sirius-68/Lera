@@ -1,5 +1,5 @@
 import { Statement, statementToText, statementVars, walk, Node } from '../engine/ast';
-import { cleanTex, hasTex, isTexLine } from '../engine/tex';
+import { cleanTex, hasTex, isTexLine, texToPlain } from '../engine/tex';
 import { finalForm, isCollected, prepare } from '../engine/check';
 import { cleanPath } from '../engine/analyze';
 import { CONCEPTS, conceptsForText } from '../engine/concepts';
@@ -188,6 +188,13 @@ let exerciseCounter = 0;
 
 /** One exercise from one piece of text, or null if there is no exercise in it. */
 export function buildProblem(text: string, inherited: string | undefined, topicId: string): Problem | null {
+  // a question written in LaTeX is read in the engine's own notation, and still shown the way it was written
+  if (hasTex(text)) {
+    const typed = texToPlain(text);
+    const p = hasTex(typed) ? null : buildProblem(typed, inherited, topicId);
+    const tidy = (q: string) => q.trim().replace(NUMBERING, '').replace(EXERCISE_LEAD, '').trim();
+    return p ? { ...p, original: (p.original ?? tidy(typed)).replace(tidy(typed), tidy(text)) } : null;
+  }
   const clean = text.trim().replace(NUMBERING, '').replace(EXERCISE_LEAD, '').trim();
   if (plain(clean).length < 2) return null;
   const ownVerb = VERB.exec(clean)?.[1];
