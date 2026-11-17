@@ -3,6 +3,7 @@ import { CalcParseError, E, Flaw, Indefinite, N, V, add, constantRatio, diff, di
 import { IntFlaw, integrate, integrateRaw, integrateWith, toPoly, polyToExpr } from './integrate';
 import { getLang, msg, t } from '../../i18n';
 import { definiteRoute, derivativeRoute, handText, integralRoute, limitRoute } from './route';
+import { Scope, SideWork, isWords, sideWork, statements, unjoin } from './scope';
 
 /**
  * Line-by-line checking for calculus.
@@ -69,6 +70,8 @@ const DIVERGES = /^(?:diverges?|divergent)$/i;
 
 interface Side {
   e?: E;
+  /** The side as written, before named letters (u, v …) were put back. */
+  orig?: E;
   special?: 'dne' | 'diverges';
   latex: string;
 }
@@ -364,6 +367,42 @@ function diagnose(p: Prep, problem: Problem, s: Side): Diagnosis {
   return unknown(p, problem, t('This line doesn’t follow. Check it against the line above.'), s);
 }
 
+/** What is wrong with a piece of side working: a differential, a derivative of a named letter, or v that does not give dv back. */
+function sideDiag(p: Prep, problem: Problem, w: SideWork): Diagnosis {
+  const v = p.v;
+  if (w.kind === 'differential') {
+    const should = w.should ? toText(w.should) : '';
+    return {
+      code: 'differential',
+      concept: problem.concepts.includes('integration-by-parts') ? 'integration-by-parts' : 'u-substitution',
+      severity: 'gap',
+      title: t('d{0} is the derivative of {1}, times d{2}.', { 0: w.name, 1: w.name, 2: v }),
+      message: should ? t('Differentiate {0}: its derivative is ${1}$, so d{2} = ${3}$ d{4}.', { 0: w.name, 1: should, 2: w.name, 3: should, 4: v }) : t('Differentiate the letter you named, then multiply by d{0}.', { 0: v }),
+      fix: should ? `d${w.name} = ${should} d${v}` : undefined,
+    };
+  }
+  if (w.kind === 'prime') {
+    return {
+      code: 'prime',
+      concept: problem.concepts[0] ?? 'power-rule',
+      severity: 'slip',
+      title: t('That is not the derivative of {0}.', { 0: w.name }),
+      message: t('Differentiate what {0} stands for: {1}′ = ${2}$.', { 0: w.name, 1: w.name, 2: toText(w.should) }),
+      fix: `${w.name}' = ${toText(w.should)}`,
+    };
+  }
+  const owed = w.kind === 'name' && !w.ok ? w.owed : null;
+  const right = owed ? integrate(owed, v) : null;
+  return {
+    code: 'parts-v',
+    concept: 'integration-by-parts',
+    severity: 'gap',
+    title: t('v has to differentiate back to dv.'),
+    message: t('v is an antiderivative of ${0}$. Differentiate your v to check: it should give ${1}$ back.', { 0: owed ? toText(owed) : 'dv', 1: owed ? toText(owed) : 'dv' }),
+    fix: right ? `${w.name} = ${toText(right.F)}` : undefined,
+  };
+}
+
 /* ───────────── the whole attempt ───────────── */
 
 export function calcAnalyze(problem: Problem, rawLines: string[], opts: AnalyzeOptions = {}): AttemptAnalysis {
@@ -377,22 +416,56 @@ export function calcAnalyze(problem: Problem, rawLines: string[], opts: AnalyzeO
     | { kind: 'unreadable'; text: string; note: string }
     | { kind: 'unchecked'; text: string; latex: string }
     | { kind: 'true'; text: string; latex: string; last: Side; fin: { final: boolean; remaining?: string } }
-    | { kind: 'false'; text: string; latex: string; last: Side; first: Side; sides: Side[]; bad: Side; diag: Diagnosis; unfinished: boolean; note?: string };
+    | { kind: 'false'; text: string; latex: string; last: Side; first: Side; sides: Side[]; bad: Side; diag: Diagnosis; unfinished: boolean; note?: string; sideOnly?: boolean }
+    | { kind: 'aside'; text: string; latex: string; note?: string }
+    | { kind: 'words'; text: string };
+  const scope = new Scope(p.v);
   const judged: Judged[] = texts.map((text): Judged => {
-    const parsed = parseLine(text, p.v);
+    // joining words (let, so, ⇒ …) say how the writer got here; the statements after them are what is checked
+    const { body, words } = unjoin(text);
+    // a sentence of reasoning: read, not marked
+    if (isWords(body)) return { kind: 'words', text };
+    const stmts = statements(body).map((x) => unjoin(x).body).filter(Boolean);
+    const side: SideWork[] = [];
+    const rest: string[] = [];
+    for (const st of stmts) {
+      const w = sideWork(st, scope);
+      if (w) side.push(w);
+      else rest.push(st);
+    }
+    const lead = words ? `\\text{${words.replace(/[{}\\]/g, '')}}\\; ` : '';
+    const wrong = side.find((w) => !w.ok);
+    if (wrong) {
+      const latex = lead + [...side.map((w) => w.latex), ...rest].join(',\\quad ');
+      return { kind: 'false', text, latex, last: { latex: '' }, first: { latex: '' }, sides: [], bad: { latex: '' }, diag: sideDiag(p, problem, wrong), unfinished: false, sideOnly: true };
+    }
+    if (!rest.length) {
+      const named = side.find((w) => w.kind === 'name');
+      const note = named && named.kind === 'name' ? t('{0} stands for ${1}$ from here on.', { 0: named.name, 1: toText(named.e) }) : undefined;
+      return { kind: 'aside', text, latex: lead + side.map((w) => w.latex).join(',\\quad '), note };
+    }
+    const parsed = parseLine(scope.primesOut(rest.join(' = ')), p.v);
     if (!parsed.ok) return { kind: 'unreadable', text, note: parsed.error };
-    const verdicts = parsed.sides.map((x) => truth(p, x));
+    // a line in u is checked in x: u put back, and du put back as u′ dx
+    const sides = parsed.sides.map((x) => (x.e && !scope.empty ? { ...x, e: scope.back(x.e), orig: x.e } : x));
+    const latex = lead + [...side.map((w) => w.latex), parsed.latex].join(',\\quad ');
+    const verdicts = sides.map((x) => truth(p, x));
     const badAt = verdicts.findIndex((x) => x === false);
-    const last = parsed.sides[parsed.sides.length - 1];
-    if (badAt < 0 && verdicts.some((x) => x === null)) return { kind: 'unchecked', text, latex: parsed.latex };
-    if (badAt < 0) return { kind: 'true', text, latex: parsed.latex, last, fin: finished(p, last) };
-    const bad = parsed.sides[badAt];
+    const last = sides[sides.length - 1];
+    if (badAt < 0 && verdicts.some((x) => x === null)) return { kind: 'unchecked', text, latex };
+    if (badAt < 0) {
+      // right, but still in u: the answer has to be put back in x
+      const still = last.orig ? scope.mentionsNamed(last.orig) : null;
+      const fin = still ? { final: false, remaining: t('Right. Now put {0} back in terms of {1}.', { 0: still, 1: p.v }) } : finished(p, last);
+      return { kind: 'true', text, latex, last, fin };
+    }
+    const bad = sides[badAt];
     const diag = diagnose(p, problem, bad);
     // half a rule, on the last side of the line: a step on the way, not a false claim
     const ai = diag.code === 'unknown' ? opts.aiSteps?.[text] : undefined;
-    if (ai) return { kind: 'false', text, latex: parsed.latex, last, first: parsed.sides[0], sides: parsed.sides, bad, diag: { ...diag, fix: ai.fix ?? diag.fix, halfDone: true }, unfinished: true, note: ai.note };
-    const unfinished = diag.code in UNFINISHED && badAt === parsed.sides.length - 1;
-    return { kind: 'false', text, latex: parsed.latex, last, first: parsed.sides[0], sides: parsed.sides, bad, diag: unfinished ? { ...diag, fix: completedText(p, bad, diag.code), halfDone: true } : diag, unfinished };
+    if (ai) return { kind: 'false', text, latex, last, first: sides[0], sides, bad, diag: { ...diag, fix: ai.fix ?? diag.fix, halfDone: true }, unfinished: true, note: ai.note };
+    const unfinished = diag.code in UNFINISHED && badAt === sides.length - 1;
+    return { kind: 'false', text, latex, last, first: sides[0], sides, bad, diag: unfinished ? { ...diag, fix: completedText(p, bad, diag.code), halfDone: true } : diag, unfinished };
   });
 
   // 2. decide each line in the light of the whole attempt
@@ -403,6 +476,19 @@ export function calcAnalyze(problem: Problem, rawLines: string[], opts: AnalyzeO
   judged.forEach((j, i) => {
     if (j.kind === 'unreadable') {
       lines.push({ text: j.text, status: 'unreadable', note: j.note });
+      return;
+    }
+    if (j.kind === 'aside') {
+      // a name or a differential, right in itself: it changes nothing about where the attempt stands
+      lines.push({ text: j.text, status: 'ok', latex: j.latex, aside: true, note: j.note });
+      return;
+    }
+    if (j.kind === 'words') {
+      lines.push({ text: j.text, status: 'unchecked', note: t('A line of words: I read it, but only the maths gets marked.') });
+      return;
+    }
+    if (j.kind === 'false' && j.sideOnly) {
+      lines.push({ text: j.text, status: 'wrong', latex: j.latex, trueToGiven: false, diag: j.diag, aside: true });
       return;
     }
     if (j.kind === 'unchecked') {

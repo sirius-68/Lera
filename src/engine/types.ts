@@ -117,6 +117,8 @@ export interface CheckedLine {
   isFinal?: boolean;
   /** Says the same thing as the original problem. */
   trueToGiven?: boolean;
+  /** Working on the side (a name such as u = x² + 1, a differential): checked on its own, not against the problem. */
+  aside?: boolean;
 }
 
 export type Verdict = 'solved' | 'unfinished' | 'wrong' | 'empty';

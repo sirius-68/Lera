@@ -564,7 +564,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
                 </span>
                 <Mark line={line} pending={!isChecked(i)} />
               </button>
-              {isChecked(i) && line.status === 'step' && line.note && <p className="line-next">{line.note}</p>}
+              {isChecked(i) && (line.status === 'step' || (line.aside && line.status === 'ok')) && line.note && <p className="line-next"><RichText text={line.note} /></p>}
               {isChecked(i) && line.status === 'wrong' && line.diag && openDiag === i && (
                 <DiagnosisCard
                   diag={line.diag}

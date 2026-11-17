@@ -4,6 +4,7 @@ import { diagnose, hasProductOfSums } from './diagnose';
 import { parseLine } from './parse';
 import { nextStep, solutionSteps } from './steps';
 import { calcAnalyze, calcAnswer, calcHint, calcPath, isCalc } from './calc/check';
+import { isWords, unjoin } from './calc/scope';
 import { AnalyzeOptions, AttemptAnalysis, CheckedLine, ConceptId, Diagnosis, Problem, SolutionStep, StepTag } from './types';
 import { msg, t } from '../i18n';
 
@@ -33,7 +34,13 @@ export function analyze(problem: Problem, rawLines: string[], opts: AnalyzeOptio
   let prev: Statement = prep.given;
 
   for (const text of texts) {
-    const parsed = parseLine(text);
+    // joining words (so, hence, ⇒ …) say how the writer got here; a sentence of reasoning is read, not marked
+    const body = unjoin(text).body;
+    if (isWords(body) && !/^(?:no solution|all real numbers)$/i.test(body.trim())) {
+      lines.push({ text, status: 'unchecked', note: t('A line of words: I read it, but only the maths gets marked.') });
+      continue;
+    }
+    const parsed = parseLine(body);
     if (!parsed.ok) {
       lines.push({ text, status: 'unreadable', note: parsed.error });
       continue;
