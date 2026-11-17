@@ -183,8 +183,13 @@
 .noticed:active { background: var(--tint); }
 .route { list-style: none; counter-reset: r; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .route li { counter-increment: r; position: relative; padding-left: 30px; font-size: 18px; animation: rise 0.4s var(--ease) both; }
-.route li::before { content: counter(r); position: absolute; left: 0; top: 3px; width: 21px; height: 21px; border-radius: 50%; background: var(--tint); color: var(--brand-d); font-size: 12px; font-weight: 700; display: grid; place-items: center; }
+.route li::before { content: attr(data-n); position: absolute; left: 0; top: 3px; width: 21px; height: 21px; border-radius: 50%; background: var(--tint); color: var(--brand-d); font-size: 12px; font-weight: 700; display: grid; place-items: center; }
 .route li .muted { display: block; font-size: 13.5px; line-height: 1.4; margin-top: 1px; }
+/* working on the side (u = …, a value put in): indented, as on paper */
+.route li.aside { margin-left: 30px; padding-left: 12px; border-left: 2px solid var(--line); font-size: 16px; }
+.route li.aside::before { display: none; }
+.route-rule { display: block; margin-bottom: 4px; padding: 6px 10px; border-radius: 10px; background: var(--tint); font-size: 15px; }
+.route-rule .faint { display: block; font-size: 11.5px; letter-spacing: 0.02em; text-transform: uppercase; }
 .ws-foot { padding: 12px 20px calc(14px + var(--safe-b)); display: flex; justify-content: center; background: #fff; border-top: 1.5px solid var(--line); animation: rise 0.4s var(--ease) both; }
 .ws-keys { background: #fff; border-top: 1.5px solid var(--line); padding: 6px 8px calc(8px + var(--safe-b)); }
 .ws-tools { padding: 0 4px 6px; }
@@ -311,3 +316,7 @@
 .wish-go:active { transform: translateY(3px); box-shadow: none; }
 .wish-go:disabled { opacity: 0.6; }
 .more-practice .bad { color: var(--bad, #d64545); }
+
+/* "Explain it" on a worked example: the engine's own steps, under the example */
+.ex-explain { margin-top: 12px; padding-top: 10px; border-top: 1.5px dashed var(--line); }
+.ex-explain .linkbtn { margin-top: 10px; display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; }

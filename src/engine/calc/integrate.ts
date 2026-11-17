@@ -137,7 +137,7 @@ function table(name: Fn, t: E, c: Ctx): E | null {
 }
 
 /** ∫ OUTER(t) dt where the outer function wraps a bare variable t. */
-function outer(e: E, t: string, c: Ctx): E | null {
+export function outer(e: E, t: string, c: Ctx = { v: t, hit: false, how: 'power' }): E | null {
   const T = V(t);
   if (isVar(e, t)) return powerRule(T, 1, c);
   if (e.t === 'f' && isVar(e.a, t)) return table(e.name, T, c);
@@ -172,7 +172,7 @@ function outer(e: E, t: string, c: Ctx): E | null {
 }
 
 /** The "insides" a substitution could use: arguments, bases of powers, exponents, denominators. */
-function insides(e: E, v: string, out: E[] = []): E[] {
+export function insides(e: E, v: string, out: E[] = []): E[] {
   const push = (u: E): void => {
     if (has(u, v) && !isVar(u, v)) out.push(u);
   };
@@ -207,7 +207,7 @@ function insides(e: E, v: string, out: E[] = []): E[] {
 const PTS = [0.41, 0.93, 1.37, 2.2, -0.6, 3.1];
 
 /** If e = g(u)·u′ for some g, return g written in the fresh variable t. Found by rewriting, confirmed by numbers. */
-function inTermsOf(e: E, u: E, v: string): E | null {
+export function inTermsOf(e: E, u: E, v: string): E | null {
   const du = simp(diff(u, v));
   const key = JSON.stringify(u);
   const swap = (x: E): E => {

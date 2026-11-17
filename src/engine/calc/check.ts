@@ -2,6 +2,7 @@ import { AttemptAnalysis, CheckedLine, ConceptId, Diagnosis, Problem, ProblemKin
 import { CalcParseError, E, Flaw, Indefinite, N, V, add, constantRatio, diff, div, equiv, ev, has, mentions, mul, neg, nice, numText, parseCalc, pending, pow, pre, simp, subst, toLatex, toText } from './expr';
 import { IntFlaw, integrate, integrateWith, toPoly, polyToExpr } from './integrate';
 import { msg, t } from '../../i18n';
+import { definiteRoute, derivativeRoute, integralRoute, limitRoute } from './route';
 
 /**
  * Line-by-line checking for calculus.
@@ -585,7 +586,10 @@ export function calcPath(problem: Problem): SolutionStep[] {
   let steps: SolutionStep[] = [];
   if (p) {
     try {
-      steps = p.mode === 'derivative' ? derivativeSteps(p) : p.mode === 'integral' ? integralSteps(p) : p.mode === 'definite' ? definiteSteps(p) : limitSteps(p);
+      // the detailed route first; the short one only where the detailed one can't be built
+      const detailed =
+        p.mode === 'derivative' ? derivativeRoute(p.body, p.v) : p.mode === 'integral' ? integralRoute(p.body, p.v) : p.mode === 'definite' ? definiteRoute(p.body, p.v, p.lo as number, p.hi as number, p.value as number) : limitRoute(p.body, p.v, p.to as number, p.value as number);
+      steps = detailed ?? (p.mode === 'derivative' ? derivativeSteps(p) : p.mode === 'integral' ? integralSteps(p) : p.mode === 'definite' ? definiteSteps(p) : limitSteps(p));
     } catch {
       steps = [];
     }
@@ -622,11 +626,32 @@ export function calcHint(problem: Problem, rawLines: string[]): CalcHint | null 
   const path = calcPath(problem);
   if (!path.length) return null;
   const a = calcAnalyze(problem, rawLines);
-  const good = a.lines.filter((l) => l.status === 'ok' || l.status === 'recovered').length;
-  const step = path[Math.min(path.length - 1, good)];
+  const trueLines = a.lines.filter((l) => l.status === 'ok' || l.status === 'recovered');
+  const good = trueLines.length;
+  const step = path[nextIndex(path, trueLines[trueLines.length - 1]?.text, good, p.v)];
   const shape = p.mode === 'derivative' ? shapeOf(p.body, p.v).shape : 'any';
   const nudge = a.remaining && good > 0 ? a.remaining : NUDGES[p.mode][shape] ?? NUDGES[p.mode].any ?? '';
   return { nudge, method: step.why, line: step.line, concept: problem.concepts[0] };
+}
+
+/**
+ * Where the learner is on the route: just after the route line their last true line matches, or, when it matches
+ * none, as far along as the number of true lines they have written. Side working that leads into a step comes first.
+ */
+function nextIndex(path: SolutionStep[], last: string | undefined, good: number, v: string): number {
+  const canon = (text: string): string => {
+    const r = parseLine(text, v);
+    return (r.ok ? r.latex : text).replace(/\s+/g, '');
+  };
+  if (last) {
+    const mine = canon(last);
+    for (let i = path.length - 1; i >= 0; i--) if (!path[i].aside && canon(path[i].line) === mine) return Math.min(path.length - 1, i + 1);
+  }
+  const main = path.map((s, i) => (s.aside ? -1 : i)).filter((i) => i >= 0);
+  if (!main.length) return path.length - 1;
+  let at = main[Math.min(main.length - 1, good)];
+  while (at > 0 && path[at - 1].aside) at--;
+  return at;
 }
 
 /** Which calculus idea a problem mostly exercises — used when notes don't say. */

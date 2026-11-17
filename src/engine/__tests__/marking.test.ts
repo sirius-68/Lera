@@ -97,7 +97,7 @@ function checkRoute(p: Problem): void {
   assert.equal(route[route.length - 1].line, answerOf(p));
 }
 
-test.todo('every calculus route is in small steps and every line of it is true (200 seeds)', () => {
+test('every calculus route is in small steps and every line of it is true (200 seeds)', () => {
   for (const c of ALL_CONCEPTS) {
     for (let seed = 1; seed <= 200; seed++) {
       for (const p of practiceFor(c, 1, seed)) if (isCalc(p.kind)) checkRoute(p);
@@ -105,7 +105,7 @@ test.todo('every calculus route is in small steps and every line of it is true (
   }
 });
 
-test.todo('∫ 3x^2 dx is explained: constant out, the rule, n = 2, tidied, + C', () => {
+test('∫ 3x^2 dx is explained: constant out, the rule, n = 2, tidied, + C', () => {
   const route = cleanPath(P('integral', '∫ 3x^2 dx'));
   const lines = route.map((s) => s.line.replace(/\s+/g, ''));
   assert.ok(lines.includes('3∫x^2dx'), lines.join(' | '));
@@ -115,7 +115,7 @@ test.todo('∫ 3x^2 dx is explained: constant out, the rule, n = 2, tidied, + C'
   assert.equal(lines[lines.length - 1], 'x^3+C');
 });
 
-test.todo('∫ x e^(2x) dx is explained by parts, in steps', () => {
+test('∫ x e^(2x) dx is explained by parts, in steps', () => {
   const route = cleanPath(P('integral', '∫ x e^(2x) dx'));
   const text = route.map((s) => `${s.line} :: ${s.why}`).join('\n');
   assert.ok(route.length >= 5, text);
@@ -126,7 +126,7 @@ test.todo('∫ x e^(2x) dx is explained by parts, in steps', () => {
   assert.ok(route.some((s) => s.rule && /uv/.test(s.rule)), text);
 });
 
-test.todo('∫ from 0 to 2 of 3x^2 is explained: antiderivative, top, bottom, subtract', () => {
+test('∫ from 0 to 2 of 3x^2 is explained: antiderivative, top, bottom, subtract', () => {
   const route = cleanPath(P('definite', '∫[0,2] 3x^2 dx'));
   const text = route.map((s) => s.line).join(' | ');
   assert.ok(route.length >= 5, text);

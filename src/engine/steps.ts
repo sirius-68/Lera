@@ -188,27 +188,46 @@ function equationSteps(prep: Prepared, st: Statement, isIneq: boolean): Solution
     const a = coeffs[1];
     const b = fNeg(coeffs[0]);
     const lhsOnlyVar = pDegree(L, v) === 1 && !L.has('') && pDegree(R, v) === 0;
+    const sym = (o: string): string => (o === '<=' ? '≤' : o === '>=' ? '≥' : o);
+    const wrap = (f: Frac): string => (fIsInt(f) && fSign(f) >= 0 ? fText(f) : `(${fText(f)})`);
     if (!lhsOnlyVar) {
+      // ax + c = d: the same number taken off both sides is its own step, then each side is worked out
+      const c = L.get('') ?? ZERO;
+      const plain = pDegree(R, v) === 0 && pDegree(L, v) === 1 && !fIsZero(c) && L.size === 2;
+      if (plain) {
+        const minus = fSign(c) > 0;
+        const k = minus ? c : fNeg(c);
+        out.push({
+          line: `${polyToText(L)} ${minus ? '-' : '+'} ${wrap(k)} ${sym(op)} ${polyToText(R)} ${minus ? '-' : '+'} ${wrap(k)}`,
+          why: minus ? tr('Subtract {0} from both sides, so the {1} term is left on its own.', { 0: fText(k), 1: v }) : tr('Add {0} to both sides, so the {1} term is left on its own.', { 0: fText(k), 1: v }),
+          tag: 'move',
+        });
+      }
       L = pFromUni([ZERO, a], v);
       R = pConst(b);
       out.push({
         line: line(),
-        why: tr('Get the {0} terms on one side and the numbers on the other. A term changes sign when it crosses over.', { 0: v }), tag: 'move',
+        why: plain ? tr('Work out each side.') : tr('Get the {0} terms on one side and the numbers on the other. A term changes sign when it crosses over.', { 0: v }),
+        tag: 'move',
       });
     }
     if (!fEq(a, ONE)) {
       const negative = fSign(a) < 0;
+      const before = op;
       if (isIneq && negative) op = FLIP[op];
-      L = pFromUni([ZERO, ONE], v);
-      R = pConst(fDiv(b, a));
+      // ax = b: divide both sides by a, written out, then worked out
       out.push({
-        line: line(),
+        line: `${polyToText(L)}/${wrap(a)} ${sym(op)} ${wrap(b)}/${wrap(a)}`,
         why:
           isIneq && negative
             ? tr('Divide both sides by {0}. Dividing by a negative flips the inequality sign.', { 0: fText(a) })
-            : tr('Divide both sides by {0}.', { 0: fText(a) }),
+            : tr('Divide both sides by {0}, so {1} is left on its own.', { 0: fText(a), 1: v }),
         tag: 'divide',
       });
+      void before;
+      L = pFromUni([ZERO, ONE], v);
+      R = pConst(fDiv(b, a));
+      out.push({ line: line(), why: tr('Work out each side.'), tag: 'divide' });
     }
     return out;
   }

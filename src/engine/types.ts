@@ -139,4 +139,8 @@ export interface SolutionStep {
   line: string;
   why: string;
   tag: StepTag;
+  /** Working on the side (u = …, du = …, a value put in): not a line that stands for the whole problem. */
+  aside?: boolean;
+  /** The general rule this step uses, as a formula, shown before the step. */
+  rule?: string;
 }

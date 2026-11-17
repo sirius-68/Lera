@@ -60,7 +60,8 @@ test('generated problems are solvable and their clean path is accepted', () => {
       for (const p of practiceFor(id, 3, seed * 7919)) {
         count++;
         assert.ok(isCalc(p.kind) ? prepCalc(p) : prepare(p), `${id}: cannot prepare "${p.given}"`);
-        const path = cleanPath(p).map((s) => s.line);
+        // side working (u = …, a value put in) is not a line of the attempt
+        const path = cleanPath(p).filter((s) => !s.aside).map((s) => s.line);
         assert.ok(path.length > 0, `${id}: no path for "${p.given}"`);
         const a = analyze(p, path);
         assert.equal(a.verdict, 'solved', `${id}: "${p.given}" via ${path.join(' | ')} → ${a.lines.map((l) => l.status).join(',')} ${a.remaining ?? ''}`);

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { aiCheckOpen, aiDiagnose, aiSimplify } from '../ai/tasks';
 import { aiReady } from '../ai/providers';
-import { analyze, cleanPath, hintLadder, HintLadder, stepConcepts } from '../engine/analyze';
+import { analyze, cleanPath, hintLadder, HintLadder } from '../engine/analyze';
 import { isCalc } from '../engine/calc/check';
 import { conceptOf } from '../engine/concepts';
 import { PLAIN } from '../engine/concepts-calc';
@@ -19,6 +19,7 @@ import { Icon } from '../ui/icons';
 import { MathField, MathFieldHandle } from '../ui/MathField';
 import type { Kind } from '../ui/mathrow';
 import { MathView, RichText } from '../ui/math';
+import { StepList } from '../ui/Steps';
 import { TermText } from '../ui/terms';
 import { WeakCard } from './Main';
 import { msg, promptText, t as tr, tn } from '../i18n';
@@ -228,10 +229,9 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
   /** The final answer, given before any working was shown. */
   const [answerFirst, setAnswerFirst] = useState<string | null>(null);
   const clean = useMemo(() => cleanPath(problem), [problem]);
-  const cleanConcepts = useMemo(() => stepConcepts(problem, clean), [problem, clean]);
   // A problem that takes one step has no working to show: the answer is the working, and it is simply accepted.
   // For longer ones the working is asked for once; if the answer alone comes back a second time it is taken, so nobody gets stuck.
-  const needsWorking = answerFirst === null && clean.length > 1;
+  const needsWorking = answerFirst === null && clean.filter((s) => !s.aside).length > 1;
   /** What "Done" found when the work was not right or not finished yet. */
   const [review, setReview] = useState<{ wrong: number[]; remaining: string | null } | null>(null);
   const [gaps, setGaps] = useState(false);
@@ -516,7 +516,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
               <span className="chip ok"><Icon name="check" size={13} stroke={3.2} />{' '}{tr('Right answer')}</span>
               <MathView text={answerFirst} />
             </div>
-            <p><b>{tr('Now show me how you got there.')}</b>{' '}{tr('This one takes about')}{' '}{clean.length} lines. Write them, ending with the answer. The answer tells me you can do it. The steps show me how you think, and that is where I can help.</p>
+            <p><b>{tr('Now show me how you got there.')}</b>{' '}{tr('Write your working in as many steps as help you, ending with the answer. The steps show me how you think, and that is where I can help.')}</p>
           </div>
         )}
         <ol className="lines">
@@ -639,7 +639,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
               </div>
             ) : (
               <div className="card tint">
-                <b>{tr('Here’s a clean route')}</b>
+                <b>{tr('Step by step')}</b>
                 <p className="muted" style={{ fontSize: 14, marginTop: 2 }}>{tr('Read each step and the reason beside it. This one comes back later so you can do it yourself.')}</p>
               </div>
             )}
@@ -659,33 +659,13 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
 
             {strategy && <p className="ws-note info"><Icon name="swap" size={16} /> <span><RichText text={strategy.message} /></span></p>}
 
-            {clean.length > 0 && (solved ? analysis.steps !== clean.length || marks.length > 0 || compare : true) && (
+            {clean.length > 0 && (
               <div className="card">
                 <button className="row" style={{ width: '100%', justifyContent: 'space-between' }} onClick={() => setCompare(!compare)} aria-expanded={compare || revealed}>
-                  <span className="label">{revealed ? tr('Clean route') : `A clean route · ${clean.length} ${clean.length === 1 ? 'line' : 'lines'}`}</span>
+                  <span className="label">{tr('Step by step')}</span>
                   {!revealed && <Icon name={compare ? 'down' : 'chevron'} size={17} />}
                 </button>
-                {(compare || revealed) && (
-                  <ol className="route">
-                    {clean.map((s, i) => {
-                      const c = cleanConcepts[i];
-                      // the rule is spelled out the first time a step leans on it, not on every line
-                      const rule = c && cleanConcepts.indexOf(c) === i ? conceptOf(c) : null;
-                      return (
-                        <li key={i} style={{ animationDelay: `${i * 90}ms` }}>
-                          <MathView text={s.line} block />
-                          <span className="muted"><b>{tr('What I did.')}</b> <TermText text={s.why} /></span>
-                          {rule && clean.length > 1 && (
-                            <span className="route-why">
-                              <b>{tr('Why it is allowed.')}</b> <TermText text={rule.short} />{' '}
-                              <button className="linkbtn" onClick={() => openOverlay({ name: 'review', concept: rule.id })}>{rule.title} <Icon name="chevron" size={13} /></button>
-                            </span>
-                          )}
-                        </li>
-                      );
-                    })}
-                  </ol>
-                )}
+                {(compare || revealed) && <StepList problem={problem} steps={clean} />}
               </div>
             )}
           </div>

@@ -169,15 +169,15 @@ test('special answers', () => {
   assert.equal(analyze(P('linear', '2(x + 1) = 2x + 2'), ['all real numbers']).verdict, 'solved');
 });
 
-test('the long way round is noticed, not punished', () => {
+test('the long way round is not punished', () => {
   const a = analyze(P('linear', '3x + 4 = 19'), ['3x + 4 - 4 = 19 - 4', '3x + 0 = 15', '3x = 15', '3x/3 = 15/3', 'x = 5']);
   assert.equal(a.verdict, 'solved');
-  assert.ok(a.marks.some((m) => m.severity === 'strategy'));
   assert.ok(!a.marks.some((m) => m.severity === 'gap'));
 });
 
 test('clean paths end at the answer', () => {
-  assert.deepEqual(cleanPath(P('linear', '2(x + 3) = 14')).map((s) => s.line), ['2x + 6 = 14', '2x = 8', 'x = 4']);
+  // the same thing done to both sides is its own step, then each side is worked out
+  assert.deepEqual(cleanPath(P('linear', '2(x + 3) = 14')).map((s) => s.line), ['2x + 6 = 14', '2x + 6 - 6 = 14 - 6', '2x = 8', '2x/2 = 8/2', 'x = 4']);
   assert.deepEqual(cleanPath(P('quadratic', 'x^2 - 5x + 6 = 0')).map((s) => s.line), ['(x - 2)(x - 3) = 0', 'x = 2 or x = 3']);
   assert.equal(answerOf(P('quadratic', 'x^2 = 9')), 'x = ±3');
   assert.equal(answerOf(P('inequality', '-2x + 3 > 7')), 'x < -2');
@@ -194,7 +194,7 @@ test('clean paths end at the answer', () => {
 test('hints climb from a nudge to the next line', () => {
   const h = hintLadder(P('linear', '2(x + 3) = 14'), ['2x + 6 = 14']);
   assert.ok(h);
-  assert.equal(h.line, '2x = 8');
+  assert.equal(h.line, '2x + 6 - 6 = 14 - 6');
   assert.equal(h.tag, 'move');
   assert.ok(h.nudge.endsWith('?'));
   // after a wrong line, the hint restarts from the last line that was still right

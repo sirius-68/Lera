@@ -1,5 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
+import { cleanPath } from '../engine/analyze';
 import { conceptOf } from '../engine/concepts';
 import { functionOfLine } from '../ingest/calc';
 import { isMathLine, plain } from '../ingest/structure';
@@ -18,6 +19,7 @@ import { Icon } from '../ui/icons';
 import { Graph } from '../ui/Graph';
 import { Fit, MathView, tokenize } from '../ui/math';
 import { Table } from '../ui/Md';
+import { StepList } from '../ui/Steps';
 import { AS_WRITTEN } from '../engine/latex';
 import { promptText, t as tr, tn } from '../i18n';
 
@@ -225,6 +227,13 @@ function ExampleCard({ block, index, ctx }: { block: Extract<Block, { t: 'exampl
   const total = block.lines.length;
   // the example's own question, as something to solve: taken from its first line (or its title, when the question sits there)
   const problem = useMemo(() => exampleProblem(block, index, ctx.topicId), [block, index, ctx.topicId]);
+  // the engine's own worked route, when it can solve the question: offline, and every line of it checked
+  const route = useMemo(() => (problem ? cleanPath(problem) : []), [problem]);
+  const [explained, setExplained] = useState(false);
+  const askLera = () => {
+    haptic(5);
+    openOverlay({ name: 'ask', topicId: ctx.topicId, seed: tr('Explain this example to me step by step, and say why each step is allowed: {0}', { 0: block.lines.map((l) => plain(l)).join(' ; ') }) });
+  };
   return (
     <div className="rd-example">
       <span className="label">{block.title || tr('Example')}</span>
@@ -259,14 +268,26 @@ function ExampleCard({ block, index, ctx }: { block: Extract<Block, { t: 'exampl
         )}
         <button
           className="reveal alt"
+          aria-expanded={route.length > 1 ? explained : undefined}
           onClick={() => {
-            haptic(5);
-            openOverlay({ name: 'ask', topicId: ctx.topicId, seed: tr('Explain this example to me step by step, and say why each step is allowed: {0}', { 0: block.lines.map((l) => plain(l)).join(' ; ') }) });
+            if (route.length > 1 && problem) {
+              haptic(5);
+              setExplained(!explained);
+            } else askLera();
           }}
         >
           <Icon name="chat" size={15} />{' '}{tr('Explain it')}
         </button>
       </div>
+      {explained && problem && route.length > 1 && (
+        <div className="ex-explain">
+          <span className="label">{tr('Step by step')}</span>
+          <StepList problem={problem} steps={route} />
+          <button className="linkbtn" onClick={askLera}>
+            <Icon name="chat" size={14} /> {tr('Ask Lera about this example')}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

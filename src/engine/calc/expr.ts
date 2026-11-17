@@ -438,7 +438,8 @@ export function has(e: E, v: string): boolean {
       return has(e.a, v);
     case 'int':
       if (e.lo && e.hi) return has(e.lo, v) || has(e.hi, v) || (e.v !== v && has(e.a, v));
-      return has(e.a, v);
+      // ∫ 7 dx is 7x: an integral without limits is a function of its own variable, whatever is inside
+      return e.v === v || has(e.a, v);
     case 'lim':
       return has(e.to, v) || (e.v !== v && has(e.a, v));
   }
@@ -1105,7 +1106,8 @@ export function toText(e: E): string {
         else {
           const prev = e.a[i - 1];
           const digitNext = /^[0-9]/.test(s);
-          const tight = prev.t === 'n' && !digitNext && !s.startsWith('(') ? '' : digitNext ? '*' : ' ';
+          // "7d/dx(x)" would read back as 7 · d/d · x · x, so a d/dx always gets its space
+          const tight = prev.t === 'n' && !digitNext && !s.startsWith('(') && f.t !== 'd' ? '' : digitNext ? '*' : ' ';
           out += tight + s;
         }
       });
