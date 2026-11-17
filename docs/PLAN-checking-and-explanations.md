@@ -1,7 +1,11 @@
 # Plan: fair marking of step-by-step working, full step-by-step explanations, and the written-answer screen
 
-Written 17 Nov 2026 for whoever implements it next. Nothing in this file has been built yet.
-It covers four faults reported from the phone, each reproduced in the code before being written down here.
+Written 17 Nov 2026 for whoever implements it next. It covers four faults reported from the phone, each reproduced in
+the code before being written down here.
+
+**Status: built on 17 Nov 2026** (commits a153166 to 6dd8b20 on `native`). Every acceptance test below is in
+`src/engine/__tests__/marking.test.ts` and passes. Not built: the optional AI wording pass for explanations (section 3,
+last point); the engine's own wording is complete without it. The route builder is `src/engine/calc/route.ts`.
 
 ## What the learner asked for
 
