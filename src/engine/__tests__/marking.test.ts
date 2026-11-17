@@ -19,7 +19,7 @@ const statuses = (p: Problem, lines: string[], done = true) => analyze(p, lines,
 
 /* ───────────── marking ───────────── */
 
-test.todo('a correct step-by-step integral is never flagged', () => {
+test('a correct step-by-step integral is never flagged', () => {
   const p = P('integral', '∫ 3x^2 dx');
   const a = analyze(p, ['3x^(2+1)', '3x^3/3', 'x^3 + C'], { done: true });
   assert.equal(a.verdict, 'solved');
@@ -27,7 +27,7 @@ test.todo('a correct step-by-step integral is never flagged', () => {
   assert.equal(a.marks.length, 0);
 });
 
-test.todo('a half-done rule left unfinished at "Done" is the gap, and its fix is that same line corrected', () => {
+test('a half-done rule left unfinished at "Done" is the gap, and its fix is that same line corrected', () => {
   const p = P('integral', '∫ 3x^2 dx');
   const a = analyze(p, ['3x^(2+1)'], { done: true });
   assert.notEqual(a.verdict, 'solved');
@@ -36,7 +36,7 @@ test.todo('a half-done rule left unfinished at "Done" is the gap, and its fix is
   assert.ok(['3x^3/3', 'x^3', '3(x^3/3)'].includes((a.marks[0].fix ?? '').replace(/\s+/g, '')), a.marks[0].fix);
 });
 
-test.todo('while still writing, a half-done line is a step with a note on what is left', () => {
+test('while still writing, a half-done line is a step with a note on what is left', () => {
   const p = P('integral', '∫ 3x^2 dx');
   const a = analyze(p, ['3x^(2+1)'], { done: false });
   assert.equal(a.lines[0].status, 'step');
@@ -52,7 +52,7 @@ test('differentiating instead of integrating is wrong at once', () => {
   assert.deepEqual(statuses(P('integral', '∫ 3x^2 dx'), ['6x'], false), ['wrong']);
 });
 
-test.todo('the chain rule written in two steps is not flagged, and left half-done it is', () => {
+test('the chain rule written in two steps is not flagged, and left half-done it is', () => {
   const p = P('derivative', 'd/dx(sin(x^2))');
   const a = analyze(p, ['cos(x^2)', 'cos(x^2) * 2x'], { done: true });
   assert.deepEqual(a.lines.map((l) => l.status), ['step', 'ok']);
@@ -73,7 +73,7 @@ test.todo('a long, correct solution of an equation gets no marks and no remark a
   assert.equal(a.marks.length, 0);
 });
 
-test.todo('a step line costs nothing: same points, same clean count, nothing to review', () => {
+test('a step line costs nothing: same points, same clean count, nothing to review', () => {
   const p: Problem = { ...P('integral', '∫ 3x^2 dx'), concepts: ['antiderivatives'] };
   const blank = (): Pick<AppState, 'concepts' | 'attempts' | 'solved'> => ({ concepts: {}, attempts: [], solved: {} });
   const now = new Date('2026-11-17T10:00:00');

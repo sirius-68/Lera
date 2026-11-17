@@ -4,7 +4,7 @@ import { diagnose, hasProductOfSums } from './diagnose';
 import { parseLine } from './parse';
 import { nextStep, solutionSteps } from './steps';
 import { calcAnalyze, calcAnswer, calcHint, calcPath, isCalc } from './calc/check';
-import { AttemptAnalysis, CheckedLine, ConceptId, Diagnosis, Problem, SolutionStep, StepTag } from './types';
+import { AnalyzeOptions, AttemptAnalysis, CheckedLine, ConceptId, Diagnosis, Problem, SolutionStep, StepTag } from './types';
 import { msg, t } from '../i18n';
 
 /**
@@ -14,8 +14,8 @@ import { msg, t } from '../i18n';
  * so a right answer reached by a broken route still gets caught, and one
  * mistake is marked once instead of on every line after it.
  */
-export function analyze(problem: Problem, rawLines: string[]): AttemptAnalysis {
-  if (isCalc(problem.kind)) return calcAnalyze(problem, rawLines);
+export function analyze(problem: Problem, rawLines: string[], opts: AnalyzeOptions = {}): AttemptAnalysis {
+  if (isCalc(problem.kind)) return calcAnalyze(problem, rawLines, opts);
   const prep = prepare(problem);
   const texts = rawLines.map((l) => l.trim()).filter((l) => l.length > 0);
   if (!prep) {

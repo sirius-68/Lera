@@ -145,6 +145,9 @@
 .mark.gap::before, .mark.slip::before { content: ''; width: 12px; height: 12px; border-radius: 50%; background: var(--gap); box-shadow: 0 0 0 5px var(--gap-bg); }
 .mark.slip::before { background: var(--slip); box-shadow: 0 0 0 5px var(--slip-bg); }
 .mark.carried::before { content: ''; width: 10px; height: 10px; border-radius: 50%; border: 2.5px dashed var(--ink-3); }
+.mark.step::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--brand); opacity: 0.55; }
+/* a step on the way: part of a rule done, the rest on a later line */
+.line-next { margin: 4px 0 0 34px; font-size: 13px; line-height: 1.35; color: var(--ink-2); }
 .mark.none::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--line-d); }
 .diag { position: relative; margin: 8px 0 2px 22px; padding: 12px 14px; border-radius: 16px; background: #fff; border: 1.5px solid #f5c4ba; box-shadow: 0 3px 0 #f8d9d2; animation: diag-in 0.42s var(--spring) both; transform-origin: 20% 0; }
 .diag::before { content: ''; position: absolute; top: -8px; right: 26px; width: 14px; height: 14px; background: #fff; border-left: 1.5px solid #f5c4ba; border-top: 1.5px solid #f5c4ba; transform: rotate(45deg); }

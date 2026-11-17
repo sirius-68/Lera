@@ -100,6 +100,7 @@ export type LineStatus =
   | 'wrong' //       does not follow from the line above
   | 'carried' //     follows from the line above, but that line was already off
   | 'recovered' //   doesn't follow from the (wrong) line above, yet is correct again
+  | 'step' //        part of a rule done, the rest still to come: nothing false claimed, finished on a later line
   | 'unreadable' //  couldn't be parsed
   | 'unchecked'; //  parsed, but not something that can be compared
 
@@ -117,6 +118,14 @@ export interface CheckedLine {
 }
 
 export type Verdict = 'solved' | 'unfinished' | 'wrong' | 'empty';
+
+export interface AnalyzeOptions {
+  /**
+   * The learner has said they are finished ("Done", "Show solution", leaving the problem). A rule left half-done on
+   * the last line is then a mark; while they are still writing it is a step with a note on what is left.
+   */
+  done?: boolean;
+}
 
 export interface AttemptAnalysis {
   lines: CheckedLine[];

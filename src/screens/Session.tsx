@@ -136,6 +136,7 @@ function Mark({ line, pending }: { line: CheckedLine; pending?: boolean }) {
   }
   if (line.status === 'wrong') return <span className={`mark ${line.diag?.severity === 'slip' ? 'slip' : 'gap'}`} aria-label={tr('Doesn’t follow')} />;
   if (line.status === 'carried') return <span className="mark carried" aria-label={tr('Follows from a line that is off')} />;
+  if (line.status === 'step') return <span className="mark step" aria-label={tr('A step, still to be finished')} />;
   return <span className="mark none" aria-label={tr('Not checked')} />;
 }
 
@@ -240,7 +241,11 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
   const seen = useRef(new Map<string, Diagnosis>());
   const recorded = useRef(false);
 
-  const analysis = useMemo(() => analyze(problem, lines), [problem, lines]);
+  /** How many lines there were when "Done" was last pressed: only then is a rule left half-done a mark. */
+  const [doneAt, setDoneAt] = useState<number | null>(null);
+  const analysis = useMemo(() => analyze(problem, lines, { done: doneAt === lines.length }), [problem, lines, doneAt]);
+  /** The attempt read as finished: for the record, and for leaving the problem. */
+  const finalAnalysis = (): AttemptAnalysis => (doneAt === lines.length ? analysis : analyze(problem, lines, { done: true }));
   const isChecked = (i: number): boolean => mode === 'line' || i < checkedCount;
   const allChecked = mode === 'line' || checkedCount >= lines.length;
   const solved = analysis.verdict === 'solved' && allChecked;
@@ -328,7 +333,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       return null;
     }
     const next = [...lines, text];
-    const a = analyze(problem, next);
+    const a = analyze(problem, next, { done: false });
     const line = a.lines[a.lines.length - 1];
     if (!line || line.status === 'unreadable') {
       setNote(line?.note ?? tr('I couldn’t read that line. Check the brackets and signs.'));
@@ -381,6 +386,12 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
       setMood('celebrate');
       haptic([10, 50, 20]);
       record(a, rung);
+    } else if (line.status === 'step') {
+      // part of a rule done: say what is left, without a mark
+      setOpenDiag(null);
+      setNote(line.note ?? null);
+      setMood('happy');
+      setTimeout(() => setMood('idle'), 1100);
     } else {
       setOpenDiag(null);
       setMood(line.status === 'carried' ? 'thinking' : line.status === 'recovered' ? 'eureka' : 'happy');
@@ -399,7 +410,8 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
    */
   const reviewWork = (all: string[] = lines) => {
     if (!all.length || finished) return;
-    const a = all === lines ? analysis : analyze(problem, all);
+    const a = analyze(problem, all, { done: true });
+    setDoneAt(all.length);
     setCheckedCount(all.length);
     setHintOpen(false);
     const wrong = a.lines.map((l, i) => (l.status === 'wrong' ? i : -1)).filter((i) => i >= 0);
@@ -475,18 +487,20 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
     setHintOpen(false);
     setRung(3);
     setMood('idle');
-    record(analysis, 3);
+    record(finalAnalysis(), 3);
   };
 
   const finish = (skipped = false) => {
+    const a = finalAnalysis();
+    for (const m of a.marks) seen.current.set(`${m.code}:${m.concept}`, m);
     onDone({
       problem,
-      verdict: analysis.verdict,
+      verdict: a.verdict,
       marks: marksNow(),
       hintRung: revealed ? 3 : rung,
       seconds: (Date.now() - started.current) / 1000,
-      steps: analysis.steps,
-      cleanSteps: analysis.cleanSteps,
+      steps: a.steps,
+      cleanSteps: a.cleanSteps,
       skipped,
     });
   };
@@ -534,6 +548,7 @@ function Workspace({ problem, last, onDone }: { problem: Problem; last: boolean;
                 </span>
                 <Mark line={line} pending={!isChecked(i)} />
               </button>
+              {isChecked(i) && line.status === 'step' && line.note && <p className="line-next">{line.note}</p>}
               {isChecked(i) && line.status === 'wrong' && line.diag && openDiag === i && (
                 <DiagnosisCard
                   diag={line.diag}

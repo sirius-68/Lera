@@ -19,6 +19,9 @@ type Der = Extract<E, { t: 'd' }>;
 const I = (a: E, v: string): E => ({ t: 'int', a, v });
 const D = (a: E, v: string): E => ({ t: 'd', a, v });
 const show = (e: E): string => toText(look(e));
+
+/** An expression written the way it is written by hand. */
+export const handText = show;
 const same = (a: E, b: E): boolean => show(a) === show(b);
 
 /** Drawn the way it is written by hand: 3 · x³/3 as one fraction, 3x³/3. Only the look changes, never the value. */

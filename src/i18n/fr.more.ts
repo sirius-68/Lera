@@ -1271,4 +1271,11 @@ export const FR_MORE: Record<string, string> = {
   "Add {0} to both sides, so the {1} term is left on its own.": "Ajoute {0} des deux côtés, pour que le terme en {1} reste seul.",
   "Work out each side.": "Calcule chaque côté.",
   "Divide both sides by {0}, so {1} is left on its own.": "Divise les deux côtés par {0}, pour que {1} reste seul.",
+  "Power raised. Next: divide by the new power.": "Puissance augmentée. Ensuite : divise par la nouvelle puissance.",
+  "Outside integrated. Next: divide by the derivative of the inside.": "Extérieur intégré. Ensuite : divise par la dérivée de l’intérieur.",
+  "Power brought down. Next: make the power one smaller.": "Puissance descendue devant. Ensuite : diminue la puissance de un.",
+  "Outside differentiated. Next: multiply by the derivative of the inside.": "Extérieur dérivé. Ensuite : multiplie par la dérivée de l’intérieur.",
+  "One half of the product rule written. Next: add the other half, first × (second)′.": "Une moitié de la règle du produit est écrite. Ensuite : ajoute l’autre moitié, premier × (second)′.",
+  "Top limit put in. Next: subtract the value at the bottom limit.": "Borne du haut mise. Ensuite : soustrais la valeur à la borne du bas.",
+  "A step, still to be finished": "Une étape, encore à terminer",
 };

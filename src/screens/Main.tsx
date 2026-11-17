@@ -742,7 +742,7 @@ export function ProgressScreen() {
                           <div className="line-row">
                             <span className="n">{i + 1}</span>
                             <span className="grow"><MathView text={l.text} block /></span>
-                            <span className={`mark ${l.status === 'ok' || l.status === 'recovered' ? 'ok static' : l.status === 'wrong' ? (l.severity === 'slip' ? 'slip' : 'gap') : l.status === 'carried' ? 'carried' : 'none'}`}>
+                            <span className={`mark ${l.status === 'ok' || l.status === 'recovered' ? 'ok static' : l.status === 'wrong' ? (l.severity === 'slip' ? 'slip' : 'gap') : l.status === 'carried' ? 'carried' : l.status === 'step' ? 'step' : 'none'}`}>
                               {(l.status === 'ok' || l.status === 'recovered') && <Icon name="check" size={13} stroke={3.4} />}
                             </span>
                           </div>

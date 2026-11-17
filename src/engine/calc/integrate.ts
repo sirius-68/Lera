@@ -423,6 +423,17 @@ export function integrate(e: E, v: string): Antiderivative | null {
   return { F: tidy, how: c.how, u: c.u, dv: c.dv };
 }
 
+/** An antiderivative exactly as the rules build it, before tidying (3 · x³/3 rather than x³), or null. */
+export function integrateRaw(e: E, v: string): E | null {
+  const c: Ctx = { v, hit: false, how: 'power' };
+  try {
+    const F = go(simp(e), c);
+    return F && equiv(diff(F, v), e, v) === true ? F : null;
+  } catch {
+    return null;
+  }
+}
+
 /** What the antiderivative would be if one named slip were made — or null when that slip can't happen here. */
 export function integrateWith(e: E, v: string, flaw: IntFlaw): E | null {
   const c: Ctx = { v, flaw, hit: false, how: 'power' };

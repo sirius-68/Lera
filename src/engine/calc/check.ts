@@ -1,8 +1,8 @@
-import { AttemptAnalysis, CheckedLine, ConceptId, Diagnosis, Problem, ProblemKind, SolutionStep } from '../types';
+import { AnalyzeOptions, AttemptAnalysis, CheckedLine, ConceptId, Diagnosis, Problem, ProblemKind, SolutionStep } from '../types';
 import { CalcParseError, E, Flaw, Indefinite, N, V, add, constantRatio, diff, div, equiv, ev, has, mentions, mul, neg, nice, numText, parseCalc, pending, pow, pre, simp, subst, toLatex, toText } from './expr';
-import { IntFlaw, integrate, integrateWith, toPoly, polyToExpr } from './integrate';
+import { IntFlaw, integrate, integrateRaw, integrateWith, toPoly, polyToExpr } from './integrate';
 import { msg, t } from '../../i18n';
-import { definiteRoute, derivativeRoute, integralRoute, limitRoute } from './route';
+import { definiteRoute, derivativeRoute, handText, integralRoute, limitRoute } from './route';
 
 /**
  * Line-by-line checking for calculus.
@@ -218,27 +218,64 @@ const I_FLAWS: { flaw: IntFlaw; concept: ConceptId; severity: Diagnosis['severit
   { flaw: 'inner-ignored', concept: 'u-substitution', severity: 'gap', title: msg('The inside needs dealing with too.'), message: msg('There is something more than plain x inside. When you integrate the outside you have to **divide by the derivative of the inside** (that’s what substitution does). Check: differentiate your answer, the chain rule gives an extra number you didn’t want.') },
 ];
 
-const fixText = (p: Prep): string | undefined => {
+/**
+ * "This line should read": the learner's own line put right, never a jump to the final answer. A line that had
+ * not reached + C yet is shown without it; an antiderivative stays one when the problem asked for a number.
+ */
+const fixText = (p: Prep, s?: Side): string | undefined => {
   if (p.mode === 'derivative') return toText(p.target as E);
-  if (p.mode === 'integral') {
+  const e = s?.e;
+  if (p.mode === 'integral' || (p.mode === 'definite' && e && has(e, p.v))) {
     const F = integrate(p.body, p.v);
-    return F ? `${toText(F.F)} + C` : undefined;
+    if (!F) return undefined;
+    const withC = p.mode === 'integral' && !!e && (mentions(e, 'C') || mentions(e, 'K') || mentions(e, 'c'));
+    return withC ? `${toText(F.F)} + C` : toText(F.F);
   }
   return numText(p.value as number);
 };
 
-const unknown = (p: Prep, problem: Problem, message: string): Diagnosis => ({
+/** The same line with the missing second move made, as the rule builds it: 3x³ becomes 3x³/3. */
+const completedText = (p: Prep, s: Side, code: string): string | undefined => {
+  if (code === 'forgot-lower') {
+    const F = integrate(p.body, p.v);
+    if (!F) return fixText(p, s);
+    const at = (x: number): number => nice(ev(F.F, { [p.v]: x }));
+    const bottom = at(p.lo as number);
+    return `${numText(at(p.hi as number))} - ${bottom < 0 ? `(${numText(bottom)})` : numText(bottom)}`;
+  }
+  if (p.mode !== 'integral' && (p.mode !== 'definite' || !s.e || !has(s.e, p.v))) return fixText(p, s);
+  const raw = integrateRaw(p.body, p.v);
+  if (!raw) return fixText(p, s);
+  const e = s.e;
+  const withC = p.mode === 'integral' && !!e && (mentions(e, 'C') || mentions(e, 'K') || mentions(e, 'c'));
+  return withC ? `${handText(raw)} + C` : handText(raw);
+};
+
+/**
+ * Mistakes that are only half a rule: the first move made, the second not yet. Written on the way to a finished
+ * line they are steps, not mistakes; left that way at the end they are the gap. Each has what is left, in a line.
+ */
+const UNFINISHED: Record<string, string> = {
+  'int-no-divide': msg('Power raised. Next: divide by the new power.'),
+  'int-inner-ignored': msg('Outside integrated. Next: divide by the derivative of the inside.'),
+  'power-keep': msg('Power brought down. Next: make the power one smaller.'),
+  'chain-missing': msg('Outside differentiated. Next: multiply by the derivative of the inside.'),
+  'product-first': msg('One half of the product rule written. Next: add the other half, first × (second)′.'),
+  'forgot-lower': msg('Top limit put in. Next: subtract the value at the bottom limit.'),
+};
+
+const unknown = (p: Prep, problem: Problem, message: string, s?: Side): Diagnosis => ({
   code: 'unknown',
   concept: problem.concepts[0] ?? (p.mode === 'derivative' ? 'power-rule' : p.mode === 'limit' ? 'limits' : p.mode === 'definite' ? 'definite-integrals' : 'antiderivatives'),
   severity: 'slip',
   title: t('This line doesn’t match.'),
   message,
-  fix: fixText(p),
+  fix: fixText(p, s),
 });
 
 function diagnose(p: Prep, problem: Problem, s: Side): Diagnosis {
   const v = p.v;
-  const fix = fixText(p);
+  const fix = fixText(p, s);
   const e = s.e;
   try {
     if (p.mode === 'derivative' && e) {
@@ -253,7 +290,7 @@ function diagnose(p: Prep, problem: Problem, s: Side): Diagnosis {
       if (equiv(diff(e, v), p.body, v) === true) return { code: 'integrated-instead', concept: problem.concepts[0] ?? 'power-rule', severity: 'gap', title: t('That’s the integral, not the derivative.'), message: t('You went the wrong direction: you raised the power and divided. Differentiating does the opposite, **bring the power down, then lower it by one**.'), fix };
       const k = constantRatio(e, T, v);
       if (k !== null) return { code: 'coefficient', concept: 'arithmetic', severity: 'slip', title: t('Right shape, wrong number in front.'), message: t('The x-part of your answer is right, but the number in front is off by a factor of {0}. Redo the multiplying.', { 0: numText(k) }), fix };
-      return unknown(p, problem, t('This isn’t the derivative. Go through it one piece at a time and check which rule each piece needs: power, product, quotient or chain.'));
+      return unknown(p, problem, t('This isn’t the derivative. Go through it one piece at a time and check which rule each piece needs: power, product, quotient or chain.'), s);
     }
     if (p.mode === 'integral' && e) {
       for (const f of I_FLAWS) {
@@ -264,7 +301,7 @@ function diagnose(p: Prep, problem: Problem, s: Side): Diagnosis {
       if (equiv(diff(e, v), neg(p.body), v) === true) return { code: 'sign-flip', concept: 'signed-arithmetic', severity: 'slip', title: t('Everything is right except the sign.'), message: t('Differentiate your answer and you get the integrand with the opposite sign. One minus sign is wrong.'), fix };
       const k = constantRatio(diff(e, v), p.body, v);
       if (k !== null) return { code: 'int-coefficient', concept: 'antiderivatives', severity: 'slip', title: t('Right shape, wrong number in front.'), message: t('Here’s a check that always works: **differentiate your answer**, you should get back exactly what was inside the integral. Yours comes back {0} times that, so the number in front needs fixing.', { 0: numText(k) }), fix };
-      return unknown(p, problem, t('Differentiate your answer: you should get back exactly what is inside the integral. Here you don’t, so one of the terms has gone wrong.'));
+      return unknown(p, problem, t('Differentiate your answer: you should get back exactly what is inside the integral. Here you don’t, so one of the terms has gone wrong.'), s);
     }
     if (p.mode === 'definite') {
       const val = valueOf(s);
@@ -283,7 +320,7 @@ function diagnose(p: Prep, problem: Problem, s: Side): Diagnosis {
         if (closeNum(val, g(p.hi as number) - g(p.lo as number))) return { code: 'not-integrated', concept: 'definite-integrals', severity: 'gap', title: t('Integrate first, then put the limits in.'), message: t('You put the limits straight into the function. First find the **antiderivative**, and put the limits into *that*.'), fix };
       }
       if (e && has(e, v)) return diagnose({ ...p, mode: 'integral' }, problem, s);
-      return unknown(p, problem, t('That number doesn’t match. Do it in two stages: find the antiderivative, then work out (value at the top limit) − (value at the bottom limit).'));
+      return unknown(p, problem, t('That number doesn’t match. Do it in two stages: find the antiderivative, then work out (value at the top limit) − (value at the bottom limit).'), s);
     }
     if (p.mode === 'limit') {
       const val = valueOf(s);
@@ -308,63 +345,94 @@ function diagnose(p: Prep, problem: Problem, s: Side): Diagnosis {
       if (val !== null && Number.isFinite(plug) && !closeNum(plug, L) && closeNum(val, plug)) {
         return { code: 'plugged-in', concept: 'limits', severity: 'gap', title: 'A limit is where it’s heading, not where it is.', message: t('You used the value **at** the point. A limit asks what the expression gets close to as x gets *near* the point, and here those are different.'), fix };
       }
-      return unknown(p, problem, t('That isn’t what this expression heads towards as ${0}$ gets close to {1}. Try a few values very near {2} and watch where the results go.', { 0: v, 1: numText(to), 2: numText(to) }));
+      return unknown(p, problem, t('That isn’t what this expression heads towards as ${0}$ gets close to {1}. Try a few values very near {2} and watch where the results go.', { 0: v, 1: numText(to), 2: numText(to) }), s);
     }
   } catch {
     /* fall through */
   }
-  return unknown(p, problem, t('This line doesn’t follow. Check it against the line above.'));
+  return unknown(p, problem, t('This line doesn’t follow. Check it against the line above.'), s);
 }
 
 /* ───────────── the whole attempt ───────────── */
 
-export function calcAnalyze(problem: Problem, rawLines: string[]): AttemptAnalysis {
+export function calcAnalyze(problem: Problem, rawLines: string[], opts: AnalyzeOptions = {}): AttemptAnalysis {
+  const done = opts.done ?? true;
   const texts = rawLines.map((l) => l.trim()).filter((l) => l.length > 0);
   const p = prepCalc(problem);
   if (!p) return { lines: texts.map((text) => ({ text, status: 'unchecked' as const })), verdict: texts.length ? 'unfinished' : 'empty', marks: [], steps: texts.length, cleanSteps: 0 };
 
+  // 1. judge every line on its own: true, not true (and what kind of not true), or not readable
+  type Judged =
+    | { kind: 'unreadable'; text: string; note: string }
+    | { kind: 'unchecked'; text: string; latex: string }
+    | { kind: 'true'; text: string; latex: string; last: Side; fin: { final: boolean; remaining?: string } }
+    | { kind: 'false'; text: string; latex: string; last: Side; first: Side; sides: Side[]; bad: Side; diag: Diagnosis; unfinished: boolean };
+  const judged: Judged[] = texts.map((text): Judged => {
+    const parsed = parseLine(text, p.v);
+    if (!parsed.ok) return { kind: 'unreadable', text, note: parsed.error };
+    const verdicts = parsed.sides.map((x) => truth(p, x));
+    const badAt = verdicts.findIndex((x) => x === false);
+    const last = parsed.sides[parsed.sides.length - 1];
+    if (badAt < 0 && verdicts.some((x) => x === null)) return { kind: 'unchecked', text, latex: parsed.latex };
+    if (badAt < 0) return { kind: 'true', text, latex: parsed.latex, last, fin: finished(p, last) };
+    const bad = parsed.sides[badAt];
+    const diag = diagnose(p, problem, bad);
+    // half a rule, on the last side of the line: a step on the way, not a false claim
+    const unfinished = diag.code in UNFINISHED && badAt === parsed.sides.length - 1;
+    return { kind: 'false', text, latex: parsed.latex, last, first: parsed.sides[0], sides: parsed.sides, bad, diag: unfinished ? { ...diag, fix: completedText(p, bad, diag.code) } : diag, unfinished };
+  });
+
+  // 2. decide each line in the light of the whole attempt
   const lines: CheckedLine[] = [];
   let prevGood = true;
   let prevSide: Side | null = null;
   let lastState: { good: boolean; final: boolean; remaining?: string } | null = null;
-
-  for (const text of texts) {
-    const parsed = parseLine(text, p.v);
-    if (!parsed.ok) {
-      lines.push({ text, status: 'unreadable', note: parsed.error });
-      continue;
+  judged.forEach((j, i) => {
+    if (j.kind === 'unreadable') {
+      lines.push({ text: j.text, status: 'unreadable', note: j.note });
+      return;
     }
-    const verdicts = parsed.sides.map((s) => truth(p, s));
-    const bad = parsed.sides.find((_, i) => verdicts[i] === false);
-    const last = parsed.sides[parsed.sides.length - 1];
-    if (!bad && verdicts.some((x) => x === null)) {
-      lines.push({ text, status: 'unchecked', latex: parsed.latex, note: t('I can’t compare this line, so I’ve left it unmarked.') });
-      continue;
+    if (j.kind === 'unchecked') {
+      lines.push({ text: j.text, status: 'unchecked', latex: j.latex, note: t('I can’t compare this line, so I’ve left it unmarked.') });
+      return;
     }
-    if (!bad) {
-      const fin = finished(p, last);
-      lines.push({ text, status: prevGood ? 'ok' : 'recovered', latex: parsed.latex, trueToGiven: true, isFinal: fin.final, note: fin.final ? undefined : undefined });
-      lastState = { good: true, ...fin };
+    if (j.kind === 'true') {
+      lines.push({ text: j.text, status: prevGood ? 'ok' : 'recovered', latex: j.latex, trueToGiven: true, isFinal: j.fin.final });
+      lastState = { good: true, ...j.fin };
       prevGood = true;
-    } else {
-      const carried = !prevGood && prevSide !== null && same(p, prevSide, parsed.sides[0]) && parsed.sides.every((s) => same(p, s, parsed.sides[0]));
-      if (carried) lines.push({ text, status: 'carried', latex: parsed.latex, trueToGiven: false });
-      else lines.push({ text, status: 'wrong', latex: parsed.latex, trueToGiven: false, diag: diagnose(p, problem, bad) });
-      lastState = { good: false, final: false };
-      prevGood = false;
+      prevSide = j.last;
+      return;
     }
-    prevSide = last;
-  }
+    const later = judged.slice(i + 1).filter((x) => x.kind === 'true' || x.kind === 'false');
+    const finishedLater = later.some((x) => x.kind === 'true');
+    // finished on a later line, or the last line while the learner is still writing: a step
+    if (j.unfinished && prevGood && (finishedLater || (!later.length && !done))) {
+      const note = t(UNFINISHED[j.diag.code]);
+      lines.push({ text: j.text, status: 'step', latex: j.latex, trueToGiven: false, note, diag: j.diag });
+      lastState = { good: false, final: false, remaining: note };
+      prevSide = j.last;
+      return;
+    }
+    const carried = !prevGood && prevSide !== null && same(p, prevSide, j.first) && j.sides.every((x) => same(p, x, j.first));
+    if (carried) lines.push({ text: j.text, status: 'carried', latex: j.latex, trueToGiven: false });
+    else lines.push({ text: j.text, status: 'wrong', latex: j.latex, trueToGiven: false, diag: j.diag });
+    lastState = { good: false, final: false };
+    prevGood = false;
+    prevSide = j.last;
+  });
 
   let verdict: AttemptAnalysis['verdict'] = 'empty';
   let remaining: string | undefined;
-  if (lastState) {
-    if (!lastState.good) verdict = 'wrong';
-    else if (lastState.final) verdict = 'solved';
-    else {
+  const state = lastState as { good: boolean; final: boolean; remaining?: string } | null;
+  if (state) {
+    if (state.good) {
+      verdict = state.final ? 'solved' : 'unfinished';
+      if (!state.final) remaining = state.remaining;
+    } else if (state.remaining) {
+      // the last line is a step still to be finished
       verdict = 'unfinished';
-      remaining = lastState.remaining;
-    }
+      remaining = state.remaining;
+    } else verdict = 'wrong';
   } else if (lines.length) verdict = 'unfinished';
 
   const marks: Diagnosis[] = lines.filter((l) => l.status === 'wrong' && l.diag).map((l) => l.diag as Diagnosis);
@@ -625,8 +693,8 @@ export function calcHint(problem: Problem, rawLines: string[]): CalcHint | null 
   if (!p) return null;
   const path = calcPath(problem);
   if (!path.length) return null;
-  const a = calcAnalyze(problem, rawLines);
-  const trueLines = a.lines.filter((l) => l.status === 'ok' || l.status === 'recovered');
+  const a = calcAnalyze(problem, rawLines, { done: false });
+  const trueLines = a.lines.filter((l) => l.status === 'ok' || l.status === 'recovered' || l.status === 'step');
   const good = trueLines.length;
   const step = path[nextIndex(path, trueLines[trueLines.length - 1]?.text, good, p.v)];
   const shape = p.mode === 'derivative' ? shapeOf(p.body, p.v).shape : 'any';

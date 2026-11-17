@@ -51,7 +51,9 @@ test('wrong calculus lines are named', () => {
   assert.deepEqual(codes('derivative', 'd/dx(x^3)', ['x^2']), ['power-nocoef']);
   assert.deepEqual(codes('derivative', 'd/dx(x^2 + 7)', ['2x + 7']), ['const-kept']);
   assert.deepEqual(codes('derivative', 'd/dx(x^2 sin(x))', ['2x cos x']), ['product-naive']);
-  assert.deepEqual(codes('derivative', 'd/dx(sin(3x))', ['cos(3x)', '3cos(3x)']), ['chain-missing', 'recovered']);
+  // the outside differentiated, then the inside multiplied in on the next line: a step, not a mistake
+  assert.deepEqual(analyze(P('derivative', 'd/dx(sin(3x))'), ['cos(3x)', '3cos(3x)']).lines.map((l) => l.status), ['step', 'ok']);
+  assert.deepEqual(codes('derivative', 'd/dx(sin(3x))', ['cos(3x)']), ['chain-missing']);
   assert.deepEqual(codes('derivative', 'd/dx(cos(x))', ['sin x']), ['trig-sign']);
   assert.deepEqual(codes('derivative', 'd/dx(e^(2x))', ['2x e^(2x-1)']), ['exp-power']);
   assert.deepEqual(codes('integral', '∫ x^2 dx', ['x^3 + C']), ['int-no-divide']);

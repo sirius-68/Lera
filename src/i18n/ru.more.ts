@@ -1271,4 +1271,11 @@ export const RU_MORE: Record<string, string> = {
   "Add {0} to both sides, so the {1} term is left on its own.": "Прибавь {0} к обеим частям, чтобы слагаемое с {1} осталось одно.",
   "Work out each side.": "Посчитай каждую часть.",
   "Divide both sides by {0}, so {1} is left on its own.": "Раздели обе части на {0}, чтобы {1} осталось одно.",
+  "Power raised. Next: divide by the new power.": "Показатель увеличен. Дальше: раздели на новый показатель.",
+  "Outside integrated. Next: divide by the derivative of the inside.": "Внешняя функция проинтегрирована. Дальше: раздели на производную внутренней.",
+  "Power brought down. Next: make the power one smaller.": "Показатель вынесен вперёд. Дальше: уменьши показатель на единицу.",
+  "Outside differentiated. Next: multiply by the derivative of the inside.": "Внешняя функция продифференцирована. Дальше: умножь на производную внутренней.",
+  "One half of the product rule written. Next: add the other half, first × (second)′.": "Половина правила произведения записана. Дальше: добавь вторую половину, первый × (второй)′.",
+  "Top limit put in. Next: subtract the value at the bottom limit.": "Верхний предел подставлен. Дальше: вычти значение в нижнем пределе.",
+  "A step, still to be finished": "Шаг, который ещё нужно закончить",
 };
