@@ -97,3 +97,10 @@ test('a question written in LaTeX becomes a problem the engine can check', () =>
   // shown the way the notes wrote it
   assert.equal(parseExercises('Evaluate \\int x e^{x}\\,dx', undefined, 't').problems[0].original, 'Evaluate \\int x e^{x}\\,dx');
 });
+
+test('subscripts and limit arrows written as plain text are found', () => {
+  assert.equal(markMath('then a_n → L. This lets you use it.'), 'then $a_n → L$. This lets you use it.');
+  assert.equal(markMath('if |a_n| → 0 then a_n → 0.'), 'if $|a_n| → 0$ then $a_n → 0$.');
+  assert.equal(markMath('trig powers → 1.4; rational function → partial fractions.'), 'trig powers → 1.4; rational function → partial fractions.');
+  assert.equal(plainLatex('a_n → L'), 'a_{n} \\to L');
+});

@@ -307,7 +307,14 @@ export function Onboarding() {
 
       {step === 'signin' && (
         <div className={cls} key="signin" style={{ justifyContent: 'center' }}>
-          <AuthPanel mode={getAccount() ? 'signin' : 'signup'} onDone={() => (profile.name ? finish() : go('how'))} />
+          {/* someone who signs in already has a profile: they go straight in, and are never walked through the tour again */}
+          <AuthPanel
+            mode={getAccount() ? 'signin' : 'signup'}
+            onDone={() => {
+              if (!profile.name && getAccount()?.name) actions.setProfile({ name: getAccount()!.name });
+              finish();
+            }}
+          />
         </div>
       )}
 

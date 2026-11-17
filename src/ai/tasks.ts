@@ -382,3 +382,57 @@ Rules:
   }
   return out;
 }
+
+/* ───────────── practice written on request ───────────── */
+
+export type PracticeLevel = 'easier' | 'same' | 'harder';
+
+const LEVEL_NOTE: Record<PracticeLevel, string> = {
+  easier: 'Easier than the examples in the notes: one or two steps, small whole numbers, one idea at a time.',
+  same: 'The same level as the examples and exercises in the notes.',
+  harder: 'Harder than the notes: more steps, two ideas from the notes combined, less friendly numbers. Still solvable by hand.',
+};
+
+/**
+ * New practice problems for one lesson (or a whole file), written from what the notes teach.
+ * Each one the engine can read is checked line by line like any other; the rest are written-answer problems.
+ */
+export async function aiPractice(
+  config: AiConfig,
+  input: { topicId: string; title: string; notes: string; level: PracticeLevel; count: number },
+  signal?: AbortSignal,
+): Promise<Problem[]> {
+  const reply = await chat(
+    config,
+    [
+      {
+        role: 'system',
+        content: `You write practice problems for a maths student, from the student's own notes.
+Return ONLY JSON: {"problems":[{"instruction": string, "math": string, "text": string}]}
+- Write exactly ${input.count} problems. Stay inside what the notes teach and use their methods and notation. Do not copy the notes' own examples: change the numbers and the functions.
+- "instruction" is the task, in English, starting with one of: Solve for x, Solve the inequality, Simplify, Expand and simplify, Factorise, Differentiate, Integrate, Evaluate the integral, Find the limit.
+- "math" is the expression or equation as plain typed text, never LaTeX and never dollar signs: x^2, sqrt(x), (x+1)/(x-2), sin(x), e^(2x), "∫ x e^x dx", "∫_0^1 x^2 dx", "d/dx(x^2 sin(x))", "lim x→0 sin(x)/x".
+- When a problem cannot be put that way (a proof, a convergence test, a word problem), leave "instruction" and "math" empty and write the whole question in "text", in ${langName()}, with any maths in LaTeX between $ signs.
+- Every problem has one clear answer that can be worked out by hand.
+- Difficulty: ${LEVEL_NOTE[input.level]}`,
+      },
+      { role: 'user', content: `Lesson: ${input.title}\n\nNotes:\n${input.notes.slice(0, 7000)}` },
+    ],
+    { task: 'practice', json: true, temperature: 0.7, maxTokens: 1600, signal },
+  );
+  const data = extractJson<{ problems?: { instruction?: string; math?: string; text?: string }[] }>(reply);
+  const stamp = Date.now().toString(36);
+  const out: Problem[] = [];
+  for (const [i, raw] of (data?.problems ?? []).entries()) {
+    const typed = `${raw.instruction ?? ''} ${raw.math ?? ''}`.trim();
+    const read = raw.math ? buildProblem(typed, undefined, input.topicId) : null;
+    const id = `${input.topicId}-ai${stamp}${i}`;
+    const level = input.level === 'easier' ? 1 : input.level === 'same' ? 2 : 3;
+    if (read && read.kind !== 'open') out.push({ ...read, id, made: 'lera', level, original: undefined });
+    else {
+      const question = (raw.text || typed).trim();
+      if (question) out.push({ id, kind: 'open', prompt: question, given: '', concepts: [], source: 'notes', topicId: input.topicId, original: question, made: 'lera', level });
+    }
+  }
+  return out;
+}

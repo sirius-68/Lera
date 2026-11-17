@@ -147,10 +147,10 @@ export function ProgressScreen() {
           </Rise>
 
           <Rise i={i++} style={{ flexDirection: 'row', gap: 10 }}>
-            {[[days, '', 'day streak'], [solved, '', 'solved'], [solved ? Math.round((clean / solved) * 100) : 0, '%', 'clean']].map(([n, suffix, label]) => (
+            {[[days, '', tn(days, 'day in a row', 'days in a row')], [solved, '', t('solved')], [solved ? Math.round((clean / solved) * 100) : 0, '%', t('clean')]].map(([n, suffix, label]) => (
               <View key={label as string} style={{ flex: 1, alignItems: 'center', paddingVertical: 12, paddingHorizontal: 14, borderRadius: 18, backgroundColor: C.tint }}>
                 <CountUp to={n as number} suffix={suffix as string} w={700} s={24} lh={28} c={C.brandD} />
-                <T w={500} s={12.5} c={C.ink2}>{label}</T>
+                <T w={500} s={12.5} c={C.ink2} center>{label}</T>
               </View>
             ))}
           </Rise>
@@ -172,9 +172,10 @@ export function ProgressScreen() {
 
           <Rise i={i++}>
             <Card>
-              <View style={[row(), { justifyContent: 'space-between' }]}>
+              {/* the legend drops under the title when the two do not fit on one line (longer languages) */}
+              <View style={[row(), { justifyContent: 'space-between', flexWrap: 'wrap', rowGap: 6, columnGap: 10 }]}>
                 <Label>Your error signature</Label>
-                <View style={row(10)}>
+                <View style={[row(10), { flexWrap: 'wrap' }]}>
                   <View style={row(4)}><View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: C.gap }} /><T s={12.5}>{`${t('Gaps')} ${gaps}`}</T></View>
                   <View style={row(4)}><View style={{ width: 10, height: 10, borderRadius: 3, backgroundColor: '#f0b63e' }} /><T s={12.5}>{`${t('Slips')} ${slips}`}</T></View>
                 </View>

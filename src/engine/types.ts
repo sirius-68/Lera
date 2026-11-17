@@ -67,6 +67,8 @@ export interface Problem {
   source: 'notes' | 'generated' | 'review';
   topicId?: string;
   level?: 1 | 2 | 3;
+  /** Written by Lera's AI for this lesson, on request (not found in the file). */
+  made?: 'lera';
   /** Original wording from the student's notes, when it came from there. */
   original?: string;
 }

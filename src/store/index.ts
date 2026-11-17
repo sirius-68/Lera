@@ -185,6 +185,19 @@ export const actions = {
     }));
   },
 
+  /** Problems Lera was asked to write for a lesson are kept with it, after the ones from the notes. */
+  addExercises(topicId: string, problems: Problem[]): void {
+    setState((s) => {
+      const docs = s.docs.map((d) => {
+        if (!d.units.some((u) => u.topics.some((t) => t.id === topicId))) return d;
+        const next = { ...d, units: d.units.map((u) => ({ ...u, topics: u.topics.map((t) => (t.id === topicId ? { ...t, exercises: [...t.exercises, ...problems] } : t)) })) };
+        if (docsInIdb) store(idbPut(next));
+        return next;
+      });
+      return { docs };
+    });
+  },
+
   removeDoc(id: string): void {
     if (docsInIdb) store(idbDelete(id));
     setState((s) => {

@@ -278,6 +278,10 @@ p {
   transition: transform 0.12s var(--ease), box-shadow 0.12s var(--ease), filter 0.15s;
   overflow: hidden;
   user-select: none;
+  /* a label too long for one line (French, Russian) goes onto two instead of being cut off */
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
 }
 .btn3d::after {
   /* a soft sheen that passes once when the button arrives */
@@ -452,6 +456,9 @@ p {
   color: var(--ink-2);
   transition: color 0.2s;
 }
+.seg > button { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* four choices in a row: set a little smaller so they all fit in longer languages */
+.seg > :first-child:nth-last-child(n + 5), .seg > :first-child:nth-last-child(n + 5) ~ button { font-size: 13px; padding-left: 3px; padding-right: 3px; }
 .seg > button[aria-selected='true'] { color: #fff; }
 .seg > .thumb {
   position: absolute;

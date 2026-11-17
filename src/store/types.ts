@@ -33,6 +33,8 @@ export interface Profile {
   plan: 'none' | 'trial';
   trialStarted?: string;
   onboarded: boolean;
+  /** Milestones already celebrated ("lessons:5"), so each is shown once. */
+  cheered?: string[];
   createdAt?: string;
 }
 

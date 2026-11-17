@@ -399,7 +399,16 @@ function build(d: Draft, concept: ConceptId, source: Problem['source']): Problem
 }
 
 /** n fresh problems that exercise one concept, easiest first. */
-export function practiceFor(concept: ConceptId, n: number, seed: number, source: Problem['source'] = 'generated'): Problem[] {
+/**
+ * Lera's own problems on one idea. With a `level` (1 beginner, 2 intermediate, 3 advanced) the set keeps to that
+ * level where the idea has problems at it, and to the nearest level where it does not.
+ */
+export function practiceFor(concept: ConceptId, n: number, seed: number, source: Problem['source'] = 'generated', level?: 1 | 2 | 3): Problem[] {
+  if (level) {
+    const pool = practiceFor(concept, n * 6, seed, source);
+    const near = (p: Problem) => Math.abs((p.level ?? 1) - level);
+    return [...pool].sort((a, b) => near(a) - near(b)).slice(0, n).sort((a, b) => (a.level ?? 1) - (b.level ?? 1));
+  }
   const r = rng(seed);
   const makers = MAKERS[concept] ?? MAKERS['inverse-operations'];
   const out: Problem[] = [];

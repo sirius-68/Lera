@@ -6,6 +6,7 @@ import './styles/v2.css';
 import { App } from './App';
 import { actions, getState, isHydrated, onChange } from './store';
 import { go } from './store/nav';
+import { topicProblems } from './store/learner';
 import { setWidgetTestMode, syncWidget, takeWidgetAction } from './store/widget';
 import { hostConfig, inHost, onHost, post } from './host';
 import type { AppState } from './store/types';
@@ -59,7 +60,7 @@ function startHostLink(): void {
     docs.map((d) => ({
       ...d,
       glossary: {},
-      units: d.units.map((u) => ({ ...u, topics: u.topics.map((t) => ({ ...t, blocks: t.blocks.length ? [{}] : [] })) })),
+      units: d.units.map((u) => ({ ...u, topics: u.topics.map((t) => ({ ...t, practice: topicProblems(t, getState().ai.provider !== 'none').map((p) => p.id), blocks: t.blocks.length ? [{}] : [] })) })),
     }));
   const flush = () => {
     const s = getState();

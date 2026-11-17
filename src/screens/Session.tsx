@@ -8,10 +8,12 @@ import { PLAIN } from '../engine/concepts-calc';
 import { AttemptAnalysis, CheckedLine, Diagnosis, Problem } from '../engine/types';
 import { Lera, Mood } from '../mascot/Lera';
 import { actions, getState, useStore } from '../store';
-import { levelOf, totalXp, weekStrip, xpByDay } from '../store/game';
+import { badges, levelOf, totalXp, weekStrip, xpByDay } from '../store/game';
+import { MorePractice } from './MorePractice';
 import { addDays, buildSession, dayOf, findTopic, Session, streak } from '../store/learner';
 import { weaknesses } from '../store/weakness';
-import { back, openOverlay, Route, setBackGuard } from '../store/nav';
+import { back, openOverlay, replace, Route, setBackGuard } from '../store/nav';
+import { practiceFor, seedFrom } from '../engine/generate';
 import { Button3D, Confetti, CountUp, LeraSays, Ring, haptic, toast } from '../ui/kit';
 import { CelebrationFlow, Scene } from '../ui/Celebrate';
 import { Icon } from '../ui/icons';
@@ -20,7 +22,7 @@ import type { Kind } from '../ui/mathrow';
 import { MathView, RichText } from '../ui/math';
 import { TermText } from '../ui/terms';
 import { WeakCard } from './Main';
-import { msg, promptText, t as tr } from '../i18n';
+import { msg, promptText, t as tr, tn } from '../i18n';
 
 interface Result {
   problem: Problem;
@@ -59,11 +61,17 @@ function Keyboard({ vars, onKey, onTpl, onDelete, onEnter, onMove, ready, calc }
     [{ k: '1' }, { k: '2' }, { k: '3' }, { k: '×', ins: '*', tone: 'op', label: 'times' }, { k: '≤', ins: '<=', tone: 'op' }, { k: '±', tone: 'op' }],
     [{ k: '0' }, { k: '.' }, { k: '=', tone: 'op' }, { k: '÷', tpl: 'frac', tone: 'op', label: 'fraction' }, { k: '≥', ins: '>=', tone: 'op' }, { k: '↵', tone: 'go', label: tr('Check this line') }],
   ];
-  const rows = calc ? calcRows : algebraRows;
+  // letters: any letter the problem uses that is not on the number keys (A, C, k, n …), small or capital
+  const [abc, setAbc] = useState(false);
+  const [caps, setCaps] = useState(false);
+  const letterRows: Key[][] = ['abcdef', 'ghijkl', 'mnopqr', 'stuvwx'].map((row) => [...row].map((ch) => ({ k: caps ? ch.toUpperCase() : ch, tone: 'var' })));
+  letterRows.push([{ k: caps ? 'Y' : 'y', tone: 'var' }, { k: caps ? 'Z' : 'z', tone: 'var' }, { k: '⇧', tone: caps ? 'go' : 'fn', label: tr('Capital letters') }, { k: 'θ', ins: 'θ', tone: 'var' }, { k: '⌫', tone: 'fn', label: tr('Delete') }, { k: '↵', tone: 'go', label: tr('Check this line') }]);
+  const rows = abc ? letterRows : calc ? calcRows : algebraRows;
   void b;
   return (
     <div className="kbd" aria-label={tr('Maths keyboard')}>
       <div className="kbd-extra">
+        <button className={abc ? 'on' : ''} onClick={() => { haptic(4); setAbc(!abc); }} aria-pressed={abc} aria-label={abc ? tr('Numbers') : tr('Letters')}>{abc ? '123' : 'abc'}</button>
         <button onClick={() => onMove(-1)} aria-label={tr('Move left')}><Icon name="left" size={18} /></button>
         <button onClick={() => onMove(1)} aria-label={tr('Move right')}><Icon name="right" size={18} /></button>
         <button className="tpl" onClick={() => onTpl('frac')} aria-label={tr('Fraction')}><span className="f"><i /><i /></span></button>
@@ -85,7 +93,7 @@ function Keyboard({ vars, onKey, onTpl, onDelete, onEnter, onMove, ready, calc }
             <button className="tpl" onClick={() => onTpl('abs')} aria-label={tr('Absolute value')}>|<i />|</button>
             <button onClick={() => onKey(' or ')}>or</button>
             <button onClick={() => onKey(',')}>,</button>
-            <button onClick={() => onKey(tr('no solution'))}>{tr('no solution')}</button>
+            <button onClick={() => onKey('no solution')}>{tr('no solution')}</button>
             <button onClick={() => onKey('all real numbers')}>{tr('all reals')}</button>
           </>
         )}
@@ -100,7 +108,8 @@ function Keyboard({ vars, onKey, onTpl, onDelete, onEnter, onMove, ready, calc }
             onPointerDown={(e: { preventDefault(): void }) => e.preventDefault()}
             onClick={() => {
               haptic(4);
-              if (key.k === '⌫') onDelete();
+              if (key.k === '⇧') setCaps(!caps);
+              else if (key.k === '⌫') onDelete();
               else if (key.k === '↵') onEnter();
               else if (key.tpl) onTpl(key.tpl, key.then);
               else onKey(key.ins ?? key.k);
@@ -797,6 +806,35 @@ export function SessionScreen({ route }: { route: Extract<Route, { name: 'sessio
     return () => setBackGuard(null);
   }, [phase, results.length, total, leaving]);
 
+  // a lesson whose part of the file has nothing to practise: say so, and offer to write some, rather than fill in with something else
+  const emptyTopic = total === 0 && route.topicId ? findTopic(getState().docs, route.topicId)?.topic ?? null : null;
+  if (emptyTopic) {
+    const doc = getState().docs.find((d) => d.units.some((u) => u.topics.some((x) => x.id === emptyTopic.id)));
+    const idea = emptyTopic.concepts[0];
+    return (
+      <div className="screen" data-dir="1">
+        <div className="topbar"><button className="iconbtn" onClick={back} aria-label={tr('Close')}><Icon name="close" /></button></div>
+        <div className="scroll" style={{ padding: '0 20px 28px' }}>
+          <div className="center" style={{ gap: 12, padding: '10px 10px 18px' }}>
+            <Lera size={92} mood="reading" />
+            <h2 style={{ fontSize: 21, textAlign: 'center' }}>{tr('Nothing to practise in this section yet')}</h2>
+            <p className="muted" style={{ lineHeight: 1.5, textAlign: 'center' }}>{tr('Practice here comes only from your file, and this part has no exercise or example I can check.')}</p>
+          </div>
+          <div className="col" style={{ gap: 14 }}>
+            <MorePractice topic={emptyTopic} doc={doc} onMade={(made) => replace({ name: 'session', topicId: emptyTopic.id, problems: made, title: emptyTopic.title })} />
+            {idea && (
+              <div className="center">
+                <Button3D small variant="secondary" onClick={() => replace({ name: 'session', problems: practiceFor(idea, 4, seedFrom(`${dayOf()}:${idea}:${Date.now() % 991}`)), title: conceptOf(idea).title })}>
+                  {tr('Practise the idea with Lera’s own problems')}
+                </Button3D>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (total === 0) {
     return (
       <div className="screen" data-dir="1">
@@ -924,7 +962,7 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
     if (solved === 0) return [];
     const out: Scene[] = [
       {
-        kind: 'done',
+        kind: allClean && results.length >= 3 ? 'perfect' : 'done',
         title: allClean ? tr('Flawless session!') : tr('Session complete!'),
         sub: allClean ? tr('Every line followed from the one before.') : undefined,
         stats: [
@@ -938,14 +976,23 @@ function Summary({ session, results }: { session: Session; results: Result[] }) 
       out.push({
         kind: 'streak',
         value: days,
-        title: days === 1 ? tr('Your streak starts today') : `${days} days in a row!`,
+        title: days === 1 ? tr('Your streak starts today') : tn(days, '{n} day in a row!', '{n} days in a row!'),
         sub: days === 1 ? tr('Come back tomorrow to make it two.') : tr('You showed up again. That is how it sticks.'),
         week: weekStrip({ attempts, read }).map((d) => d.active),
       });
     }
     if (xpToday >= goal && xpToday - earned < goal) out.push({ kind: 'goal', value: xpToday, title: tr('Daily goal reached!'), sub: tr('Anything more today is a bonus.') });
     const before = levelOf(Math.max(0, totalXp({ attempts, read }) - earned));
-    if (before.level < lv.level) out.push({ kind: 'level', value: lv.level, title: tr('Level {0} · {1}', { 0: lv.level, 1: lv.title }), sub: 'A new level, earned one checked line at a time.' });
+    if (before.level < lv.level) out.push({ kind: 'level', value: lv.level, title: tr('Level {0} · {1}', { 0: lv.level, 1: lv.title }), sub: tr('A new level, earned one checked line at a time.') });
+    // a round number of problems solved, all told
+    const allSolved = attempts.filter((a) => a.verdict === 'solved').length;
+    const reached = [10, 25, 50, 100, 250, 500, 1000].find((m) => allSolved - solved < m && allSolved >= m);
+    if (reached) out.push({ kind: 'milestone', value: reached, title: tr('{0} problems solved!', { 0: reached }), sub: tr('Every one of them checked line by line.') });
+    // badges this session earned
+    const had = new Set(badges({ attempts: attempts.slice(0, Math.max(0, attempts.length - done.length)), read, concepts, saved: [], notes: [], highlights: [] }).filter((b) => b.earned).map((b) => b.id));
+    for (const b of badges({ attempts, read, concepts, saved: [], notes: [], highlights: [] }).filter((x) => x.earned && !had.has(x.id) && !['collector', 'bookworm'].includes(x.id)).slice(0, 2)) {
+      out.push({ kind: 'badge', icon: b.icon, title: tr('New badge: {0}', { 0: b.title }), sub: b.desc });
+    }
     return out;
     // the scenes are fixed the moment the session ends
     // eslint-disable-next-line react-hooks/exhaustive-deps

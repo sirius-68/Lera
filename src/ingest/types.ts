@@ -53,6 +53,8 @@ export interface Topic {
   blocks: Block[];
   exercises: Problem[];
   concepts: ConceptId[];
+  /** Ids of everything in the lesson that can be practised (exercises and examples). Only filled in on the copy the native tabs get, which carries no lesson text. */
+  practice?: string[];
 }
 
 export interface Unit {

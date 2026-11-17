@@ -84,6 +84,8 @@ export const TASKS: Record<string, Task> = {
       return Array.isArray(out) && Array.isArray(sent) && out.length === sent.length && out.every((x) => typeof x === 'string');
     },
   },
+  // new practice problems from a lesson's notes: a list in a fixed shape
+  practice: { ladder: ['medium', 'hard'], maxTokens: 1800, timeoutMs: 45_000, check: (r) => isObject(firstJson(r)) && Array.isArray((firstJson(r) as { problems?: unknown }).problems) },
   // Ask Lera: a conversation about maths, it has to be right and kind
   chat: { ladder: ['medium', 'hard'], maxTokens: 900 },
   // a word problem the engine cannot check: the model's judgement is the check, so the best one does it

@@ -1,7 +1,8 @@
 import { conceptOf } from '../engine/concepts';
 import { practiceFor, seedFrom } from '../engine/generate';
 import { AttemptAnalysis, ConceptId, Problem } from '../engine/types';
-import { LeraDoc, Topic } from '../ingest/types';
+import { parseExercises, plain } from '../ingest/structure';
+import { Block, LeraDoc, Topic } from '../ingest/types';
 import { AppState, AttemptRecord, ConceptState } from './types';
 import { t as tr } from '../i18n';
 
@@ -218,8 +219,39 @@ export interface Session {
  * exercises from the student's own notes, then (if the notes run out)
  * problems written for the topic's concepts.
  */
+/** A worked example from the notes as a question to try: its own first line (or title) read as a problem. */
+export function exampleProblem(block: Extract<Block, { t: 'example' }>, index: number, topicId: string): Problem | null {
+  for (const src of [block.lines[0], block.title, `${block.lines[0] ?? ''} ${block.lines[1] ?? ''}`]) {
+    const found = src ? parseExercises(plain(src), undefined, topicId).problems[0] : undefined;
+    if (found) return { ...found, id: `${topicId}:ex${index}`, source: 'notes' };
+  }
+  return null;
+}
+
+/**
+ * Everything in a lesson that can be practised, and nothing that is not in the file: its exercises (those from
+ * the notes, then any Lera was asked to write for it), then its worked examples as questions.
+ * Written-answer problems only count when an AI model is there to check them.
+ */
+export function topicProblems(topic: Topic, withOpen: boolean): Problem[] {
+  const out: Problem[] = [];
+  const seen = new Set<string>();
+  const add = (p: Problem) => {
+    const key = p.kind === 'open' ? `open:${p.prompt}` : `${p.kind}:${p.given}`;
+    if (seen.has(key) || (p.kind === 'open' && !withOpen)) return;
+    seen.add(key);
+    out.push(p);
+  };
+  topic.exercises.forEach(add);
+  topic.blocks.forEach((b, i) => {
+    const p = b.t === 'example' ? exampleProblem(b, i, topic.id) : null;
+    if (p && p.kind !== 'open') add(p);
+  });
+  return out;
+}
+
 export function buildSession(
-  state: Pick<AppState, 'concepts' | 'solved' | 'profile'>,
+  state: Pick<AppState, 'concepts' | 'solved' | 'profile'> & Partial<Pick<AppState, 'ai'>>,
   topic: Topic | null,
   opts: { today?: string; size?: number; seed?: number } = {},
 ): Session {
@@ -249,18 +281,11 @@ export function buildSession(
   });
 
   if (topic) {
-    // 2. the student's own exercises, unsolved first
-    const own = topic.exercises.filter((e) => e.kind !== 'open');
-    const unsolved = own.filter((e) => !state.solved[e.id]);
-    const again = own.filter((e) => state.solved[e.id]);
-    for (const e of [...unsolved, ...again]) push(e);
-    // 3. top up with generated problems on the topic's concepts
-    let i = 0;
-    while (problems.length < size && i < 12) {
-      const concept = topic.concepts[i % Math.max(1, topic.concepts.length)] ?? 'like-terms';
-      for (const p of practiceFor(concept, 2, seed + 7 * (i + 1))) push({ ...p, topicId: topic.id });
-      i++;
-    }
+    // a lesson's practice is the lesson's own: what the file has, unsolved first. Nothing is made up to fill it.
+    problems.length = 0;
+    reviews = 0;
+    const own = topicProblems(topic, !!state.ai && state.ai.provider !== 'none');
+    for (const e of [...own.filter((e) => !state.solved[e.id]), ...own.filter((e) => state.solved[e.id])]) push(e);
   }
 
   const minutes = Math.max(2, Math.round(problems.length * 1.4));

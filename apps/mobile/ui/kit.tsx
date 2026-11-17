@@ -194,7 +194,8 @@ export function Seg<V extends string>({ options, value, onChange }: { options: {
           onPress={() => startTransition(() => onChange(o.id))}
           style={{ flex: 1, paddingVertical: 9, paddingHorizontal: 6, alignItems: 'center' }}
         >
-          <T w={600} s={15} c={i === lit ? '#fff' : C.ink2} numberOfLines={1}>{o.label}</T>
+          {/* a label that does not fit (four choices, or a longer language) is set smaller instead of being cut off */}
+          <T w={600} s={options.length > 3 ? 13.5 : 15} c={i === lit ? '#fff' : C.ink2} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{o.label}</T>
         </Pressable>
       ))}
     </View>

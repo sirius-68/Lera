@@ -71,23 +71,23 @@ test('slips are counted but only become a pattern when they recur', () => {
   assert.equal(reviewQueue(s.concepts, '2026-11-12')[0].kind, 'pattern');
 });
 
-test('sessions put due reviews first, then the notes’ own exercises', () => {
+test('a lesson’s session is only what its part of the file has: exercises, then examples', () => {
   let s = empty();
   s = attempt(s, { ...linear('x', '2(x + 3) = 14'), concepts: ['distributive'] }, ['2x + 3 = 14'], '2026-11-14');
   const topic: Topic = {
-    id: 't1', title: 'Solving linear equations', blocks: [], concepts: ['inverse-operations'],
+    id: 't1', title: 'Solving linear equations', concepts: ['inverse-operations'],
+    blocks: [{ t: 'p', text: 'Undo what was done to x.' }, { t: 'example', title: 'Example 1', lines: ['Solve 4x + 1 = 9', '4x = 8', 'x = 2'] }],
     exercises: [linear('e1', 'x + 7 = 12'), linear('e2', '3x = 21'), linear('e3', '2x - 5 = 9')],
   };
-  const session = buildSession(s, topic, { today: '2026-11-14', size: 5 });
-  assert.equal(session.problems.length, 5);
-  assert.equal(session.reviews, 1);
-  assert.equal(session.problems[0].source, 'review');
-  assert.deepEqual(session.problems[0].concepts, ['distributive']);
-  assert.deepEqual(session.problems.slice(1, 4).map((p) => p.id), ['e1', 'e2', 'e3']);
-  assert.equal(session.problems[4].source, 'generated');
-  // same day, same topic → same session (stable seed)
-  assert.deepEqual(buildSession(s, topic, { today: '2026-11-14', size: 5 }).problems.map((p) => p.given), session.problems.map((p) => p.given));
-  // a review-only session
+  const session = buildSession(s, topic, { today: '2026-11-14', size: 8 });
+  // no review slipped in, and nothing made up to fill the session
+  assert.deepEqual(session.problems.map((p) => p.id), ['e1', 'e2', 'e3', 't1:ex1']);
+  assert.equal(session.reviews, 0);
+  assert.ok(session.problems.every((p) => p.source === 'notes'));
+  assert.equal(session.problems[3].given, '4x + 1 = 9');
+  // a lesson whose part of the file has nothing to practise gives an empty session, not someone else's problems
+  assert.equal(buildSession(s, { ...topic, blocks: [], exercises: [] }, { today: '2026-11-14' }).problems.length, 0);
+  // a review-only session is still made of what is due
   const review = buildSession(s, null, { today: '2026-11-14', size: 4 });
   assert.ok(review.problems.length >= 2 && review.problems.every((p) => p.source === 'review'));
 });

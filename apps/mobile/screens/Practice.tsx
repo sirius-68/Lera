@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import type { Topic } from '@core/ingest/types';
 import { t, tn } from '@core/i18n';
 import { Pressable, ScrollView, View } from 'react-native';
 import { CONCEPTS } from '@core/engine/concepts';
@@ -21,6 +22,9 @@ const IDEA = {
   solid: { border: '#a9dfc8', text: C.okD, bg: C.okBg },
 } as const;
 
+/** Everything in a lesson that can be practised: the web side counts exercises and examples and sends the ids. */
+const practiceIds = (topic: Topic): string[] => topic.practice ?? topic.exercises.map((e) => e.id);
+
 export function PracticeScreen() {
   const docs = useApp((s) => s.docs);
   const concepts = useApp((s) => s.concepts);
@@ -33,7 +37,9 @@ export function PracticeScreen() {
   const later = queue.filter((q) => q.inDays > 0);
   const state = { concepts, solved };
   const topics = docs.flatMap((d) => d.units.flatMap((u) => u.topics));
-  const quick = (id: ConceptId) => go({ name: 'session', problems: practiceFor(id, 4, seedFrom(`${dayOf()}:${id}:${Date.now() % 991}`)), title: CONCEPTS[id].title });
+  // Lera's own problems run from beginner to advanced; 'mixed' takes them as they come
+  const [level, setLevel] = useState<'0' | '1' | '2' | '3'>('0');
+  const quick = (id: ConceptId) => go({ name: 'session', problems: practiceFor(id, 4, seedFrom(`${dayOf()}:${id}:${Date.now() % 991}`), 'generated', level === '0' ? undefined : (Number(level) as 1 | 2 | 3)), title: CONCEPTS[id].title });
   const shownSubject = mine.includes(subject) ? subject : mine[0];
   const [tab, setTab] = useState<'review' | 'lessons' | 'ideas'>(queue.length ? 'review' : topics.length ? 'lessons' : 'ideas');
   const ideas = ALL_CONCEPTS.filter((id) => subjectOf(id) === shownSubject);
@@ -117,7 +123,7 @@ export function PracticeScreen() {
                 <Dot status={topicStatus(topic, state)} />
                 <View style={{ flex: 1 }}>
                   <T w={700} s={14.5}>{topic.title}</T>
-                  <T s={13} c={C.ink2}>{topic.exercises.length ? t('{a}/{b} from your notes solved', { a: topic.exercises.filter((e) => solved[e.id]).length, b: topic.exercises.length }) : 'Fresh problems'}</T>
+                  <T s={13} c={C.ink2}>{practiceIds(topic).length ? t('{a}/{b} from your notes solved', { a: practiceIds(topic).filter((id) => solved[id]).length, b: practiceIds(topic).length }) : t('No exercises in this section yet')}</T>
                 </View>
                 <Icon name="play" size={15} fill />
               </RowBtn>
@@ -126,6 +132,7 @@ export function PracticeScreen() {
         </Keep>
 
         <Keep on={tab === 'ideas'} style={{ gap: 10 }}>
+          <Seg options={[{ id: '0', label: t('All') }, { id: '1', label: t('Beginner') }, { id: '2', label: t('Medium') }, { id: '3', label: t('Advanced') }]} value={level} onChange={setLevel} />
           {mine.length > 1 && <Seg options={mine.map((s) => ({ id: s, label: SUBJECT_LABEL[s] }))} value={shownSubject} onChange={setSubject} />}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             {ideas.map((id) => {

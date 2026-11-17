@@ -302,6 +302,8 @@ function ok(core: string): boolean {
 function strong(core: string): boolean {
   if (core.includes('\\')) return hasTex(core);
   if (/[\^√∫=≤≥≠≈±∞]/.test(core)) return true;
+  // a subscript: a_n, x_0, b_(n+1)
+  if (/[A-Za-z]_[A-Za-z0-9({]/.test(core)) return true;
   if (/[0-9A-Za-z)\]]\/[0-9A-Za-z(\[√]/.test(core) && !NOT_FRACTION.test(core)) return true;
   if (/^[A-Za-z]['’′]*\([0-9A-Za-z+\-−,.^/ ]*\)/.test(core)) return true;
   return /^[A-Za-z]['’′]+$/.test(core);
@@ -318,7 +320,7 @@ export function mathRuns(text: string): Run[] {
   const hit = cacheRuns.get(text);
   if (hit) return hit;
   const runs: Run[] = [];
-  if (/[\\^√∫=≤≥≠≈±∞/('’′]/.test(text)) {
+  if (/[\\^_→√∫=≤≥≠≈±∞/('’′]/.test(text)) {
     const words: { at: number; core: string; tail: string }[] = [];
     for (const m of text.matchAll(/\S+/g)) {
       const w = m[0];
@@ -365,7 +367,8 @@ export function mathRuns(text: string): Run[] {
       while (a < b && (OP_ONLY.test(word(a)) || closesEarly(a) || (article(a) && !/^[=+\-−·*/<>≤≥^]/.test(word(a + 1))))) a++;
       while (b > a && (OP_ONLY.test(word(b)) || glue.has(b) || (article(b) && !/[=+\-−·*/<>≤≥^]$/.test(word(b - 1)) && !FN_ONE.test(word(b - 1))))) b--;
       let sure = false;
-      for (let k = a; k <= b && !sure; k++) sure = strong(word(k)) || (FN_ONE.test(word(k)) && k < b && term(k + 1));
+      // an arrow between two things is a limit or a mapping: "x → 0", "a_n → L"
+      for (let k = a; k <= b && !sure; k++) sure = strong(word(k)) || (FN_ONE.test(word(k)) && k < b && term(k + 1)) || (/^(→|->)$/.test(word(k)) && k > a && k < b);
       if (sure) {
         let start = words[a].at;
         let end = words[b].at + word(b).length;

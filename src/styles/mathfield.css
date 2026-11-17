@@ -36,6 +36,7 @@
 /* template keys on the keyboard: each shows its shape with dashed boxes, centred in the key */
 .kbd-extra { align-items: stretch; padding-bottom: 8px; }
 .kbd-extra button { height: 42px; display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.kbd-extra button.on { background: var(--brand); color: #fff; }
 .kbd-extra button.tpl { gap: 2px; min-width: 48px; padding: 0 12px; background: var(--tint); color: var(--brand-d); font-family: KaTeX_Main, 'Times New Roman', serif; font-size: 17px; }
 .kbd-extra button.tpl i { display: block; width: 8px; height: 10px; border: 1.4px dashed currentColor; border-radius: 3px; opacity: 0.85; flex-shrink: 0; }
 .kbd-extra button.tpl .f { display: inline-flex; flex-direction: column; align-items: center; gap: 2px; }

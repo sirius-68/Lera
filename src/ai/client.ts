@@ -32,7 +32,7 @@ function friendly(status: number, body: string): string {
 }
 
 /** The jobs Lera's AI router knows (backend/supabase/functions/_shared/router.ts). It picks the model for each. */
-export type AiTask = 'structure' | 'translate' | 'chat' | 'checkOpen' | 'diagnose' | 'simplify';
+export type AiTask = 'structure' | 'translate' | 'chat' | 'checkOpen' | 'diagnose' | 'simplify' | 'practice';
 
 /** A random id this phone keeps, so the router can hold each phone to a daily limit. It says nothing about the person. */
 function deviceId(): string {

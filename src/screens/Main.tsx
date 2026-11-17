@@ -5,12 +5,12 @@ import { conceptOf } from '../engine/concepts';
 import { SUBJECT_LABEL, subjectOf } from '../engine/concepts-calc';
 import { ALL_CONCEPTS, practiceFor, seedFrom } from '../engine/generate';
 import { ConceptId, Subject } from '../engine/types';
-import { LeraDoc } from '../ingest/types';
+import { LeraDoc, Topic } from '../ingest/types';
 import { Lera, Mood } from '../mascot/Lera';
 import { actions, persisted, useStore } from '../store';
 import { levelOf, totalXp, weekStrip, xpByDay } from '../store/game';
 import { dailyQuests, learnerModel } from '../store/insights';
-import { byDay, confidence, dayOf, docMastery, dueNow, findTopic, insights, reviewQueue, statusOf, streak, topicMastery, topicStatus } from '../store/learner';
+import { byDay, confidence, dayOf, docMastery, dueNow, findTopic, insights, reviewQueue, statusOf, streak, topicMastery, topicProblems, topicStatus } from '../store/learner';
 import { go, openOverlay, Route } from '../store/nav';
 import { AttemptRecord } from '../store/types';
 import { Weakness, weaknesses } from '../store/weakness';
@@ -288,6 +288,12 @@ export function HomeScreen() {
 /* ───────────── learn: the notes as a path ───────────── */
 
 const DAY_PART = { morning: msg('in the morning'), afternoon: msg('in the afternoon'), evening: msg('in the evening'), night: msg('at night') } as const;
+/** "3/8 from your notes solved", or that the lesson's part of the file has nothing to practise yet. */
+function practiceLine(topic: Topic, solved: Record<string, unknown>, aiOn: boolean): string {
+  const own = topicProblems(topic, aiOn);
+  return own.length ? tr('{a}/{b} from your notes solved', { a: own.filter((e) => solved[e.id]).length, b: own.length }) : tr('No exercises in this section yet');
+}
+
 const STATUS_LABEL = { new: msg('Not started'), gap: msg('Has a gap'), shaky: msg('In progress'), solid: msg('Mastered') } as const;
 /** How far each stop sits from the centre line, so the path winds. */
 const SWAY = [0, 46, 74, 46, 0, -46, -74, -46];
@@ -420,6 +426,7 @@ const dueLabel = (inDays: number): string => (inDays <= 0 ? tr('Due now') : inDa
 export function PracticeScreen() {
   const docs = useStore((s) => s.docs);
   const concepts = useStore((s) => s.concepts);
+  const aiOn = useStore((s) => s.ai.provider !== 'none');
   const solved = useStore((s) => s.solved);
   const profile = useStore((s) => s.profile);
   const mine: Subject[] = profile.subjects?.length ? profile.subjects : ['algebra'];
@@ -429,7 +436,9 @@ export function PracticeScreen() {
   const later = queue.filter((q) => q.inDays > 0);
   const state = { concepts, solved };
   const topics = docs.flatMap((d) => d.units.flatMap((u) => u.topics));
-  const quick = (id: ConceptId) => go({ name: 'session', problems: practiceFor(id, 4, seedFrom(`${dayOf()}:${id}:${Date.now() % 991}`)), title: conceptOf(id).title });
+  // Lera's own problems run from beginner to advanced; 'mixed' takes them as they come
+  const [level, setLevel] = useState<'0' | '1' | '2' | '3'>('0');
+  const quick = (id: ConceptId) => go({ name: 'session', problems: practiceFor(id, 4, seedFrom(`${dayOf()}:${id}:${Date.now() % 991}`), 'generated', level === '0' ? undefined : (Number(level) as 1 | 2 | 3)), title: conceptOf(id).title });
   const shownSubject = mine.includes(subject) ? subject : mine[0];
   const [tab, setTab] = useState<'review' | 'lessons' | 'ideas'>(queue.length ? 'review' : topics.length ? 'lessons' : 'ideas');
   const ideas = ALL_CONCEPTS.filter((id) => subjectOf(id) === shownSubject);
@@ -510,7 +519,7 @@ export function PracticeScreen() {
                   <span className={`dot ${topicStatus(t, state)}`} />
                   <span className="grow">
                     <b style={{ fontSize: 14.5, display: 'block' }}>{t.title}</b>
-                    <span className="muted" style={{ fontSize: 13 }}>{t.exercises.length ? tr('{a}/{b} from your notes solved', { a: t.exercises.filter((e) => solved[e.id]).length, b: t.exercises.length }) : tr('Fresh problems')}</span>
+                    <span className="muted" style={{ fontSize: 13 }}>{practiceLine(t, solved, aiOn)}</span>
                   </span>
                   <Icon name="play" size={15} fill />
                 </button>
@@ -519,6 +528,7 @@ export function PracticeScreen() {
           )}
 
           {tab === 'ideas' && <section className="col" style={{ gap: 10 }}>
+            <Seg options={[{ id: '0', label: tr('All') }, { id: '1', label: tr('Beginner') }, { id: '2', label: tr('Medium') }, { id: '3', label: tr('Advanced') }]} value={level} onChange={setLevel} />
             {mine.length > 1 && <Seg options={mine.map((s) => ({ id: s, label: tr(SUBJECT_LABEL[s]) }))} value={shownSubject} onChange={setSubject} />}
             <div className="idea-grid">
               {ideas.map((id) => (

@@ -2,13 +2,14 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { MouseEvent as ReactMouseEvent } from 'react';
 import { conceptOf } from '../engine/concepts';
 import { functionOfLine } from '../ingest/calc';
-import { isMathLine, parseExercises, plain } from '../ingest/structure';
+import { isMathLine, plain } from '../ingest/structure';
 import { prettyInline } from '../ingest/text';
 import { isTexLine } from '../engine/tex';
 import { Block, LeraDoc, Topic } from '../ingest/types';
 import { Lera } from '../mascot/Lera';
 import { actions, useStore } from '../store';
-import { findTopic, statusOf, streak } from '../store/learner';
+import { exampleProblem, findTopic, statusOf, streak, topicProblems } from '../store/learner';
+import { MorePractice } from './MorePractice';
 import { back, go, openOverlay, replace, Route } from '../store/nav';
 import { Highlight, Note } from '../store/types';
 import { Button3D, LeraSays, Seg, Sheet, haptic, toast } from '../ui/kit';
@@ -223,13 +224,7 @@ function ExampleCard({ block, index, ctx }: { block: Extract<Block, { t: 'exampl
   const [shown, setShown] = useState(1);
   const total = block.lines.length;
   // the example's own question, as something to solve: taken from its first line (or its title, when the question sits there)
-  const problem = useMemo(() => {
-    for (const src of [block.lines[0], block.title, `${block.lines[0] ?? ''} ${block.lines[1] ?? ''}`]) {
-      const found = src ? parseExercises(plain(src), undefined, ctx.topicId).problems[0] : undefined;
-      if (found) return { ...found, id: `${ctx.topicId}:ex${index}`, source: 'notes' as const };
-    }
-    return null;
-  }, [block, index, ctx.topicId]);
+  const problem = useMemo(() => exampleProblem(block, index, ctx.topicId), [block, index, ctx.topicId]);
   return (
     <div className="rd-example">
       <span className="label">{block.title || tr('Example')}</span>
@@ -644,9 +639,20 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
   const prevTopic = topics[topicAt - 1];
   const nextUnit = nextTopic ? doc.units.find((u) => u.topics.some((t) => t.id === nextTopic.id)) : null;
   /** Move on; leaving the last lesson of a chapter gets its own moment first. */
-  const toNext = () => {
+  const moveOn = () => {
     if (!nextTopic || nextUnit !== found.unit) setChapterDone(true);
     else replace({ name: 'lesson', topicId: nextTopic.id });
+  };
+  // a round number of lessons read is marked once, on the way to the next lesson
+  const lessonsRead = useStore((s) => Object.keys(s.read).length);
+  const cheered = useStore((s) => s.profile.cheered);
+  const [readCheer, setReadCheer] = useState<number | null>(null);
+  const toNext = () => {
+    const mark = [100, 50, 25, 10, 5, 1].find((m) => lessonsRead >= m);
+    if (mark && !(cheered ?? []).includes(`lessons:${mark}`)) {
+      actions.setProfile({ cheered: [...(cheered ?? []), `lessons:${mark}`] });
+      setReadCheer(mark);
+    } else moveOn();
   };
   const barLeft = (x: number) => Math.max(150, Math.min((screen.current?.clientWidth ?? 390) - 150, x));
 
@@ -737,6 +743,15 @@ export function LessonScreen({ route, dir }: { route: Extract<Route, { name: 'le
             </button>
           )}
         </div>
+      )}
+      {readCheer !== null && (
+        <Celebration
+          scene={{ kind: 'lesson', value: readCheer, title: readCheer === 1 ? tr('First lesson read!') : tr('{0} lessons read!', { 0: readCheer }), sub: tr('Reading first makes the practice stick.') }}
+          onNext={() => {
+            setReadCheer(null);
+            moveOn();
+          }}
+        />
       )}
       {chapterDone && (
         <Celebration
@@ -837,30 +852,35 @@ function TopicPractice({ topic, doc }: { topic: Topic; doc: LeraDoc }) {
   const solved = useStore((s) => s.solved);
   const concepts = useStore((s) => s.concepts);
   const attempts = useStore((s) => s.attempts);
-  const n = topic.exercises.length;
-  const done = topic.exercises.filter((e) => solved[e.id]).length;
+  const aiOn = useStore((s) => s.ai.provider !== 'none');
+  // only what the file has: its exercises, its worked examples as questions, and anything Lera was asked to write
+  const problems = useMemo(() => topicProblems(topic, aiOn), [topic, aiOn]);
+  const n = problems.length;
+  const done = problems.filter((e) => solved[e.id]).length;
   const text =
     n === 0
-      ? tr('I didn’t find exercises under this heading, so I’ll write problems that fit the topic.')
+      ? tr('I found no exercise or example I can check in this part of your notes. I can write some from it.')
       : done === n
-        ? tr('You’ve solved all **{0}** exercises from this part of your notes. I can still bring fresh ones.', { 0: n })
+        ? tr('You’ve solved all **{0}** problems from this part of your notes. I can write new ones.', { 0: n })
         : done ? tn(n, 'I found **{n}** exercise in this part of your notes, {done} solved. Write every line; I read the working.', 'I found **{n}** exercises in this part of your notes, {done} solved. Write every line; I read the working.', { done }) : tn(n, 'I found **{n}** exercise in this part of your notes. Write every line; I read the working.', 'I found **{n}** exercises in this part of your notes. Write every line; I read the working.');
   const lastFor = (id: string) => [...attempts].reverse().find((a) => a.problemId === id);
   return (
     <div className="scroll">
       <div className="stagger" style={{ padding: '6px 20px 28px', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <LeraSays size={54} text={text} mood={done === n && n > 0 ? 'proud' : 'idle'} />
-        <div className="center">
-          <Button3D sheen onClick={() => go({ name: 'session', topicId: topic.id })}>
-            <Icon name="play" size={17} fill />{' '}{tr('Start practice')}
-          </Button3D>
-        </div>
+        {n > 0 && (
+          <div className="center">
+            <Button3D sheen onClick={() => go({ name: 'session', topicId: topic.id })}>
+              <Icon name="play" size={17} fill />{' '}{tr('Start practice')}
+            </Button3D>
+          </div>
+        )}
 
         {n > 0 && (
           <section>
             <span className="label">{tr('From your notes')}</span>
             <div className="col" style={{ gap: 10, marginTop: 8 }}>
-              {topic.exercises.map((e, i) => {
+              {problems.map((e, i) => {
                 const last = lastFor(e.id);
                 const gaps = last?.marks.filter((m) => m.severity === 'gap').length ?? 0;
                 return (
@@ -869,6 +889,7 @@ function TopicPractice({ topic, doc }: { topic: Topic; doc: LeraDoc }) {
                     <span className="grow">
                       <span className="muted" style={{ fontSize: 13.5, display: 'block' }}>{e.kind === 'open' ? tr('Written answer') : promptText(e.prompt)}</span>
                       {e.kind === 'open' ? <span style={{ fontSize: 15, lineHeight: 1.4 }}>{prettyInline(plain(e.original ?? e.prompt)).slice(0, 110)}</span> : <MathView text={e.given} block />}
+                      {e.made && <span className="chip plain" style={{ marginTop: 6 }}>{tr('Written by Lera')}</span>}
                       {last && !solved[e.id] && <span className="chip slip" style={{ marginTop: 6 }}>{tr('Tried · not solved yet')}</span>}
                       {last && solved[e.id] && gaps > 0 && <span className="chip gap" style={{ marginTop: 6 }}>{tr('Solved with a gap')}</span>}
                     </span>
@@ -879,6 +900,8 @@ function TopicPractice({ topic, doc }: { topic: Topic; doc: LeraDoc }) {
             </div>
           </section>
         )}
+
+        <MorePractice topic={topic} doc={doc} onMade={(made) => go({ name: 'session', topicId: topic.id, problems: made, title: topic.title })} />
 
         {topic.concepts.length > 0 && (
           <section>

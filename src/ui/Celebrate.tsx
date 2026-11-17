@@ -13,7 +13,7 @@ import { t } from '../i18n';
  * a light, a flame counting up, a ring closing, a badge bursting open. They
  * are shown one after another when more than one was earned at once.
  */
-export type SceneKind = 'done' | 'streak' | 'goal' | 'level' | 'chapter' | 'first';
+export type SceneKind = 'done' | 'streak' | 'goal' | 'level' | 'chapter' | 'first' | 'milestone' | 'badge' | 'lesson' | 'perfect';
 
 export interface Scene {
   kind: SceneKind;
@@ -25,10 +25,12 @@ export interface Scene {
   stats?: { label: string; value: number; of?: number; tone?: 'xp' | 'score' | 'time' }[];
   /** Days of this week already practised, Monday first (the 'streak' scene). */
   week?: boolean[];
+  /** The badge's icon (the 'badge' scene). */
+  icon?: string;
   cta?: string;
 }
 
-const MOOD: Record<SceneKind, Mood> = { done: 'celebrate', streak: 'fired', goal: 'cool', level: 'party', chapter: 'graduate', first: 'eureka' };
+const MOOD: Record<SceneKind, Mood> = { done: 'celebrate', streak: 'fired', goal: 'cool', level: 'party', chapter: 'graduate', first: 'eureka', milestone: 'starstruck', badge: 'proud', lesson: 'teacher', perfect: 'celebrate' };
 const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
 function Stage({ scene }: { scene: Scene }) {
@@ -87,13 +89,50 @@ function Stage({ scene }: { scene: Scene }) {
       </div>
     );
   }
-  // done · chapter · first: she rises on a column of light above a glowing plate
+  if (kind === 'milestone') {
+    // a count reached: a medal with the number on it, stars circling
+    return (
+      <div className="cb-stage cb-milestone">
+        <div className="cb-orbit" aria-hidden="true">{Array.from({ length: 8 }, (_, i) => <i key={i} style={{ '--i': i } as CSSProperties}>★</i>)}</div>
+        <div className="cb-medal">
+          <span className="ribbon l" /><span className="ribbon r" />
+          <b><CountUp to={scene.value ?? 10} ms={900} /></b>
+        </div>
+        <div className="cb-lera side"><Lera size={86} mood="starstruck" interactive={false} /></div>
+      </div>
+    );
+  }
+  if (kind === 'badge') {
+    // a badge earned: it drops in, lands, and a shine runs across it
+    return (
+      <div className="cb-stage cb-earned">
+        <div className="cb-burst" aria-hidden="true">{Array.from({ length: 12 }, (_, i) => <i key={i} style={{ '--i': i } as CSSProperties} />)}</div>
+        <div className="cb-token"><Icon name={scene.icon ?? 'sparkle'} size={54} stroke={2.2} /><i className="shine" /></div>
+        <div className="cb-lera side"><Lera size={86} mood="proud" interactive={false} /></div>
+      </div>
+    );
+  }
+  if (kind === 'lesson') {
+    // lessons read: a book whose pages turn, one after another
+    return (
+      <div className="cb-stage cb-read">
+        <div className="cb-book" aria-hidden="true">
+          <span className="cover" />
+          {[0, 1, 2].map((i) => <span key={i} className="page" style={{ '--i': i } as CSSProperties} />)}
+          <b><CountUp to={scene.value ?? 1} ms={700} /></b>
+        </div>
+        <div className="cb-lera side"><Lera size={90} mood="teacher" interactive={false} /></div>
+      </div>
+    );
+  }
+  // done · perfect · chapter · first: she rises on a column of light above a glowing plate
   return (
     <div className={`cb-stage cb-rise ${kind}`}>
       <div className="cb-beam" aria-hidden="true" />
       <div className="cb-motes" aria-hidden="true">
         {['x²', '+', 'π', '∫', '=', '√', '÷', '∞'].map((g, i) => <i key={i} style={{ '--i': i } as CSSProperties}>{g}</i>)}
       </div>
+      {kind === 'perfect' && <div className="cb-twinkle" aria-hidden="true">{Array.from({ length: 9 }, (_, i) => <i key={i} style={{ '--i': i } as CSSProperties}>✦</i>)}</div>}
       <div className="cb-plate" aria-hidden="true"><i /><i /><i /><span><Icon name="check" size={30} stroke={3.4} /></span></div>
       <div className="cb-lera float"><Lera size={118} mood={MOOD[kind]} interactive={false} /></div>
     </div>
